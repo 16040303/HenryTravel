@@ -1,0 +1,8 @@
+{
+  "name": "HenryTravel",
+  "description": "Nền tảng tìm kiếm và đặt villa, homestay cao cấp, chốt phòng và hỗ trợ trực tuyến qua Zalo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
