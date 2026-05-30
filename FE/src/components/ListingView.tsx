@@ -5,6 +5,8 @@ import { getVillas } from '../lib/api';
 import { LOCATIONS, FACILITIES } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
+import { VillaCardSkeleton } from './common/Skeleton';
+import EmptyState from './common/EmptyState';
 
 interface ListingViewProps {
   initialSearchParams: {
@@ -413,34 +415,19 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
           </div>
 
           {loading ? (
-            <div className="flex flex-col gap-5">
-              {[1, 2].map(n => (
-                <div key={n} className="bg-white p-5 rounded-2xl border border-neutral-100 flex flex-col md:flex-row gap-5 animate-pulse h-64">
-                  <div className="w-full md:w-1/3 bg-neutral-200 rounded-xl" />
-                  <div className="w-full md:w-2/3 flex flex-col gap-3">
-                    <div className="h-6 bg-neutral-200 rounded w-2/3" />
-                    <div className="h-4 bg-neutral-200 rounded w-1/3" />
-                    <div className="h-10 bg-neutral-200 rounded w-full mt-auto" />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map(n => (
+                <VillaCardSkeleton key={n} />
               ))}
             </div>
           ) : sortedVillas.length === 0 ? (
-            <div className="bg-white p-12 rounded-2xl border border-neutral-100 text-center flex flex-col items-center justify-center gap-3">
-              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
-                <Search className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-bold text-neutral-800">{language === 'vi' ? 'Không tìm thấy phòng phù hợp' : (language === 'ko' ? '일치하는 숙소를 찾을 수 없습니다' : 'No properties found')}</h3>
-              <p className="text-xs text-neutral-500 max-w-sm leading-relaxed">
-                {language === 'vi' ? 'Xin lỗi, chúng tôi không tìm thấy villa hay homestay nào khớp với bộ lọc của bạn dưới khoảng giá hiện tại. Bạn vui lòng nâng mức tối đa hoặc tích chọn bớt tiện nghi.' : (language === 'ko' ? '오류: 현재 필터 조건에 부합하는 숙소가 존재하지 않습니다. 최대 가격 캡을 넓히거나 편의 옵션을 조정하시길 바랍니다.' : 'Sorry, we couldn’t find any properties matching your queries in this range. Try increasing your maximum budget or unchecking some filter options.')}
-              </p>
-              <button 
-                onClick={handleResetSearch}
-                className="mt-2 bg-[#0071c2] hover:bg-[#005899] text-white font-bold text-xs py-2 px-4 rounded-lg cursor-pointer"
-              >
-                {language === 'vi' ? 'Khôi phục tìm kiếm mặc định' : (language === 'ko' ? '검색 매개변수 초기화' : 'Restore Default Filters')}
-              </button>
-            </div>
+            <EmptyState
+              title={language === 'vi' ? 'Không tìm thấy phòng phù hợp' : (language === 'ko' ? '일치하는 숙소를 찾을 수 없습니다' : 'No properties found')}
+              description={language === 'vi' ? 'Xin lỗi, chúng tôi không tìm thấy villa hay homestay nào khớp với bộ lọc của bạn dưới khoảng giá hiện tại. Bạn vui lòng nâng mức tối đa hoặc tích chọn bớt tiện nghi.' : (language === 'ko' ? '오류: 현재 필터 조건에 부합하는 숙소가 존재하지 않습니다. 최대 가격 캡을 넓히거나 편의 옵션을 조정하시길 바랍니다.' : 'Sorry, we couldn’t find any properties matching your queries in this range. Try increasing your maximum budget or unchecking some filter options.')}
+              actionText={language === 'vi' ? 'Khôi phục tìm kiếm mặc định' : (language === 'ko' ? '검색 매개변수 초기화' : 'Restore Default Filters')}
+              onAction={handleResetSearch}
+              icon="search"
+            />
           ) : (
             <div className="flex flex-col gap-6">
               {sortedVillas.map((villa) => {

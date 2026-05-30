@@ -11,6 +11,7 @@ export interface Villa {
   type: 'Villa' | 'Homestay' | 'Căn hộ';
   facilities: string[];
   description: string;
+  isActive?: boolean;
 }
 
 export interface VillaDetail extends Villa {

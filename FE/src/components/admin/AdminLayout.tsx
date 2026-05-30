@@ -1,0 +1,195 @@
+import React, { useState } from 'react';
+import { 
+  Building2, CalendarCheck, Landmark, AlertCircle, Sparkles, 
+  ArrowUpRight, PlusCircle, CalendarDays, ClipboardList, 
+  MessageSquare, Sliders, LogOut, ShieldCheck, User 
+} from 'lucide-react';
+import { VillaDetail, Booking, Feedback } from '../../types';
+import { useLanguage } from '../../contexts/LanguageContext';
+import AdminDashboard from './AdminDashboard';
+import AdminVillaManager from './AdminVillaManager';
+import AdminBookingManager from './AdminBookingManager';
+import AdminFeedbackManager from './AdminFeedbackManager';
+import AdminAvailabilityManager from './AdminAvailabilityManager';
+import AdminSettings from './AdminSettings';
+
+interface AdminLayoutProps {
+  villas: VillaDetail[];
+  bookings: Booking[];
+  feedbacks: Feedback[];
+  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
+  onDeleteVilla: (id: number, name: string) => void;
+  onUpdateVilla: (v: VillaDetail) => void;
+  onDuplicateVilla: (id: number) => void;
+  onBulkDeleteVillas: (ids: number[]) => void;
+  onBulkStatusUpdateVillas: (ids: number[], active: boolean) => void;
+  onApproveBooking: (code: string) => void;
+  onRejectBooking: (code: string) => void;
+  onToggleVerifyFeedback: (id: string) => void;
+  onUpdateVillaAvailability: (villaId: number, bookedDates: string[], pendingDates: string[]) => void;
+  onLogout: () => void;
+}
+
+export default function AdminLayout({
+  villas,
+  bookings,
+  feedbacks,
+  onAddVilla,
+  onDeleteVilla,
+  onUpdateVilla,
+  onDuplicateVilla,
+  onBulkDeleteVillas,
+  onBulkStatusUpdateVillas,
+  onApproveBooking,
+  onRejectBooking,
+  onToggleVerifyFeedback,
+  onUpdateVillaAvailability,
+  onLogout
+}: AdminLayoutProps) {
+  const { language } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings'>('dashboard');
+
+  // Trigger add villa modal directly from dashboard quick action
+  const [directOpenAddVilla, setDirectOpenAddVilla] = useState(false);
+
+  const pendingBookingsCount = bookings.filter(b => b.status === 'PENDING').length;
+  const confirmedBookingsCount = bookings.filter(b => b.status === 'CONFIRMED').length;
+  const cancelledBookingsCount = bookings.filter(b => b.status === 'CANCELLED').length;
+
+  const totalRevenue = bookings
+    .filter(b => b.status === 'CONFIRMED')
+    .reduce((sum, curr) => sum + curr.totalPrice, 0) + 128000000;
+
+  const handleOpenAddVillaDirectly = () => {
+    setDirectOpenAddVilla(true);
+    setActiveTab('villas');
+  };
+
+  interface MenuItem {
+    readonly id: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings';
+    readonly label: string;
+    readonly icon: React.ReactNode;
+    readonly badge?: number;
+  }
+
+  const menuItems: MenuItem[] = [
+    { id: 'dashboard', label: language === 'vi' ? 'Tổng quan' : 'Dashboard', icon: <Landmark className="w-4.5 h-4.5" /> },
+    { id: 'villas', label: language === 'vi' ? 'Quản lý Villa' : 'Villas Manager', icon: <Building2 className="w-4.5 h-4.5" /> },
+    { id: 'bookings', label: language === 'vi' ? 'Quản lý Đơn' : 'Bookings', icon: <ClipboardList className="w-4.5 h-4.5" />, badge: pendingBookingsCount > 0 ? pendingBookingsCount : undefined },
+    { id: 'feedback', label: language === 'vi' ? 'Đánh giá' : 'Feedbacks', icon: <MessageSquare className="w-4.5 h-4.5" /> },
+    { id: 'availability', label: language === 'vi' ? 'Lịch trống' : 'Availability', icon: <CalendarDays className="w-4.5 h-4.5" /> },
+    { id: 'settings', label: language === 'vi' ? 'Cấu hình' : 'Settings', icon: <Sliders className="w-4.5 h-4.5" /> }
+  ];
+
+  return (
+    <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-[calc(100vh-12rem)] animate-fadeIn">
+      {/* 1. Desktop Left Sidebar / Mobile Header Navigation Selector Tabs */}
+      <aside className="lg:col-span-3 bg-white border border-neutral-100 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col gap-5 sticky top-24 self-start w-full">
+        {/* Admin profile snippet desktop */}
+        <div className="hidden lg:flex items-center gap-3 bg-neutral-50 p-3 rounded-2xl border border-neutral-100">
+          <div className="w-10 h-10 rounded-full bg-[#0071c2]/10 text-[#0071c2] flex items-center justify-center font-bold">
+            AD
+          </div>
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="text-xs font-black text-neutral-800 truncate">Quản trị viên</span>
+            <span className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">admin@villastay.com</span>
+          </div>
+        </div>
+
+        {/* Sidebar Nav anchors */}
+        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible p-1 lg:p-0 bg-neutral-50 lg:bg-transparent rounded-2xl border lg:border-0 border-neutral-100 gap-1 scrollbar-none shrink-0 w-full">
+          {menuItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (item.id !== 'villas') {
+                    setDirectOpenAddVilla(false);
+                  }
+                }}
+                className={`flex items-center justify-center lg:justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap lg:w-full select-none ${
+                  isActive
+                    ? 'bg-[#0071c2] text-white shadow-sm shadow-[#0071c2]/20'
+                    : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  {item.icon}
+                  <span className="hidden lg:inline">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-full leading-none ml-2 ${isActive ? 'bg-white text-[#0071c2]' : 'bg-red-500 text-white animate-pulse'}`}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* 2. Right Sub-Tab view Content Orchestrator */}
+      <section className="lg:col-span-9 w-full flex flex-col gap-6">
+        {activeTab === 'dashboard' && (
+          <AdminDashboard
+            villas={villas}
+            bookings={bookings}
+            feedbacks={feedbacks}
+            onNavigateToTab={(tab) => {
+              setActiveTab(tab);
+              if (tab !== 'villas') {
+                setDirectOpenAddVilla(false);
+              }
+            }}
+            onOpenAddVilla={handleOpenAddVillaDirectly}
+          />
+        )}
+
+        {activeTab === 'villas' && (
+          <AdminVillaManager
+            villas={villas}
+            onAddVilla={onAddVilla}
+            onDeleteVilla={onDeleteVilla}
+            onUpdateVilla={onUpdateVilla}
+            onDuplicateVilla={onDuplicateVilla}
+            onBulkDeleteVillas={onBulkDeleteVillas}
+            onBulkStatusUpdateVillas={onBulkStatusUpdateVillas}
+            showAddModalDirectly={directOpenAddVilla}
+            onCloseAddModalDirectly={() => setDirectOpenAddVilla(false)}
+          />
+        )}
+
+        {activeTab === 'bookings' && (
+          <AdminBookingManager
+            bookings={bookings}
+            onApproveBooking={onApproveBooking}
+            onRejectBooking={onRejectBooking}
+          />
+        )}
+
+        {activeTab === 'feedback' && (
+          <AdminFeedbackManager
+            feedbacks={feedbacks}
+            villas={villas}
+            onToggleVerifyFeedback={onToggleVerifyFeedback}
+          />
+        )}
+
+        {activeTab === 'availability' && (
+          <AdminAvailabilityManager
+            villas={villas}
+            onUpdateVillaAvailability={onUpdateVillaAvailability}
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <AdminSettings
+            onLogout={onLogout}
+          />
+        )}
+      </section>
+    </div>
+  );
+}

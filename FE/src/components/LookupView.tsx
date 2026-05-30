@@ -5,6 +5,8 @@ import { checkBooking, submitFeedback } from '../lib/api';
 import { BOOKING_STATUSES, getZaloLink } from '../constants';
 import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
+import { LookupSkeleton } from './common/Skeleton';
+import EmptyState from './common/EmptyState';
 
 export default function LookupView() {
   const { showToast } = useToast();
@@ -132,7 +134,9 @@ export default function LookupView() {
         </div>
 
         {/* Display Outcomes structures details box */}
-        {lookupResult && (
+        {searching ? (
+          <LookupSkeleton />
+        ) : lookupResult && (
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl p-6 sm:p-8 animate-scaleIn">
             {lookupResult.found && lookupResult.booking ? (
               <div className="flex flex-col gap-6">
@@ -290,13 +294,11 @@ export default function LookupView() {
 
               </div>
             ) : (
-              <div className="text-center py-6 flex flex-col items-center gap-2">
-                <ShieldAlert className="w-12 h-12 text-red-500" />
-                <h4 className="font-bold text-neutral-800">{t('look.notFoundTitle')}</h4>
-                <p className="text-xs text-neutral-500 max-w-sm">
-                  {t('look.notFoundDesc')}
-                </p>
-              </div>
+              <EmptyState
+                title={t('look.notFoundTitle')}
+                description={t('look.notFoundDesc')}
+                icon="search"
+              />
             )}
           </div>
         )}

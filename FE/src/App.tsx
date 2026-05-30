@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HomeView from './components/HomeView';
 import ListingView from './components/ListingView';
@@ -16,50 +17,67 @@ import { SearchParams, FilterParams } from './types';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-
 function AppContent() {
-  const [view, setView] = useState<'home' | 'listings' | 'detail' | 'lookup' | 'admin'>('home');
   const { t } = useLanguage();
+  const location = useLocation();
+  const navigate = useNavigate();
   
-  // Active selected villa for the details layout
-  const [selectedVillaId, setSelectedVillaId] = useState<number | null>(null);
-
   // Trigger state increments to re-fetch villas list from storage across components
   const [villasTriggerUpdate, setVillasTriggerUpdate] = useState<number>(0);
 
-  // Extracted search & filter query criteria
-  const [activeSearchParams, setActiveSearchParams] = useState<SearchParams>({
-    location: 'Đà Lạt',
-    checkIn: '2026-06-20',
-    checkOut: '2026-06-23',
-    guests: 2,
-    rooms: 1
+  // Extracted search & filter query criteria backed by sessionStorage for refresh persistence
+  const [activeSearchParams, setActiveSearchParams] = useState<SearchParams>(() => {
+    const saved = sessionStorage.getItem('villastay_search');
+    return saved ? JSON.parse(saved) : {
+      location: 'Đà Lạt',
+      checkIn: '2026-06-20',
+      checkOut: '2026-06-23',
+      guests: 2,
+      rooms: 1
+    };
   });
 
-  const [activeFilterParams, setActiveFilterParams] = useState<FilterParams>({
-    priceMin: 0,
-    priceMax: 10000000,
-    type: 'All',
-    facilities: []
+  const [activeFilterParams, setActiveFilterParams] = useState<FilterParams>(() => {
+    const saved = sessionStorage.getItem('villastay_filters');
+    return saved ? JSON.parse(saved) : {
+      priceMin: 0,
+      priceMax: 10000000,
+      type: 'All',
+      facilities: []
+    };
   });
 
   const handleSearchSubmitFromHome = (search: SearchParams, filter: FilterParams) => {
     setActiveSearchParams(search);
+    sessionStorage.setItem('villastay_search', JSON.stringify(search));
     setActiveFilterParams(filter);
-    setView('listings');
-  };
-
-  const handleViewDetailOfVilla = (id: number) => {
-    setSelectedVillaId(id);
-    setView('detail');
-  };
-
-  const handleNavigateFromNavbar = (targetView: 'home' | 'listings' | 'lookup' | 'admin') => {
-    setView(targetView);
+    sessionStorage.setItem('villastay_filters', JSON.stringify(filter));
+    navigate('/villas');
   };
 
   const handleVillaAddedGlobally = () => {
     setVillasTriggerUpdate(prev => prev + 1);
+  };
+
+  // Helper to resolve currently active view name for Navbar highlights
+  const getActiveView = (): 'home' | 'listings' | 'detail' | 'lookup' | 'admin' => {
+    const path = location.pathname;
+    if (path === '/') return 'home';
+    if (path.startsWith('/villas')) {
+      // Check if it is a detail path (e.g. /villas/7)
+      const isDetail = /^\/villas\/\d+/.test(path);
+      return isDetail ? 'detail' : 'listings';
+    }
+    if (path.startsWith('/lookup')) return 'lookup';
+    if (path.startsWith('/admin')) return 'admin';
+    return 'home';
+  };
+
+  const handleNavigateFromNavbar = (targetView: 'home' | 'listings' | 'lookup' | 'admin') => {
+    if (targetView === 'home') navigate('/');
+    else if (targetView === 'listings') navigate('/villas');
+    else if (targetView === 'lookup') navigate('/lookup');
+    else if (targetView === 'admin') navigate('/admin');
   };
 
   return (
@@ -68,57 +86,88 @@ function AppContent() {
       <div>
         {/* Persisted Branding Navbar Header */}
         <Navbar 
-          currentView={view} 
+          currentView={getActiveView()} 
           onNavigate={handleNavigateFromNavbar} 
-          selectedVillaIdForDetail={selectedVillaId}
+          selectedVillaIdForDetail={null}
         />
 
         {/* Main View Router switch layout with smooth 2026 core animations */}
         <main className="min-h-[calc(100vh-8rem)]">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-            >
-              {view === 'home' && (
-                <HomeView 
-                  onSearch={handleSearchSubmitFromHome} 
-                  onViewDetail={handleViewDetailOfVilla}
-                  villasTriggerUpdate={villasTriggerUpdate}
-                />
-              )}
+            <Routes>
+              <Route path="/" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                >
+                  <HomeView 
+                    onSearch={handleSearchSubmitFromHome} 
+                    onViewDetail={(id) => navigate(`/villas/${id}`)}
+                    villasTriggerUpdate={villasTriggerUpdate}
+                  />
+                </motion.div>
+              } />
 
-              {view === 'listings' && (
-                <ListingView 
-                  initialSearchParams={activeSearchParams}
-                  initialFilterParams={activeFilterParams}
-                  onViewDetail={handleViewDetailOfVilla}
-                  villasTriggerUpdate={villasTriggerUpdate}
-                />
-              )}
+              <Route path="/villas" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                >
+                  <ListingView 
+                    initialSearchParams={activeSearchParams}
+                    initialFilterParams={activeFilterParams}
+                    onViewDetail={(id) => navigate(`/villas/${id}`)}
+                    villasTriggerUpdate={villasTriggerUpdate}
+                  />
+                </motion.div>
+              } />
 
-              {view === 'detail' && selectedVillaId !== null && (
-                <DetailView 
-                  villaId={selectedVillaId}
-                  onBack={() => setView('listings')}
-                  onNavigateToLookup={() => setView('lookup')}
-                  onBookingSuccessNotify={handleVillaAddedGlobally}
-                />
-              )}
+              <Route path="/villas/:id" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                >
+                  <DetailView 
+                    onBack={() => navigate('/villas')}
+                    onNavigateToLookup={() => navigate('/lookup')}
+                    onBookingSuccessNotify={handleVillaAddedGlobally}
+                  />
+                </motion.div>
+              } />
 
-              {view === 'lookup' && (
-                <LookupView />
-              )}
+              <Route path="/lookup" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                >
+                  <LookupView />
+                </motion.div>
+              } />
 
-              {view === 'admin' && (
-                <AdminConsoleView 
-                  onVillaAddedNotification={handleVillaAddedGlobally}
-                />
-              )}
-            </motion.div>
+              <Route path="/admin" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                >
+                  <AdminConsoleView 
+                    onVillaAddedNotification={handleVillaAddedGlobally}
+                  />
+                </motion.div>
+              } />
+
+              {/* Catch-all redirect */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </AnimatePresence>
         </main>
       </div>
@@ -139,25 +188,57 @@ function AppContent() {
           <div className="md:col-span-3 flex flex-col gap-2.5">
             <span className="text-white font-bold uppercase text-xs tracking-wider">{t('home.popularLocations')}</span>
             <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
-              <button onClick={() => { setActiveSearchParams({ ...activeSearchParams, location: 'Đà Lạt' }); setView('listings'); }} className="hover:text-white text-left cursor-pointer transition-colors duration-200">
+              <Link 
+                to="/villas" 
+                onClick={() => {
+                  const updated = { ...activeSearchParams, location: 'Đà Lạt' };
+                  setActiveSearchParams(updated);
+                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
+                }} 
+                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+              >
                 {t('fac.landscape')} - {t('loc.dalat')}
-              </button>
-              <button onClick={() => { setActiveSearchParams({ ...activeSearchParams, location: 'Vũng Tàu' }); setView('listings'); }} className="hover:text-white text-left cursor-pointer transition-colors duration-200">
+              </Link>
+              <Link 
+                to="/villas" 
+                onClick={() => {
+                  const updated = { ...activeSearchParams, location: 'Vũng Tàu' };
+                  setActiveSearchParams(updated);
+                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
+                }} 
+                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+              >
                 {t('fac.beach_access')} - {t('loc.vungtau')}
-              </button>
-              <button onClick={() => { setActiveSearchParams({ ...activeSearchParams, location: 'Phú Quốc' }); setView('listings'); }} className="hover:text-white text-left cursor-pointer transition-colors duration-200">
+              </Link>
+              <Link 
+                to="/villas" 
+                onClick={() => {
+                  const updated = { ...activeSearchParams, location: 'Phú Quốc' };
+                  setActiveSearchParams(updated);
+                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
+                }} 
+                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+              >
                 {t('nav.listings')} - {t('loc.phuquoc')}
-              </button>
-              <button onClick={() => { setActiveSearchParams({ ...activeSearchParams, location: 'Hội An' }); setView('listings'); }} className="hover:text-white text-left cursor-pointer transition-colors duration-200">
+              </Link>
+              <Link 
+                to="/villas" 
+                onClick={() => {
+                  const updated = { ...activeSearchParams, location: 'Hội An' };
+                  setActiveSearchParams(updated);
+                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
+                }} 
+                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+              >
                 {t('nav.home')} - {t('loc.hoian')}
-              </button>
+              </Link>
             </div>
           </div>
 
           <div className="md:col-span-3 flex flex-col gap-2.5">
             <span className="text-white font-bold uppercase text-xs tracking-wider">{t('look.bookingDetails')}</span>
             <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
-              <button onClick={() => setView('lookup')} className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.lookup')}</button>
+              <Link to="/lookup" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.lookup')}</Link>
               <a href="https://zalo.me/0901234567" target="_blank" rel="noopener noreferrer" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.zaloSupport')} (Hotline 24/7)</a>
               <span className="text-neutral-600 block mt-1">Working hours: 07:00 – 23:00</span>
             </div>
@@ -187,9 +268,10 @@ export default function App() {
   return (
     <LanguageProvider>
       <ToastProvider>
-        <AppContent />
+        <HashRouter>
+          <AppContent />
+        </HashRouter>
       </ToastProvider>
     </LanguageProvider>
   );
 }
-

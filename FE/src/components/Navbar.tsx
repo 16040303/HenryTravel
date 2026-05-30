@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { NavLink, Link } from 'react-router-dom';
 import { MessageSquare, Shield, Search, SearchCode, Home, Building2, Globe } from 'lucide-react';
 import { getZaloLink } from '../constants';
-import { useLanguage, Language } from '../contexts/LanguageContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface NavbarProps {
-  currentView: 'home' | 'listings' | 'detail' | 'lookup' | 'admin';
-  onNavigate: (view: 'home' | 'listings' | 'lookup' | 'admin') => void;
-  selectedVillaIdForDetail: number | null;
+  currentView?: 'home' | 'listings' | 'detail' | 'lookup' | 'admin';
+  onNavigate?: (view: 'home' | 'listings' | 'lookup' | 'admin') => void;
+  selectedVillaIdForDetail?: number | null;
 }
 
 export default function Navbar({ currentView, onNavigate, selectedVillaIdForDetail }: NavbarProps) {
@@ -28,8 +29,8 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
         
         {/* Brand Group */}
         <div className="flex items-center gap-8">
-          <button 
-            onClick={() => onNavigate('home')} 
+          <Link 
+            to="/" 
             className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer group"
           >
             <span className="text-2xl font-black tracking-tight text-[#005899] font-display">
@@ -38,57 +39,49 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
             <div className="hidden sm:block text-[10px] bg-[#edf3ff] text-[#00487f] uppercase font-bold py-0.5 px-2 rounded-full tracking-wider group-hover:bg-[#0071c2] group-hover:text-white transition-colors duration-200">
               {language.toUpperCase()}
             </div>
-          </button>
+          </Link>
  
           {/* Links for desktop */}
           <nav className="hidden md:flex items-center gap-1 font-medium text-sm">
-            <button
-              onClick={() => onNavigate('home')}
-              className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentView === 'home' 
+            <NavLink
+              to="/"
+              className={({ isActive }) => `px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                isActive 
                   ? 'text-[#005899] bg-[#edf3ff] font-semibold' 
                   : 'text-neutral-600 hover:text-[#005899] hover:bg-neutral-50'
               }`}
             >
               <Home className="w-4 h-4" />
               {t('nav.home')}
-            </button>
+            </NavLink>
             
-            <button
-              onClick={() => onNavigate('listings')}
-              className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentView === 'listings' || currentView === 'detail'
-                  ? 'text-[#005899] bg-[#edf3ff] font-semibold' 
-                  : 'text-neutral-600 hover:text-[#005899] hover:bg-neutral-50'
-              }`}
+            <NavLink
+              to="/villas"
+              className={({ isActive }) => {
+                // Remain active on detail pages too!
+                const isListingOrDetail = isActive || window.location.hash.startsWith('#/villas/');
+                return `px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isListingOrDetail 
+                    ? 'text-[#005899] bg-[#edf3ff] font-semibold' 
+                    : 'text-neutral-600 hover:text-[#005899] hover:bg-neutral-50'
+                }`;
+              }}
             >
               <Building2 className="w-4 h-4" />
               {t('nav.listings')}
-            </button>
+            </NavLink>
 
-            <button
-              onClick={() => onNavigate('lookup')}
-              className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentView === 'lookup' 
+            <NavLink
+              to="/lookup"
+              className={({ isActive }) => `px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                isActive 
                   ? 'text-[#005899] bg-[#edf3ff] font-semibold' 
                   : 'text-neutral-600 hover:text-[#005899] hover:bg-neutral-50'
               }`}
             >
               <SearchCode className="w-4 h-4" />
               {t('nav.lookup')}
-            </button>
-
-            <button
-              onClick={() => onNavigate('admin')}
-              className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentView === 'admin' 
-                  ? 'text-[#005899] bg-[#edf3ff] font-semibold' 
-                  : 'text-neutral-600 hover:text-[#005899] hover:bg-neutral-50'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              {t('nav.admin')}
-            </button>
+            </NavLink>
           </nav>
         </div>
 
@@ -127,44 +120,37 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
 
       {/* Sub navigation bar for small viewports */}
       <div className="flex md:hidden items-center justify-around border-t border-neutral-100 bg-neutral-50/50 py-2 px-2 text-xs font-semibold">
-        <button
-          onClick={() => onNavigate('home')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
-            currentView === 'home' ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
+        <NavLink
+          to="/"
+          className={({ isActive }) => `flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
+            isActive ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
           }`}
         >
           <Home className="w-4 h-4" />
           {t('nav.home')}
-        </button>
-        <button
-          onClick={() => onNavigate('listings')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
-            currentView === 'listings' || currentView === 'detail' ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
-          }`}
+        </NavLink>
+        <NavLink
+          to="/villas"
+          className={({ isActive }) => {
+            const isListingOrDetail = isActive || window.location.hash.startsWith('#/villas/');
+            return `flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
+              isListingOrDetail ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
+            }`;
+          }}
         >
           <Building2 className="w-4 h-4" />
           {t('nav.listings')}
-        </button>
-        <button
-          onClick={() => onNavigate('lookup')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
-            currentView === 'lookup' ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
+        </NavLink>
+        <NavLink
+          to="/lookup"
+          className={({ isActive }) => `flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
+            isActive ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
           }`}
         >
           <SearchCode className="w-4 h-4" />
           {t('nav.lookup')}
-        </button>
-        <button
-          onClick={() => onNavigate('admin')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] px-2 py-1 rounded-md cursor-pointer ${
-            currentView === 'admin' ? 'text-[#0071c2] font-bold' : 'text-neutral-500'
-          }`}
-        >
-          <Shield className="w-4 h-4" />
-          {t('nav.admin')}
-        </button>
+        </NavLink>
       </div>
     </header>
   );
 }
-

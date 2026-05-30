@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Star, MapPin, Calendar, Heart, Share2, Compass, Waves, Wifi, 
   ParkingCircle, Utensils, Flame, Mountain, PawPrint, Users, MessageSquare, 
@@ -11,17 +12,25 @@ import { useBookingCountdown } from '../hooks/useBookingCountdown';
 import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
 import { useToast } from './Toast';
+import BookingCalendar from './calendar/BookingCalendar';
+import { VillaDetailSkeleton } from './common/Skeleton';
+import EmptyState from './common/EmptyState';
 
 interface DetailViewProps {
-  villaId: number;
+  villaId?: number;
   onBack: () => void;
   onNavigateToLookup: () => void;
-  onBookingSuccessNotify?: () => void; // callbacks to alert top parent if needed
+  onBookingSuccessNotify?: () => void;
 }
 
 export default function DetailView({ villaId, onBack, onNavigateToLookup, onBookingSuccessNotify }: DetailViewProps) {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
+  const { id } = useParams<{ id: string }>();
+
+  // Determine active villa ID from route param or prop (defaults to 7 if none provided)
+  const activeVillaId = id ? Number(id) : (villaId || 7);
+
   const [villa, setVilla] = useState<VillaDetail | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,10 +67,10 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   useEffect(() => {
     async function loadVilla() {
       setLoading(true);
-      const data = await getVillaById(villaId);
+      const data = await getVillaById(activeVillaId);
       if (data) {
         setVilla(data);
-        const fList = await getVillaFeedbacks(villaId);
+        const fList = await getVillaFeedbacks(activeVillaId);
         setFeedbacks(fList);
         
         // Populate standard configs
@@ -70,7 +79,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       setLoading(false);
     }
     loadVilla();
-  }, [villaId]);
+  }, [activeVillaId]);
 
   // Recalculate days and prices whenever check dates are updated
   useEffect(() => {
@@ -89,19 +98,19 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   }, [checkIn, checkOut, villa]);
 
   if (loading) {
-    return (
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16 text-center">
-        <div className="animate-spin inline-block w-8 h-8 border-4 border-[#0071c2] border-t-transparent rounded-full" />
-        <p className="mt-4 text-xs font-bold text-neutral-400">Đang tải thông tin chi tiết biệt thự...</p>
-      </div>
-    );
+    return <VillaDetailSkeleton />;
   }
 
   if (!villa) {
     return (
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16 text-center">
-        <h2 className="text-xl font-bold text-neutral-800">Không tìm thấy biệt thự</h2>
-        <button onClick={onBack} className="mt-4 bg-[#0071c2] text-white px-4 py-2 rounded-lg">Quay lại</button>
+        <EmptyState 
+          title="Không tìm thấy biệt thự"
+          description="Hệ thống không tìm thấy biệt thự tương ứng với mã yêu cầu. Vui lòng quay lại danh sách để khám phá các lựa chọn tuyệt vời khác!"
+          actionText="Quay lại danh sách"
+          onAction={onBack}
+          icon="villa"
+        />
       </div>
     );
   }
@@ -390,89 +399,26 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               </div>
             </div>
 
-            {/* Side-by-Side Double Calendar visual layout (Screen 3 Spec) */}
-            <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-sm flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-display font-black text-neutral-800">Lịch xem phòng có sẵn</h3>
-                  <p className="text-[11px] text-neutral-400 font-semibold mt-0.5">Chọn khoảng ngày trống không bị gạch ngang bôi đỏ</p>
-                </div>
-                <span className="text-xs font-black bg-indigo-50 text-[#0071c2] py-1 px-3.5 rounded-full uppercase tracking-wider">Lịch Năm 2026</span>
-              </div>
-
-              {/* Side by side months container */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-neutral-100">
-                {/* Month 1: May 2026 */}
-                <div className="flex flex-col gap-2">
-                  <div className="text-center font-bold text-xs text-neutral-700 pb-2 border-b border-neutral-50">Tháng 5/2026</div>
-                  <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px]">
-                    {['Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'CN'].map(w => (
-                      <span key={w} className="text-[9px] font-bold text-neutral-400 py-1">{w}</span>
-                    ))}
-                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                      const dateStr = `2026-05-${day.toString().padStart(2, '0')}`;
-                      const isBooked = villa.bookedDates.includes(dateStr);
-                      const isPending = villa.pendingDates.includes(dateStr);
-                      
-                      let bgClass = 'bg-neutral-50 text-neutral-700 hover:bg-neutral-100';
-                      if (isBooked) bgClass = 'bg-red-100 text-red-500 line-through cursor-not-allowed';
-                      else if (isPending) bgClass = 'bg-amber-100 text-amber-800 font-bold';
-
-                      return (
-                        <div key={day} className={`py-1.5 rounded text-center text-[10px] font-semibold ${bgClass}`}>
-                          {day}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Month 2: June 2026 */}
-                <div className="flex flex-col gap-2">
-                  <div className="text-center font-bold text-xs text-neutral-700 pb-2 border-b border-neutral-50">Tháng 6/2026</div>
-                  <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px]">
-                    {['Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'CN'].map(w => (
-                      <span key={w} className="text-[9px] font-bold text-neutral-400 py-1">{w}</span>
-                    ))}
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map(day => {
-                      const dateStr = `2026-06-${day.toString().padStart(2, '0')}`;
-                      const isBooked = villa.bookedDates.includes(dateStr);
-                      const isPending = villa.pendingDates.includes(dateStr);
-                      // Highlight active search check points
-                      const startDay = new Date(checkIn).getDate();
-                      const endDay = new Date(checkOut).getDate();
-                      const inSelectRange = day >= startDay && day <= endDay;
-
-                      let bgClass = 'bg-neutral-50 text-neutral-700 hover:bg-neutral-100';
-                      if (inSelectRange) bgClass = 'bg-[#0071c2] text-white font-extrabold';
-                      else if (isBooked) bgClass = 'bg-red-100 text-red-500 line-through';
-                      else if (isPending) bgClass = 'bg-amber-100 text-amber-800 font-bold';
-
-                      return (
-                        <div key={day} className={`py-1.5 rounded text-center text-[10px] font-semibold ${bgClass}`}>
-                          {day}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Legends index block */}
-              <div className="flex gap-4 text-[10px] text-neutral-500 font-extrabold pt-2 border-t border-neutral-50">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded bg-red-100 inline-block" />
-                  <span>Đã đặt kín</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded bg-amber-100 inline-block" />
-                  <span>Đang giữ tạm</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded bg-[#0071c2] inline-block" />
-                  <span>Lịch bạn chọn</span>
+            {/* Range Booking Calendar replaces hardcoded May/June sections */}
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h3 className="text-xl font-display font-black text-neutral-800">
+                  {language === 'vi' ? 'Lịch đặt phòng trực quan' : (language === 'ko' ? '실시간 예약 달력' : 'Interactive Reservation Calendar')}
+                </h3>
+                <span className="text-[9px] font-extrabold bg-[#edf3ff] text-[#005899] py-0.5 px-2 rounded-full uppercase tracking-wider">
+                  Real-time Available Map
                 </span>
               </div>
+              <BookingCalendar 
+                bookedDates={villa.bookedDates}
+                pendingDates={villa.pendingDates}
+                checkIn={checkIn}
+                checkOut={checkOut}
+                onDateChange={(start, end) => {
+                  setCheckIn(start);
+                  setCheckOut(end);
+                }}
+              />
             </div>
 
             {/* Core House Rules Policies list */}
@@ -511,7 +457,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               
               <div className="flex flex-col gap-4">
                 {feedbacks.length === 0 ? (
-                  <p className="text-xs font-semibold text-neutral-400 italic">Chưa có bình luận nào cho biệt thự này. Hãy là người đầu tiên trải nghiệm!</p>
+                  <EmptyState 
+                    title={language === 'vi' ? 'Chưa có đánh giá nào' : (language === 'ko' ? '등록된 리뷰가 없습니다' : 'No reviews yet')}
+                    description={language === 'vi' ? 'Biệt thự này hiện chưa nhận được nhận xét nào từ khách lưu trú. Hãy chọn đặt phòng ngay để trở thành những vị khách đầu tiên gửi gắm trải nghiệm lưu trú thực tế tại đây!' : (language === 'ko' ? '투숙객들의 생생한 이용 후기가 아직 등록되지 않았습니다. 지금 바로 예약을 확정하시고 첫 투숙객들의 소중한 경험을 나누어 보세요!' : 'This villa has not received any guest reviews yet. Book now and be the first to share your vacation experiences here!')}
+                    icon="feedback"
+                  />
                 ) : (
                   feedbacks.map((f) => (
                     <div key={f.id} className="bg-white p-5 rounded-xl border border-neutral-100 shadow-sm flex flex-col gap-2 animate-fadeIn">
