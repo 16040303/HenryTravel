@@ -27,21 +27,27 @@ export default function LookupView() {
 
   const handleLookupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingCode.trim() || !phoneNumber.trim()) {
-      showToast('warning', language === 'vi' 
-        ? 'Vui lòng nhập cả Mã Đặt Phòng và Số Điện Thoại!' 
-        : (language === 'ko' ? '예약 코드와 전화번호를 모두 입력해 주세요!' : 'Please enter both Booking Code and Phone Number!')
+    const normalizedCode = bookingCode.trim().toUpperCase();
+    const normalizedPhone = phoneNumber.trim();
+
+    if (!normalizedCode || !normalizedPhone) {
+      showToast('warning', language === 'vi'
+        ? 'Vui l?ng nh?p m? booking v? s? ?i?n tho?i.'
+        : (language === 'ko' ? '?? ??? ????? ??? ???.' : 'Please enter both booking code and phone number.')
       );
       return;
     }
 
+    setBookingCode(normalizedCode);
+    setPhoneNumber(normalizedPhone);
     setSearching(true);
     setFeedbackSuccess('');
     try {
-      const result = await checkBooking(bookingCode, phoneNumber);
+      const result = await checkBooking(normalizedCode, normalizedPhone);
       setLookupResult(result);
     } catch (err) {
       console.error(err);
+      showToast('error', language === 'vi' ? 'Kh?ng th? tra c?u l?c n?y. Vui l?ng th? l?i.' : 'Lookup failed. Please try again.');
     } finally {
       setSearching(false);
     }
@@ -51,9 +57,9 @@ export default function LookupView() {
     e.preventDefault();
     if (!lookupResult?.booking) return;
     if (!comment.trim()) {
-      showToast('warning', language === 'vi' 
-        ? 'Vui lòng điền nội dung nhận xét!' 
-        : (language === 'ko' ? '의견 내용을 입력해 주세요!' : 'Please write your feedback content!')
+      showToast('warning', language === 'vi'
+        ? 'Vui l?ng nh?p n?i dung ??nh gi?.'
+        : (language === 'ko' ? '?? ??? ??? ???.' : 'Please write your feedback content.')
       );
       return;
     }
@@ -64,13 +70,14 @@ export default function LookupView() {
         villaId: lookupResult.booking.villaId,
         guestName: reviewerName.trim() || lookupResult.booking.fullName,
         rating,
-        comment
+        comment: comment.trim()
       });
 
       setFeedbackSuccess(t('look.feedbackSuccess'));
       setComment('');
     } catch (err) {
       console.error(err);
+      showToast('error', language === 'vi' ? 'Ch?a g?i ???c ??nh gi?. Vui l?ng th? l?i.' : 'Could not submit feedback. Please try again.');
     } finally {
       setSubmittingFeedback(false);
     }

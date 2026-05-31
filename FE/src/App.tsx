@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HomeView from './components/HomeView';
@@ -11,6 +11,7 @@ import ListingView from './components/ListingView';
 import DetailView from './components/DetailView';
 import LookupView from './components/LookupView';
 import AdminConsoleView from './components/AdminConsoleView';
+import ScrollToTop from './components/common/ScrollToTop';
 import { ToastProvider } from './components/Toast';
 
 import { SearchParams, FilterParams } from './types';
@@ -22,6 +23,23 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [location.pathname]);
+
+  // Dynamic page title based on route
+  useEffect(() => {
+    const path = location.pathname;
+    let title = 'VillaStay';
+    if (path === '/') title = `VillaStay — ${t('home.heroTitle')}`;
+    else if (path === '/villas') title = `${t('nav.listings')} — VillaStay`;
+    else if (path.startsWith('/villas/')) title = `${t('home.viewDetails')} — VillaStay`;
+    else if (path === '/lookup') title = `${t('nav.lookup')} — VillaStay`;
+    else if (path === '/admin') title = `${t('nav.admin')} — VillaStay`;
+    document.title = title;
+  }, [location.pathname, t]);
+
   // Trigger state increments to re-fetch villas list from storage across components
   const [villasTriggerUpdate, setVillasTriggerUpdate] = useState<number>(0);
 
@@ -172,6 +190,9 @@ function AppContent() {
         </main>
       </div>
 
+      {/* Floating back-to-top button */}
+      <ScrollToTop />
+
       {/* Persistence brand footer element translated dynamically */}
       <footer className="bg-neutral-900 text-neutral-400 py-12 px-4 border-t border-neutral-800 shrink-0 mt-12">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-12 gap-8 text-sm">
@@ -239,24 +260,24 @@ function AppContent() {
             <span className="text-white font-bold uppercase text-xs tracking-wider">{t('look.bookingDetails')}</span>
             <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
               <Link to="/lookup" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.lookup')}</Link>
-              <a href="https://zalo.me/0901234567" target="_blank" rel="noopener noreferrer" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.zaloSupport')} (Hotline 24/7)</a>
-              <span className="text-neutral-600 block mt-1">Working hours: 07:00 – 23:00</span>
+              <a href="https://zalo.me/0901234567" target="_blank" rel="noopener noreferrer" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.zaloSupport')} ({t('footer.hotline')})</a>
+              <span className="text-neutral-600 block mt-1">{t('footer.workingHours')}</span>
             </div>
           </div>
 
           <div className="md:col-span-2 flex flex-col gap-2.5">
-            <span className="text-white font-bold uppercase text-xs tracking-wider">Policies</span>
+            <span className="text-white font-bold uppercase text-xs tracking-wider">{t('footer.policies')}</span>
             <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
               <span>{t('detail.policies')}</span>
-              <span>15 Minutes Guaranteed Reservation</span>
-              <span>Secure Transactions</span>
+              <span>{t('footer.holdGuarantee')}</span>
+              <span>{t('footer.secureTransaction')}</span>
             </div>
           </div>
 
         </div>
 
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 border-t border-neutral-800 mt-10 pt-6 text-center text-xs text-neutral-600 font-semibold">
-          © 2026 VillaStay International Ltd. Dedicated to delivering state-of-the-art vacation stays & automated holds.
+          {t('footer.copyright')}
         </div>
       </footer>
 

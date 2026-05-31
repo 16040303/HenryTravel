@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, Sparkles, MessageSquare, ShieldCheck, Heart } from 'lucide-react';
 import { Villa } from '../types';
 import { getVillas } from '../lib/api';
 import { LOCATIONS, FACILITIES } from '../constants';
+import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
 
@@ -25,6 +26,7 @@ interface HomeViewProps {
 
 export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate = 0 }: HomeViewProps) {
   const { t, language } = useLanguage();
+  const { showToast } = useToast();
 
   // Main Search State
   const [searchLocation, setSearchLocation] = useState('Đà Lạt');
@@ -44,14 +46,31 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadFeatured() {
       setLoading(true);
-      const list = await getVillas();
-      // Show first 6 villas on the home grid
-      setFeaturedVillas(list.slice(0, 6));
-      setLoading(false);
+      try {
+        const list = await getVillas();
+        if (isMounted) {
+          setFeaturedVillas(list.slice(0, 6));
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) {
+          setFeaturedVillas([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     }
+
     loadFeatured();
+    return () => {
+      isMounted = false;
+    };
   }, [villasTriggerUpdate]);
 
   const handleFacilityToggle = (id: string) => {
@@ -62,13 +81,24 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+
+    if (!checkIn || !checkOut || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      showToast('warning', language === 'vi'
+        ? 'Ng?y tr? ph?ng ph?i sau ng?y nh?n ph?ng.'
+        : (language === 'ko' ? '???? ??? ??? ???? ???.' : 'Check-out must be after check-in.')
+      );
+      return;
+    }
+
     onSearch(
       {
         location: searchLocation,
         checkIn,
         checkOut,
-        guests,
-        rooms
+        guests: Math.min(Math.max(guests, 1), 20),
+        rooms: Math.min(Math.max(rooms, 1), 10)
       },
       {
         priceMin: 0,
@@ -86,7 +116,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   };
 
   // Safe mapping of location string for translation looks
-  const getLocationLabel = (loc: string): string => {
+  const getLocationLabel = useCallback((loc: string): string => {
     const keyMap: Record<string, string> = {
       'Đà Lạt': 'loc.dalat',
       'Vũng Tàu': 'loc.vungtau',
@@ -97,7 +127,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     };
     const key = keyMap[loc];
     return key ? t(key) : loc;
-  };
+  }, [t]);
 
   return (
     <div className="bg-[#fcf9f8] min-h-screen text-[#1c1b1b]">
@@ -166,7 +196,15 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                   <input 
                     type="date"
                     value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setCheckIn(next);
+                      if (checkOut && new Date(checkOut) <= new Date(next)) {
+                        const adjusted = new Date(next);
+                        adjusted.setDate(adjusted.getDate() + 1);
+                        setCheckOut(adjusted.toISOString().slice(0, 10));
+                      }
+                    }}
                     className="w-full bg-neutral-50 py-2.5 border border-neutral-200 rounded-lg text-sm font-semibold outline-none px-3 cursor-pointer text-[#1c1b1b]"
                   />
                 </div>
@@ -199,7 +237,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                   min={1}
                   max={20}
                   value={guests}
-                  onChange={(e) => setGuests(Number(e.target.value))}
+                  onChange={(e) => setGuests(Math.min(Math.max(Number(e.target.value), 1), 20))}
                   className="w-full bg-neutral-50 py-2.5 px-3 border border-neutral-200 rounded-lg text-sm font-semibold outline-none focus:border-[#0071c2] text-[#1c1b1b]"
                 />
               </div>
@@ -215,7 +253,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                   min={1}
                   max={10}
                   value={rooms}
-                  onChange={(e) => setRooms(Number(e.target.value))}
+                  onChange={(e) => setRooms(Math.min(Math.max(Number(e.target.value), 1), 10))}
                   className="w-full bg-neutral-50 py-2.5 px-3 border border-neutral-200 rounded-lg text-sm font-semibold outline-none focus:border-[#0071c2] text-[#1c1b1b]"
                 />
               </div>
@@ -242,12 +280,12 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span>{t('list.filters')}</span>
-                <span className="text-[10px] bg-blue-50 text-[#0071c2] px-2 py-0.5 rounded-full font-bold">2026 Engine</span>
+                <span className="text-[10px] bg-blue-50 text-[#0071c2] px-2 py-0.5 rounded-full font-bold">{t('home.filterEngine')}</span>
               </button>
 
               <div className="text-[10px] text-neutral-400 font-semibold flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-ping" />
-                <span>Đang áp dụng bộ lọc trực tiếp</span>
+                <span>{t('home.filterActive')}</span>
               </div>
             </div>
 
@@ -387,7 +425,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               <div className="absolute bottom-0 left-0 right-0 p-4 text-left">
                 <h3 className="text-white font-black text-lg leading-tight drop-shadow-md">{t(item.key)}</h3>
                 <p className="text-white/80 text-[10px] font-bold mt-0.5 uppercase tracking-wider">
-                  {featuredVillas.filter(v => v.location === item.loc).length}+ {language === 'vi' ? 'biệt thự' : (language === 'ko' ? '숙소' : 'properties')}
+                  {featuredVillas.filter(v => v.location === item.loc).length}+ {t('home.properties')}
                 </p>
               </div>
             </button>
@@ -433,7 +471,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                     <span className="text-neutral-500 font-normal">({villa.reviewsCount})</span>
                   </div>
                 ) 
-                : <span className="text-xs font-bold text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">{language === 'vi' ? 'Chưa có' : (language === 'ko' ? '리뷰 없음' : 'No reviews')}</span>;
+                : <span className="text-xs font-bold text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">{t('home.noReviews')}</span>;
 
               const badgeColor = villa.status === 'Available'
                 ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
@@ -479,7 +517,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                     {/* Footer Row */}
                     <div className="flex items-end justify-between pt-4 border-t border-neutral-100 font-mono">
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">From</span>
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">{t('home.from')}</span>
                         <span className="text-lg font-black text-[#fe6a34] font-display">
                           {villa.price.toLocaleString('vi-VN')}₫
                           <span className="text-xs text-neutral-400 font-normal"> / {t('home.night')}</span>
@@ -505,8 +543,8 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
       {/* Why Choose Us */}
       <section className="bg-neutral-50 border-t border-b border-neutral-100 py-16">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 text-center">
-          <span className="text-[#fe6a34] text-xs font-extrabold tracking-widest uppercase">Guarantee</span>
-          <h2 className="text-3xl font-display font-black tracking-tight text-neutral-800 mt-1 mb-12">{language === 'vi' ? 'Cam kết chất lượng chuẩn 2026' : (language === 'ko' ? '2026 서비스 품질 보장' : '2026 Service Quality Guarantee')}</h2>
+          <span className="text-[#fe6a34] text-xs font-extrabold tracking-widest uppercase">{t('home.guaranteeTag')}</span>
+          <h2 className="text-3xl font-display font-black tracking-tight text-neutral-800 mt-1 mb-12">{t('home.guaranteeTitle')}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Cardinal feature 1 */}
@@ -514,9 +552,9 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               <div className="w-16 h-16 bg-[#edf3ff] rounded-full flex items-center justify-center text-[#0071c2] mb-6 shadow-sm">
                 <MessageSquare className="w-8 h-8 font-bold fill-neutral-50 text-[#0071c2]" />
               </div>
-              <h3 className="text-xl font-bold text-neutral-800 mb-2">Zalo Booking</h3>
+              <h3 className="text-xl font-bold text-neutral-800 mb-2">{t('home.zaloBookingTitle')}</h3>
               <p className="text-sm text-neutral-500 leading-relaxed max-w-[280px]">
-                {language === 'vi' ? 'Tư vấn nhanh chóng và chốt phòng trực tiếp qua Zalo. Dịch vụ cá nhân hoá, nhiệt huyết hỗ trợ 24/7.' : (language === 'ko' ? 'Zalo를 통한 실시간 상담 및 신속 예약 대응. 24시간 철저한 밀착 지원 보장.' : 'Instant consultations and direct booking confirmation via Zalo. Highly personalized 24/7 client care.')}
+                {t('home.zaloBookingDesc')}
               </p>
             </div>
 
@@ -525,9 +563,9 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               <div className="w-16 h-16 bg-[#edf3ff] rounded-full flex items-center justify-center text-[#0071c2] mb-6 shadow-sm">
                 <ShieldCheck className="w-8 h-8 font-bold text-[#0071c2]" />
               </div>
-              <h3 className="text-xl font-bold text-neutral-800 mb-2">{language === 'vi' ? 'Xác minh chỗ nghỉ' : (language === 'ko' ? '승인 대조 의무' : 'Hold Integrity')}</h3>
+              <h3 className="text-xl font-bold text-neutral-800 mb-2">{t('home.holdTitle')}</h3>
               <p className="text-sm text-neutral-500 leading-relaxed max-w-[280px]">
-                {language === 'vi' ? 'Nói không với overbooking. Trạng thái phòng khớp lịch trực tiếp, đảm bảo kỳ nghỉ của bạn trọn vẹn nhất.' : (language === 'ko' ? '중복 예약 제로 보장 정책. 오버부킹 없는 실시간 점검 시스템 제공.' : 'Zero overbooking penalty policy. Live status updates directly protect your reservations.')}
+                {t('home.holdDesc')}
               </p>
             </div>
 
@@ -536,9 +574,9 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               <div className="w-16 h-16 bg-[#edf3ff] rounded-full flex items-center justify-center text-[#0071c2] mb-6 shadow-sm">
                 <Star className="w-8 h-8 fill-[#0071c2] text-[#0071c2]" />
               </div>
-              <h3 className="text-xl font-bold text-neutral-800 mb-2">{language === 'vi' ? 'Đánh giá chân thực' : (language === 'ko' ? '검증된 투스크 평' : 'Authenticated Reviews')}</h3>
+              <h3 className="text-xl font-bold text-neutral-800 mb-2">{t('home.reviewTitle')}</h3>
               <p className="text-sm text-neutral-500 leading-relaxed max-w-[280px]">
-                {language === 'vi' ? 'Cam đoan hình ảnh thực tế và review 100% từ du khách cũ. Không sử dụng hình ảnh minh hoạ ảo mộng.' : (language === 'ko' ? '실제 투숙을 마치신 고객님들이 자발적으로 작성해 준 성실하고 신뢰도 높은 후기 수집.' : '100% genuine photographs and peer-rated feedback directly from real holidaymakers.')}
+                {t('home.reviewDesc')}
               </p>
             </div>
           </div>

@@ -231,3 +231,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background-color: rgba(254, 106, 52, 0.15);
   color: #fe6a34;
 }
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.public-content-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 720px;
+}
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}

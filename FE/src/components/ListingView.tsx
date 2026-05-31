@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sparkles, Sliders, CheckSquare, RefreshCw } from 'lucide-react';
 import { Villa } from '../types';
 import { getVillas } from '../lib/api';
@@ -84,11 +84,11 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   };
 
   // Sort villas
-  const sortedVillas = [...villas].sort((a, b) => {
+  const sortedVillas = useMemo(() => [...villas].sort((a, b) => {
     if (sortBy === 'priceAsc') return a.price - b.price;
     if (sortBy === 'priceDesc') return b.price - a.price;
     return b.rating - a.rating; // default popular
-  });
+  }), [villas, sortBy]);
 
   const handleFacilityCheck = (id: string) => {
     const isMatched = filterParams.facilities.includes(id);
@@ -133,7 +133,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   };
 
   // Safe mapping of location string for translation looks
-  const getLocationLabel = (loc: string): string => {
+  const getLocationLabel = useCallback((loc: string): string => {
     const keyMap: Record<string, string> = {
       'Đà Lạt': 'loc.dalat',
       'Vũng Tàu': 'loc.vungtau',
@@ -144,7 +144,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     };
     const key = keyMap[loc];
     return key ? t(key) : loc;
-  };
+  }, [t]);
 
   // Mini-calendar formatter which highlights reservation states of a villa
   const renderMiniCalendar = (villaId: number) => {
@@ -157,7 +157,9 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     return (
       <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 flex flex-col gap-1.5 animate-fadeIn">
         <div className="flex items-center justify-between text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-1">
-          <span>{language === 'vi' ? 'Sơ đồ giữ phòng' : (language === 'ko' ? '예약 캘린더' : 'Hold Status Map')}</span>
+          <span className="text-[9px] font-extrabold bg-[#edf3ff] text-[#005899] py-0.5 px-2 rounded-full uppercase tracking-wider">
+            {t('list.calendarTitle')}
+          </span>
           <span className="text-[#0071c2]">06/2026</span>
         </div>
         
@@ -219,7 +221,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             className="bg-[#0071c2] hover:bg-[#005899] text-white hover:text-white px-5 py-2.5 rounded-lg border border-white/10 shadow-md font-bold text-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
           >
             <Search className="w-4 h-4 shrink-0" />
-            <span>{language === 'vi' ? 'Thay đổi tìm kiếm' : (language === 'ko' ? '검색 변경' : 'Change Search')}</span>
+            <span>{t('list.changeSearch')}</span>
           </button>
         </div>
       </section>
@@ -229,12 +231,12 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl p-6 w-full max-w-[540px] animate-scaleIn">
             <h3 className="font-black font-display text-lg text-neutral-800 mb-4 pb-2 border-b border-neutral-100">
-              {language === 'vi' ? 'Chỉnh sửa kì nghỉ' : (language === 'ko' ? '기본 매개변수 정정' : 'Modify Parameters')}
+              {t('list.editTitle')}
             </h3>
 
             <form onSubmit={handleApplyEditSearch} className="flex flex-col gap-4 text-xs font-semibold">
               <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-neutral-400 uppercase">Địa điểm</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('list.locationLabel')}</span>
                 <select 
                   value={editLocation}
                   onChange={(e) => setEditLocation(e.target.value)}
@@ -297,14 +299,14 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                   type="submit"
                   className="bg-[#0071c2] hover:bg-[#005899] text-white py-1.5 h-9 px-4 rounded-lg font-black transition-colors"
                 >
-                  {language === 'vi' ? 'Cập nhật' : (language === 'ko' ? '적용하기' : 'Apply')}
+                  {t('list.applyBtn')}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setShowEditSearch(false)}
                   className="border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-600 py-1.5 px-3 rounded-lg font-bold"
                 >
-                  {language === 'vi' ? 'Đóng' : (language === 'ko' ? '닫기' : 'Close')}
+                  {t('list.closeBtn')}
                 </button>
               </div>
             </form>
@@ -395,40 +397,39 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
           {/* Top Info sorting controller row */}
           <div className="bg-white p-4 rounded-xl border border-neutral-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs font-semibold text-neutral-500">
-              {language === 'vi' ? 'Tìm thấy ' : (language === 'ko' ? '검색 결과 ' : 'Found ')} 
+              {t('list.foundPrefix')} 
               <strong className="text-neutral-800 text-sm font-extrabold">{sortedVillas.length}</strong> 
-              {language === 'vi' ? ' villa và homestay phù hợp' : (language === 'ko' ? '개의 일치하는 숙소' : ' villas & homestays matching')}
+              {t('list.foundSuffix')}
             </div>
 
             <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-neutral-500 uppercase tracking-wider">{language === 'vi' ? 'Sắp xếp:' : (language === 'ko' ? '정렬 기준으로:' : 'Sort:')}</span>
+              <span className="font-bold text-neutral-500 uppercase tracking-wider">{t('list.sortLabel')}</span>
               <select 
                 value={sortBy} 
                 onChange={handleSortChange}
                 className="bg-neutral-50 border border-neutral-200 rounded-lg py-1 px-3 text-xs font-bold text-neutral-700 outline-none focus:border-[#0071c2]"
               >
-                <option value="popular">{language === 'vi' ? 'Nội bật nhất' : (language === 'ko' ? '가장 실용적인 평가순' : 'Highly Recommended')}</option>
-                <option value="priceAsc">{language === 'vi' ? 'Giá từ thấp đến cao' : (language === 'ko' ? '가격 낮은 순' : 'Price: Low to High')}</option>
-                <option value="priceDesc">{language === 'vi' ? 'Giá từ cao đến thấp' : (language === 'ko' ? '가격 높은 순' : 'Price: High to Low')}</option>
+                <option value="popular">{t('list.sortPopular')}</option>
+                <option value="priceAsc">{t('list.sortPriceAsc')}</option>
+                <option value="priceDesc">{t('list.sortPriceDesc')}</option>
               </select>
             </div>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {[1, 2, 3, 4].map(n => (
-                <VillaCardSkeleton key={n} />
-              ))}
+            <div className="flex flex-col gap-6">
+              {[1, 2, 3].map((n) => <VillaCardSkeleton key={n} />)}
             </div>
           ) : sortedVillas.length === 0 ? (
             <EmptyState
-              title={language === 'vi' ? 'Không tìm thấy phòng phù hợp' : (language === 'ko' ? '일치하는 숙소를 찾을 수 없습니다' : 'No properties found')}
-              description={language === 'vi' ? 'Xin lỗi, chúng tôi không tìm thấy villa hay homestay nào khớp với bộ lọc của bạn dưới khoảng giá hiện tại. Bạn vui lòng nâng mức tối đa hoặc tích chọn bớt tiện nghi.' : (language === 'ko' ? '오류: 현재 필터 조건에 부합하는 숙소가 존재하지 않습니다. 최대 가격 캡을 넓히거나 편의 옵션을 조정하시길 바랍니다.' : 'Sorry, we couldn’t find any properties matching your queries in this range. Try increasing your maximum budget or unchecking some filter options.')}
-              actionText={language === 'vi' ? 'Khôi phục tìm kiếm mặc định' : (language === 'ko' ? '검색 매개변수 초기화' : 'Restore Default Filters')}
+              title={t('list.emptyTitle')}
+              description={t('list.emptyDesc')}
+              actionText={t('list.emptyAction')}
               onAction={handleResetSearch}
               icon="search"
             />
           ) : (
+
             <div className="flex flex-col gap-6">
               {sortedVillas.map((villa) => {
                 
@@ -510,7 +511,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
                       <div className="flex items-end justify-between md:flex-col md:items-stretch gap-1">
                         <div className="text-right">
-                          <span className="text-[10px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Giá phòng' : (language === 'ko' ? '객실 요금' : 'Rate')}</span>
+                          <span className="text-[10px] uppercase font-bold text-neutral-400">{t('list.rateLabel')}</span>
                           <div className="text-xl font-black text-[#fe6a34] font-display">
                             {villa.price.toLocaleString('vi-VN')}₫
                             <span className="text-[10px] text-neutral-400 font-normal"> /{t('home.night')}</span>
@@ -526,8 +527,8 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                           }`}
                         >
                           {hasMatchingStatus 
-                            ? (language === 'vi' ? 'Đặt phòng ngay' : (language === 'ko' ? '지금 예약하기' : 'Book Room Now')) 
-                            : (language === 'vi' ? 'Xem thông tin' : (language === 'ko' ? '숙소 정보 보기' : 'View Details'))}
+                            ? t('list.bookNow') 
+                            : t('list.viewInfo')}
                         </button>
                       </div>
                     </div>
