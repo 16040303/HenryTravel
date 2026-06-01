@@ -83,7 +83,7 @@ function AppContent() {
     if (path === '/') return 'home';
     if (path.startsWith('/villas')) {
       // Check if it is a detail path (e.g. /villas/7)
-      const isDetail = /^\/villas\/\d+/.test(path);
+      const isDetail = /^\/villas\/[\w-]+/.test(path);
       return isDetail ? 'detail' : 'listings';
     }
     if (path.startsWith('/lookup')) return 'lookup';

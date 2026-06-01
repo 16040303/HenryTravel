@@ -67,8 +67,8 @@ export default function LookupView() {
     setSubmittingFeedback(true);
     try {
       await submitFeedback({
-        villaId: lookupResult.booking.villaId,
-        guestName: reviewerName.trim() || lookupResult.booking.fullName,
+        bookingCode: lookupResult.booking.code,
+        phone: lookupResult.booking.phone,
         rating,
         comment: comment.trim()
       });
@@ -77,7 +77,7 @@ export default function LookupView() {
       setComment('');
     } catch (err) {
       console.error(err);
-      showToast('error', language === 'vi' ? 'Ch?a g?i ???c ??nh gi?. Vui l?ng th? l?i.' : 'Could not submit feedback. Please try again.');
+      showToast('error', err instanceof Error ? err.message : (language === 'vi' ? 'Chưa gửi được đánh giá. Vui lòng thử lại.' : 'Could not submit feedback. Please try again.'));
     } finally {
       setSubmittingFeedback(false);
     }

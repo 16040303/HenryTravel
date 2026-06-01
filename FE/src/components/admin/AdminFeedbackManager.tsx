@@ -3,7 +3,7 @@ import {
   MessageSquare, Star, User, Calendar, ShieldCheck, 
   Eye, EyeOff, ShieldAlert, Sparkles 
 } from 'lucide-react';
-import { Feedback, VillaDetail } from '../../types';
+import { EntityId, Feedback, VillaDetail } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import EmptyState from '../common/EmptyState';
 
@@ -19,12 +19,12 @@ export default function AdminFeedbackManager({
   onToggleVerifyFeedback
 }: AdminFeedbackManagerProps) {
   const { language } = useLanguage();
-  const [selectedVillaId, setSelectedVillaId] = useState<number | 'ALL'>('ALL');
+  const [selectedVillaId, setSelectedVillaId] = useState<EntityId | 'ALL'>('ALL');
   const [ratingFilter, setRatingFilter] = useState<'ALL' | number>('ALL');
 
   // Filter feedbacks
   const filteredFeedbacks = feedbacks.filter(f => {
-    const matchesVilla = selectedVillaId === 'ALL' || f.villaId === Number(selectedVillaId);
+    const matchesVilla = selectedVillaId === 'ALL' || String(f.villaId) === String(selectedVillaId);
     const matchesRating = ratingFilter === 'ALL' || f.rating === Number(ratingFilter);
     return matchesVilla && matchesRating;
   });
@@ -48,7 +48,7 @@ export default function AdminFeedbackManager({
           {/* Villa Selector */}
           <select
             value={selectedVillaId}
-            onChange={(e) => setSelectedVillaId(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+            onChange={(e) => setSelectedVillaId(e.target.value === 'ALL' ? 'ALL' : e.target.value)}
             className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-[180px] truncate"
           >
             <option value="ALL">{language === 'vi' ? 'Tất cả biệt thự' : 'All Villas'}</option>
@@ -81,7 +81,7 @@ export default function AdminFeedbackManager({
       ) : (
         <div className="flex flex-col gap-4">
           {filteredFeedbacks.map((f) => {
-            const villaName = villas.find(v => v.id === f.villaId)?.name || `Villa ID: ${f.villaId}`;
+            const villaName = villas.find(v => String(v.id) === String(f.villaId))?.name || `Villa ID: ${f.villaId}`;
             return (
               <div 
                 key={f.id} 
@@ -126,7 +126,7 @@ export default function AdminFeedbackManager({
                 <div className="self-end sm:self-center shrink-0">
                   {f.isVerified ? (
                     <button
-                      onClick={() => onToggleVerifyFeedback(f.id)}
+                      onClick={() => onToggleVerifyFeedback(String(f.id))}
                       className="bg-emerald-50 hover:bg-rose-50 text-emerald-600 hover:text-rose-600 border border-emerald-200 hover:border-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                       title="Click to Hide from Public site"
                     >
@@ -135,7 +135,7 @@ export default function AdminFeedbackManager({
                     </button>
                   ) : (
                     <button
-                      onClick={() => onToggleVerifyFeedback(f.id)}
+                      onClick={() => onToggleVerifyFeedback(String(f.id))}
                       className="bg-neutral-50 hover:bg-emerald-50 text-neutral-500 hover:text-emerald-700 border border-neutral-200 hover:border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                       title="Click to Show on Public site"
                     >

@@ -22,7 +22,7 @@ interface ListingViewProps {
     type?: 'Villa' | 'Homestay' | 'Căn hộ' | 'All';
     facilities: string[];
   };
-  onViewDetail: (id: number) => void;
+  onViewDetail: (id: string) => void;
   villasTriggerUpdate?: number;
 }
 

@@ -3,13 +3,13 @@ import {
   Calendar, ChevronLeft, ChevronRight, Info, Check, 
   HelpCircle, ShieldAlert, Sparkles, Lock, Unlock, X 
 } from 'lucide-react';
-import { VillaDetail } from '../../types';
+import { EntityId, VillaDetail } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../Toast';
 
 interface AdminAvailabilityManagerProps {
   villas: VillaDetail[];
-  onUpdateVillaAvailability: (villaId: number, bookedDates: string[], pendingDates: string[]) => void;
+  onUpdateVillaAvailability: (villaId: EntityId, bookedDates: string[], pendingDates: string[]) => void;
 }
 
 export default function AdminAvailabilityManager({
@@ -19,11 +19,11 @@ export default function AdminAvailabilityManager({
   const { language } = useLanguage();
   const { showToast } = useToast();
 
-  const [activeVillaId, setActiveVillaId] = useState<number>(() => {
+  const [activeVillaId, setActiveVillaId] = useState<EntityId>(() => {
     return villas.length > 0 ? villas[0].id : 0;
   });
 
-  const activeVilla = villas.find(v => v.id === activeVillaId);
+  const activeVilla = villas.find(v => String(v.id) === String(activeVillaId));
 
   // Multi-day date selection states
   const [rangeStart, setRangeStart] = useState<string | null>(null);
@@ -181,7 +181,7 @@ export default function AdminAvailabilityManager({
         <select
           value={activeVillaId}
           onChange={(e) => {
-            setActiveVillaId(Number(e.target.value));
+            setActiveVillaId(e.target.value);
             handleClearSelection();
           }}
           className="bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-xs"

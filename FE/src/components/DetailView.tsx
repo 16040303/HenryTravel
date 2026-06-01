@@ -17,7 +17,7 @@ import { VillaDetailSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
 
 interface DetailViewProps {
-  villaId?: number;
+  villaId?: string;
   onBack: () => void;
   onNavigateToLookup: () => void;
   onBookingSuccessNotify?: () => void;
@@ -28,8 +28,8 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   const { showToast } = useToast();
   const { id } = useParams<{ id: string }>();
 
-  // Determine active villa ID from route param or prop (defaults to 7 if none provided)
-  const activeVillaId = id ? Number(id) : (villaId || 7);
+  // Determine active villa ID from route param or prop
+  const activeVillaId = id || villaId || '';
 
   const [villa, setVilla] = useState<VillaDetail | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -38,6 +38,8 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   // Review Form States
   const [newFeedbackName, setNewFeedbackName] = useState('');
   const [newFeedbackRating, setNewFeedbackRating] = useState(5);
+  const [newFeedbackBookingCode, setNewFeedbackBookingCode] = useState('');
+  const [newFeedbackPhone, setNewFeedbackPhone] = useState('');
   const [newFeedbackComment, setNewFeedbackComment] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState('');
@@ -159,22 +161,24 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
   const handleReviewFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFeedbackName.trim() || !newFeedbackComment.trim()) {
-      showToast('warning', 'Vui lòng điền đầy đủ thông tin nhận xét!');
+    if (!newFeedbackName.trim() || !newFeedbackBookingCode.trim() || !newFeedbackPhone.trim() || !newFeedbackComment.trim()) {
+      showToast('warning', 'Vui lòng nhập tên, mã booking, số điện thoại và nội dung nhận xét!');
       return;
     }
 
     setIsSubmittingFeedback(true);
     try {
       await submitFeedback({
-        villaId: villa.id,
-        guestName: newFeedbackName,
+        bookingCode: newFeedbackBookingCode,
+        phone: newFeedbackPhone,
         rating: newFeedbackRating,
         comment: newFeedbackComment
       });
 
       setFeedbackSuccessMsg('Cực kỳ cảm ơn đánh giá của bạn! Đánh giá đã được lưu vào hệ thống.');
       setNewFeedbackName('');
+      setNewFeedbackBookingCode('');
+      setNewFeedbackPhone('');
       setNewFeedbackComment('');
       
       // Reload feedbacks list
@@ -188,6 +192,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       }
     } catch (err) {
       console.error(err);
+      showToast('error', err instanceof Error ? err.message : 'Chưa gửi được đánh giá. Vui lòng thử lại.');
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -507,6 +512,28 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                           value={newFeedbackName}
                           onChange={(e) => setNewFeedbackName(e.target.value)}
                           placeholder="Ví dụ: Nguyễn Văn Hải"
+                          className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Mã booking</span>
+                        <input
+                          type="text"
+                          required
+                          value={newFeedbackBookingCode}
+                          onChange={(e) => setNewFeedbackBookingCode(e.target.value)}
+                          placeholder="VB-2026-001"
+                          className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2] uppercase"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Số điện thoại đặt phòng</span>
+                        <input
+                          type="tel"
+                          required
+                          value={newFeedbackPhone}
+                          onChange={(e) => setNewFeedbackPhone(e.target.value)}
+                          placeholder="090..."
                           className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
                         />
                       </div>

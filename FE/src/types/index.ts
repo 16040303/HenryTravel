@@ -1,5 +1,7 @@
+export type EntityId = string | number;
+
 export interface Villa {
-  id: number;
+  id: EntityId;
   name: string;
   location: string;
   image: string;
@@ -12,6 +14,8 @@ export interface Villa {
   facilities: string[];
   description: string;
   isActive?: boolean;
+  avgRating?: number;
+  feedbackCount?: number;
 }
 
 export interface VillaDetail extends Villa {
@@ -33,16 +37,21 @@ export interface Booking {
   phone: string;
   fullName: string;
   email: string;
-  villaId: number;
+  villaId: EntityId;
   villaName: string;
   checkIn: string; // ISO date format
   checkOut: string; // ISO date format
   guests: number;
   rooms: number;
   totalPrice: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
   expiresAt: string; // ISO string when hold expires
   createdAt: string;
+  bookingCode?: string;
+  holdExpireAt?: string;
+  guestToken?: string;
+  zaloLinks?: ZaloLinks;
+  remainingMinutes?: number;
 }
 
 export interface BookingResult {
@@ -50,6 +59,10 @@ export interface BookingResult {
   holdExpireAt: string;
   success: boolean;
   message?: string;
+  booking?: Booking;
+  guestToken?: string;
+  zaloLinks?: ZaloLinks;
+  holdMinutes?: number;
 }
 
 export interface BookingStatus {
@@ -59,8 +72,8 @@ export interface BookingStatus {
 }
 
 export interface Feedback {
-  id: string;
-  villaId: number;
+  id: EntityId;
+  villaId: EntityId;
   guestName: string;
   rating: number;
   comment: string;
@@ -87,4 +100,17 @@ export interface ZaloLinkInfo {
   phone: string;
   formattedLink: string;
   label: string;
+}
+
+export interface ZaloLinks {
+  mobile: string;
+  web: string;
+  fallback: string;
+  phone?: string;
+  message?: string;
+}
+
+export interface VillaAvailabilityDay {
+  date: string;
+  status: 'available' | 'pending' | 'booked';
 }

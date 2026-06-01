@@ -4,18 +4,18 @@ import {
   Users, CheckCircle2, AlertCircle, X, Copy, Eye, 
   ToggleLeft, ToggleRight, CheckSquare, Square 
 } from 'lucide-react';
-import { VillaDetail } from '../../types';
+import { EntityId, VillaDetail } from '../../types';
 import { LOCATIONS, FACILITIES } from '../../constants';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 interface AdminVillaManagerProps {
   villas: VillaDetail[];
   onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
-  onDeleteVilla: (id: number, name: string) => void;
+  onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void;
-  onDuplicateVilla: (id: number) => void;
-  onBulkDeleteVillas: (ids: number[]) => void;
-  onBulkStatusUpdateVillas: (ids: number[], active: boolean) => void;
+  onDuplicateVilla: (id: EntityId) => void;
+  onBulkDeleteVillas: (ids: EntityId[]) => void;
+  onBulkStatusUpdateVillas: (ids: EntityId[], active: boolean) => void;
   showAddModalDirectly?: boolean;
   onCloseAddModalDirectly?: () => void;
 }
@@ -44,7 +44,7 @@ export default function AdminVillaManager({
   const [editingVilla, setEditingVilla] = useState<VillaDetail | null>(null);
 
   // Bulk selections state
-  const [selectedVillaIds, setSelectedVillaIds] = useState<number[]>([]);
+  const [selectedVillaIds, setSelectedVillaIds] = useState<EntityId[]>([]);
 
   // Add/Edit Form State
   const [villaName, setVillaName] = useState('');
@@ -183,9 +183,9 @@ export default function AdminVillaManager({
   });
 
   // Checkbox handlers
-  const handleToggleSelect = (id: number) => {
+  const handleToggleSelect = (id: EntityId) => {
     setSelectedVillaIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      prev.some(x => String(x) === String(id)) ? prev.filter(x => String(x) !== String(id)) : [...prev, id]
     );
   };
 
@@ -322,7 +322,7 @@ export default function AdminVillaManager({
       {/* Grid listing */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         {filteredVillas.map((v) => {
-          const isChecked = selectedVillaIds.includes(v.id);
+          const isChecked = selectedVillaIds.some(id => String(id) === String(v.id));
           const isActive = v.isActive !== false;
           
           const badgeClass = 

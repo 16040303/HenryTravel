@@ -20,7 +20,7 @@ interface HomeViewProps {
     type?: 'Villa' | 'Homestay' | 'Căn hộ' | 'All';
     facilities: string[];
   }) => void;
-  onViewDetail: (id: number) => void;
+  onViewDetail: (id: string) => void;
   villasTriggerUpdate?: number; // to refetch if admin inserts new villas
 }
 
