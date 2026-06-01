@@ -5,7 +5,7 @@ import {
   ClipboardList, MessageSquare, Star, ArrowRight, User 
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { VillaDetail, Booking, Feedback } from '../../types';
+import { AdminStats, VillaDetail, Booking, Feedback } from '../../types';
 
 interface AdminDashboardProps {
   villas: VillaDetail[];
@@ -13,6 +13,7 @@ interface AdminDashboardProps {
   feedbacks: Feedback[];
   onNavigateToTab: (tab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings') => void;
   onOpenAddVilla: () => void;
+  stats?: AdminStats;
 }
 
 export default function AdminDashboard({
@@ -20,19 +21,17 @@ export default function AdminDashboard({
   bookings,
   feedbacks,
   onNavigateToTab,
-  onOpenAddVilla
+  onOpenAddVilla,
+  stats
 }: AdminDashboardProps) {
   const { language } = useLanguage();
 
-  // Basic counters
-  const villasCount = villas.length;
-  const bookingsCount = bookings.length;
-  const pendingCount = bookings.filter(b => b.status === 'PENDING').length;
-  const confirmedCount = bookings.filter(b => b.status === 'CONFIRMED').length;
-  const cancelledCount = bookings.filter(b => b.status === 'CANCELLED').length;
-  
-  // Calculate completed bookings (checkout date is in the past)
-  const completedCount = bookings.filter(b => 
+  const villasCount = stats?.totalVillas ?? villas.length;
+  const bookingsCount = stats ? stats.pendingBookings + stats.confirmedBookings + stats.cancelledBookings + stats.completedBookings : bookings.length;
+  const pendingCount = stats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length;
+  const confirmedCount = stats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length;
+  const cancelledCount = stats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length;
+  const completedCount = stats?.completedBookings ?? bookings.filter(b => 
     b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date()
   ).length;
 
@@ -56,33 +55,40 @@ export default function AdminDashboard({
     .filter(b => b.status === 'CONFIRMED')
     .reduce((sum, curr) => sum + curr.totalPrice, 0);
 
-  const thisMonthRevenue = baseConfirmedRevenue + 78000000;
+  const thisMonthRevenue = stats?.estimatedRevenue ?? (baseConfirmedRevenue + 78000000);
   const lastMonthRevenue = 68000000;
   const revenuePercentChange = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
   const isRevenueUp = revenuePercentChange >= 0;
 
-  // 3. Top 5 Villas by Booking Count
-  const topVillas = villas.map(villa => {
-    const count = bookings.filter(b => b.villaId === villa.id).length;
-    // Mock occupancy percentage
-    const occupancy = villa.bookedDates ? Math.min(Math.round((villa.bookedDates.length / 30) * 100), 100) : 0;
-    return {
-      id: villa.id,
-      name: villa.name,
-      image: villa.image,
-      bookingCount: count,
-      occupancy: occupancy || Math.max(35, Math.min(95, count * 15))
-    };
-  })
-  .sort((a, b) => b.bookingCount - a.bookingCount)
-  .slice(0, 5);
+  const topVillas = (stats?.topVillas && stats.topVillas.length > 0
+    ? stats.topVillas.map((villa) => {
+        const matchedVilla = villas.find((item) => String(item.id) === String(villa.id));
+        return {
+          id: villa.id,
+          name: villa.name,
+          image: matchedVilla?.image || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1200&auto=format&fit=crop',
+          bookingCount: villa.bookingCount,
+          occupancy: Math.max(35, Math.min(95, villa.bookingCount * 15)),
+        };
+      })
+    : villas.map(villa => {
+        const count = bookings.filter(b => String(b.villaId) === String(villa.id)).length;
+        const occupancy = villa.bookedDates ? Math.min(Math.round((villa.bookedDates.length / 30) * 100), 100) : 0;
+        return {
+          id: villa.id,
+          name: villa.name,
+          image: villa.image,
+          bookingCount: count,
+          occupancy: occupancy || Math.max(35, Math.min(95, count * 15))
+        };
+      }))
+    .sort((a, b) => b.bookingCount - a.bookingCount)
+    .slice(0, 5);
 
-  // 4. Recent Bookings (top 5 sorted by createdAt)
   const recentBookings = [...bookings]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
-  // 5. Recent Feedbacks (top 4)
   const recentFeedbacks = [...feedbacks]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 4);

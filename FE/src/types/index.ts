@@ -33,6 +33,7 @@ export interface VillaDetail extends Villa {
 }
 
 export interface Booking {
+  id?: EntityId;
   code: string;
   phone: string;
   fullName: string;
@@ -113,4 +114,113 @@ export interface ZaloLinks {
 export interface VillaAvailabilityDay {
   date: string;
   status: 'available' | 'pending' | 'booked';
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | string;
+}
+
+export interface AdminLoginResponse {
+  token: string;
+  expiresIn: string;
+  user: AdminUser;
+}
+
+export interface AdminStats {
+  totalVillas: number;
+  activeVillas: number;
+  bookingsThisWeek?: number;
+  bookingsThisMonth?: number;
+  pendingBookings: number;
+  confirmedBookings: number;
+  cancelledBookings: number;
+  completedBookings: number;
+  newFeedbacks?: number;
+  estimatedRevenue: number;
+  topVillas: Array<{ id: string; name: string; location?: string; bookingCount: number }>;
+  recentBookings: Array<{
+    id: string;
+    bookingCode: string;
+    villaId: string;
+    guestName?: string | null;
+    guestPhone?: string | null;
+    guestEmail?: string | null;
+    checkIn: string;
+    checkOut: string;
+    guestsCount?: number;
+    roomsCount?: number;
+    status: string;
+    holdExpireAt?: string | null;
+    createdAt?: string;
+    villa?: { id: string; name: string; location?: string; price?: string | number };
+  }>;
+  recentFeedbacks: Array<{
+    id: string;
+    villaId: string;
+    bookingId?: string;
+    rating: number;
+    comment?: string | null;
+    verified: boolean;
+    createdAt: string;
+    villa?: { id: string; name: string; location?: string };
+    booking?: { id?: string; bookingCode?: string; guestName?: string | null; guestPhone?: string | null };
+  }>;
+}
+
+export interface AdminVillaResponse {
+  villas: Array<{
+    id: string;
+    name: string;
+    location: string;
+    description?: string | null;
+    status?: string;
+    price: string | number;
+    priceType?: string;
+    facilities?: string[] | null;
+    images?: string[] | null;
+    maxGuests: number;
+    holdMinutes?: number;
+    avgRating?: number;
+    bookingCount?: number;
+    feedbackCount?: number;
+    createdAt?: string;
+  }>;
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminBookingResponse {
+  bookings: AdminStats['recentBookings'];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminFeedbackResponse {
+  feedbacks: AdminStats['recentFeedbacks'];
+  stats?: { avgRating: number; distribution: Record<string, number> };
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminLogResponse {
+  logs: Array<{
+    id: string;
+    adminId: string;
+    action: string;
+    targetType: string;
+    targetId: string;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    timestamp: string;
+    admin?: { id: string; name: string; email: string };
+  }>;
+  total: number;
+  page: number;
+  totalPages: number;
 }

@@ -4,7 +4,7 @@ import {
   ArrowUpRight, PlusCircle, CalendarDays, ClipboardList, 
   MessageSquare, Sliders, LogOut, ShieldCheck, User 
 } from 'lucide-react';
-import { VillaDetail, Booking, Feedback } from '../../types';
+import { AdminStats, AdminUser, EntityId, VillaDetail, Booking, Feedback } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import AdminDashboard from './AdminDashboard';
 import AdminVillaManager from './AdminVillaManager';
@@ -18,16 +18,18 @@ interface AdminLayoutProps {
   bookings: Booking[];
   feedbacks: Feedback[];
   onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
-  onDeleteVilla: (id: number, name: string) => void;
+  onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void;
-  onDuplicateVilla: (id: number) => void;
-  onBulkDeleteVillas: (ids: number[]) => void;
-  onBulkStatusUpdateVillas: (ids: number[], active: boolean) => void;
+  onDuplicateVilla: (id: EntityId) => void;
+  onBulkDeleteVillas: (ids: EntityId[]) => void;
+  onBulkStatusUpdateVillas: (ids: EntityId[], active: boolean) => void;
   onApproveBooking: (code: string) => void;
   onRejectBooking: (code: string) => void;
   onToggleVerifyFeedback: (id: string) => void;
-  onUpdateVillaAvailability: (villaId: number, bookedDates: string[], pendingDates: string[]) => void;
+  onUpdateVillaAvailability: (villaId: EntityId, bookedDates: string[], pendingDates: string[]) => void;
   onLogout: () => void;
+  adminStats?: AdminStats;
+  adminUser?: AdminUser;
 }
 
 export default function AdminLayout({
@@ -44,7 +46,9 @@ export default function AdminLayout({
   onRejectBooking,
   onToggleVerifyFeedback,
   onUpdateVillaAvailability,
-  onLogout
+  onLogout,
+  adminStats,
+  adminUser
 }: AdminLayoutProps) {
   const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings'>('dashboard');
@@ -52,9 +56,9 @@ export default function AdminLayout({
   // Trigger add villa modal directly from dashboard quick action
   const [directOpenAddVilla, setDirectOpenAddVilla] = useState(false);
 
-  const pendingBookingsCount = bookings.filter(b => b.status === 'PENDING').length;
-  const confirmedBookingsCount = bookings.filter(b => b.status === 'CONFIRMED').length;
-  const cancelledBookingsCount = bookings.filter(b => b.status === 'CANCELLED').length;
+  const pendingBookingsCount = adminStats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length;
+  const confirmedBookingsCount = adminStats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length;
+  const cancelledBookingsCount = adminStats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length;
 
   const totalRevenue = bookings
     .filter(b => b.status === 'CONFIRMED')
@@ -91,8 +95,8 @@ export default function AdminLayout({
             AD
           </div>
           <div className="flex flex-col leading-tight min-w-0">
-            <span className="text-xs font-black text-neutral-800 truncate">Quản trị viên</span>
-            <span className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">admin@villastay.com</span>
+            <span className="text-xs font-black text-neutral-800 truncate">{adminUser?.name || 'Quản trị viên'}</span>
+            <span className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">{adminUser?.email || 'admin@villa.com'}</span>
           </div>
         </div>
 
@@ -144,6 +148,7 @@ export default function AdminLayout({
               }
             }}
             onOpenAddVilla={handleOpenAddVillaDirectly}
+            stats={adminStats}
           />
         )}
 

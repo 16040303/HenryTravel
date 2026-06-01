@@ -1,4 +1,11 @@
 import {
+  AdminBookingResponse,
+  AdminFeedbackResponse,
+  AdminLogResponse,
+  AdminLoginResponse,
+  AdminStats,
+  AdminUser,
+  AdminVillaResponse,
   Booking,
   BookingResult,
   BookingStatus,
@@ -22,11 +29,11 @@ interface ApiErrorBody {
 interface BackendVilla {
   id: string;
   name: string;
-  location: string;
+  location?: string;
   description?: string | null;
-  price: string | number;
+  price?: string | number;
   priceType?: string;
-  maxGuests: number;
+  maxGuests?: number;
   images?: string[] | null;
   facilities?: string[] | null;
   status?: string;
@@ -163,6 +170,7 @@ export function mapBackendBookingToFrontendBooking(booking: BackendBooking, vill
   const price = villaData ? Number(villaData.price) || 0 : 0;
 
   return {
+    id: booking.id,
     code: booking.bookingCode,
     bookingCode: booking.bookingCode,
     phone: booking.guestPhone || '',
@@ -331,7 +339,147 @@ export async function getVillaFeedbacks(_villaId: string): Promise<Feedback[]> {
   return [];
 }
 
-// Admin remains mock/localStorage in this phase by design.
+export const ADMIN_TOKEN_KEY = 'henrytravel_admin_token';
+export const ADMIN_USER_KEY = 'henrytravel_admin_user';
+
+export function getAdminToken(): string | null {
+  return localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function setAdminToken(token: string): void {
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
+export function clearAdminToken(): void {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+export function getStoredAdminUser(): AdminUser | null {
+  const raw = localStorage.getItem(ADMIN_USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AdminUser;
+  } catch {
+    adminLogout();
+    return null;
+  }
+}
+
+export function adminLogout(): void {
+  clearAdminToken();
+  localStorage.removeItem(ADMIN_USER_KEY);
+  localStorage.removeItem('villastay_admin_authenticated');
+  sessionStorage.removeItem('villastay_admin_authenticated');
+}
+
+export async function adminApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAdminToken();
+  const headers = new Headers(options.headers);
+
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await response.json() : null;
+
+  if (!response.ok) {
+    const body = (data || {}) as ApiErrorBody;
+    if (response.status === 401 || response.status === 403) {
+      adminLogout();
+    }
+    const message = body.message || (response.status === 401 || response.status === 403
+      ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+      : 'Không thể tải dữ liệu quản trị. Vui lòng thử lại.');
+    const error = new Error(message);
+    (error as Error & { code?: string; status?: number }).code = body.error;
+    (error as Error & { code?: string; status?: number }).status = response.status;
+    throw error;
+  }
+
+  return data as T;
+}
+
+export async function adminLogin(email: string, password: string): Promise<AdminLoginResponse> {
+  const response = await apiRequest<AdminLoginResponse>('/admin/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  setAdminToken(response.token);
+  localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(response.user));
+  return response;
+}
+
+export async function getAdminStats(): Promise<AdminStats> {
+  return adminApiRequest<AdminStats>('/admin/stats');
+}
+
+export async function getAdminVillas(params: {
+  q?: string;
+  location?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminVillaResponse> {
+  return adminApiRequest<AdminVillaResponse>(`/admin/villas${buildQuery(params)}`);
+}
+
+export async function getAdminBookings(params: {
+  villaId?: string;
+  status?: string;
+  phone?: string;
+  code?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminBookingResponse> {
+  return adminApiRequest<AdminBookingResponse>(`/admin/bookings${buildQuery(params)}`);
+}
+
+export async function getAdminFeedbacks(params: {
+  villaId?: string;
+  rating?: number;
+  verified?: boolean;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminFeedbackResponse> {
+  return adminApiRequest<AdminFeedbackResponse>(`/admin/feedbacks${buildQuery(params)}`);
+}
+
+export async function getAdminLogs(params: {
+  adminId?: string;
+  action?: string;
+  targetType?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminLogResponse> {
+  return adminApiRequest<AdminLogResponse>(`/admin/logs${buildQuery(params)}`);
+}
+
+export function mapAdminVillaToFrontendVilla(villa: AdminVillaResponse['villas'][number]): VillaDetail {
+  return mapBackendVillaToFrontendVilla(villa);
+}
+
+export function mapAdminBookingToFrontendBooking(booking: AdminBookingResponse['bookings'][number]): Booking {
+  return mapBackendBookingToFrontendBooking(booking, booking.villa);
+}
+
+export function mapAdminFeedbackToFrontendFeedback(feedback: AdminFeedbackResponse['feedbacks'][number]): Feedback {
+  return mapBackendFeedbackToFrontendFeedback(feedback);
+}
+
+// Admin mutation helpers below remain mock/localStorage by design until FE API Phase 3.
 const STORAGE_KEYS = {
   VILLAS: 'villastay_villas',
   FEEDBACKS: 'villastay_feedbacks',

@@ -2,8 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, AlertCircle, Lock, User, LogIn, Eye, EyeOff, LogOut
 } from 'lucide-react';
-import { addVilla } from '../lib/api';
-import { VillaDetail, Booking, Feedback } from '../types';
+import {
+  adminLogin,
+  adminLogout,
+  getAdminBookings,
+  getAdminFeedbacks,
+  getAdminStats,
+  getAdminToken,
+  getAdminVillas,
+  getStoredAdminUser,
+  mapAdminBookingToFrontendBooking,
+  mapAdminFeedbackToFrontendFeedback,
+  mapAdminVillaToFrontendVilla,
+} from '../lib/api';
+import { AdminStats, AdminUser, EntityId, VillaDetail, Booking, Feedback } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from './Toast';
 import { AdminDashboardSkeleton } from './common/Skeleton';
@@ -30,7 +42,10 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const [allVillas, setAllVillas] = useState<VillaDetail[]>([]);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
   const [allFeedbacks, setAllFeedbacks] = useState<Feedback[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminDataError, setAdminDataError] = useState('');
 
   // Global Confirmation modal configuration state
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
@@ -57,53 +72,99 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   };
 
   useEffect(() => {
-    const sessionAuth = sessionStorage.getItem('villastay_admin_authenticated');
-    const localAuth = localStorage.getItem('villastay_admin_authenticated');
-    if (sessionAuth === 'true' || localAuth === 'true') {
+    const token = getAdminToken();
+    const storedUser = getStoredAdminUser();
+    if (token && storedUser) {
+      setAdminUser(storedUser);
       setIsLoggedIn(true);
+      loadAdminStats();
+      return;
     }
-    loadAdminStats();
+    setLoading(false);
   }, []);
 
-  const loadAdminStats = () => {
+  const logoutToLogin = (message?: string) => {
+    adminLogout();
+    setAdminUser(null);
+    setAdminStats(null);
+    setIsLoggedIn(false);
+    setLoading(false);
+    if (message) setLoginError(message);
+  };
+
+  const isAuthError = (error: unknown) => {
+    const status = (error as Error & { status?: number }).status;
+    return status === 401 || status === 403;
+  };
+
+  const loadAdminStats = async () => {
     setLoading(true);
-    // Read villas
-    const rawVillas = localStorage.getItem('villastay_villas');
-    const villasList: VillaDetail[] = rawVillas ? JSON.parse(rawVillas) : [];
-    setAllVillas(villasList);
+    setAdminDataError('');
+    const errors: string[] = [];
 
-    // Read bookings
-    const rawBookings = localStorage.getItem('villastay_bookings');
-    const bookingsList: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
-    setRecentBookings(bookingsList);
+    const [statsResult, villasResult, bookingsResult, feedbacksResult] = await Promise.allSettled([
+      getAdminStats(),
+      getAdminVillas({ limit: 100 }),
+      getAdminBookings({ limit: 100 }),
+      getAdminFeedbacks({ limit: 100 }),
+    ]);
 
-    // Read reviews
-    const rawFeedbacks = localStorage.getItem('villastay_feedbacks');
-    const feedbacksList: Feedback[] = rawFeedbacks ? JSON.parse(rawFeedbacks) : [];
-    setAllFeedbacks(feedbacksList);
+    const settled = [statsResult, villasResult, bookingsResult, feedbacksResult];
+    const authFailure = settled.find((result) => result.status === 'rejected' && isAuthError(result.reason));
+    if (authFailure) {
+      logoutToLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      return;
+    }
 
+    if (statsResult.status === 'fulfilled') {
+      setAdminStats(statsResult.value);
+    } else {
+      errors.push(statsResult.reason instanceof Error ? statsResult.reason.message : 'Không tải được thống kê admin.');
+    }
+
+    if (villasResult.status === 'fulfilled') {
+      setAllVillas(villasResult.value.villas.map(mapAdminVillaToFrontendVilla));
+    } else {
+      errors.push(villasResult.reason instanceof Error ? villasResult.reason.message : 'Không tải được danh sách villa.');
+    }
+
+    if (bookingsResult.status === 'fulfilled') {
+      setRecentBookings(bookingsResult.value.bookings.map(mapAdminBookingToFrontendBooking));
+    } else {
+      errors.push(bookingsResult.reason instanceof Error ? bookingsResult.reason.message : 'Không tải được danh sách booking.');
+    }
+
+    if (feedbacksResult.status === 'fulfilled') {
+      setAllFeedbacks(feedbacksResult.value.feedbacks.map(mapAdminFeedbackToFrontendFeedback));
+    } else {
+      errors.push(feedbacksResult.reason instanceof Error ? feedbacksResult.reason.message : 'Không tải được danh sách feedback.');
+    }
+
+    if (errors.length > 0) {
+      setAdminDataError(errors.join(' '));
+    }
     setLoading(false);
   };
 
   // Login handler
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim().toLowerCase() === 'admin' && (password === 'admin123' || password === 'admin2026')) {
-      if (rememberMe) {
-        localStorage.setItem('villastay_admin_authenticated', 'true');
-      } else {
-        sessionStorage.setItem('villastay_admin_authenticated', 'true');
-      }
+    setLoginError('');
+    setLoading(true);
+    try {
+      const response = await adminLogin(username, password);
+      setAdminUser(response.user);
       setIsLoggedIn(true);
-      setLoginError('');
-      loadAdminStats();
-    } else {
+      setPassword('');
+      await loadAdminStats();
+    } catch (error) {
+      adminLogout();
+      setIsLoggedIn(false);
+      setLoading(false);
       setLoginError(
-        language === 'ko'
-          ? '아이디 혹은 비밀번호가 투숙 관리 정보와 일치하지 않습니다.'
-          : language === 'en'
-            ? 'Incorrect admin username or password!'
-            : 'Tên đăng nhập hoặc mật khẩu quản trị viên không chính xác!'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Email hoặc mật khẩu không đúng'
       );
     }
   };
@@ -115,9 +176,10 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       message: language === 'vi' ? 'Bạn có muốn đăng xuất và kết thúc phiên làm việc quản trị không?' : 'Are you sure you want to end your administration session?',
       type: 'warning',
       onConfirm: () => {
-        localStorage.removeItem('villastay_admin_authenticated');
-        sessionStorage.removeItem('villastay_admin_authenticated');
+        adminLogout();
         setIsLoggedIn(false);
+        setAdminUser(null);
+        setAdminStats(null);
         setUsername('');
         setPassword('');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -128,207 +190,55 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   // 1. ADD Villa
   const handleAddVilla = async (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => {
-    try {
-      const list = [...allVillas];
-      const newVilla: VillaDetail = {
-        ...v,
-        id: list.length > 0 ? Math.max(...list.map(x => x.id)) + 1 : 1,
-        rating: 5.0,
-        reviewsCount: 1,
-        images: [v.image, 'https://picsum.photos/800/600?random=10'],
-        bookedDates: [],
-        pendingDates: []
-      };
-      
-      list.push(newVilla);
-      localStorage.setItem('villastay_villas', JSON.stringify(list));
-      loadAdminStats();
-      onVillaAddedNotification();
-      showToast('success', language === 'vi' ? `Đã thêm thành công villa "${v.name}"` : `Added villa "${v.name}"`);
-    } catch (err) {
-      console.error(err);
-      showToast('error', 'Lỗi hệ thống khi thêm biệt thự');
-    }
+    showToast('info', language === 'vi' ? `Thêm villa "${v.name}" sẽ nối API ở phase sau.` : `Add villa "${v.name}" API will be connected in the next phase.`);
   };
 
   // 2. DELETE Villa with double confirm modal
-  const triggerDeleteVilla = (id: number, name: string) => {
-    triggerConfirmModal({
-      title: language === 'vi' ? 'Xóa cơ sở lưu trú?' : 'Delete Accommodation?',
-      message: language === 'vi' 
-        ? `Hành động này cực kỳ nguy hiểm và không thể khôi phục! Bạn sắp xóa biệt thự "${name}" khỏi cơ sở dữ liệu.`
-        : `This will permanently remove "${name}" from the database. This action is irreversible!`,
-      type: 'danger',
-      onConfirm: () => {
-        const filtered = allVillas.filter(v => v.id !== id);
-        localStorage.setItem('villastay_villas', JSON.stringify(filtered));
-        loadAdminStats();
-        onVillaAddedNotification();
-        setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-        showToast('info', language === 'vi' ? `Đã xóa villa "${name}"` : `Removed villa "${name}"`);
-      }
-    });
+  const triggerDeleteVilla = (_id: EntityId, name: string) => {
+    showToast('info', language === 'vi' ? `Xóa villa "${name}" sẽ nối API ở phase sau.` : `Delete villa "${name}" API will be connected in the next phase.`);
   };
 
   // 3. UPDATE Villa properties
   const handleUpdateVilla = (v: VillaDetail) => {
-    const list = allVillas.map(item => item.id === v.id ? v : item);
-    localStorage.setItem('villastay_villas', JSON.stringify(list));
-    loadAdminStats();
-    onVillaAddedNotification();
-    showToast('success', language === 'vi' ? `Đã cập nhật thông tin biệt thự` : `Updated villa properties.`);
+    showToast('info', language === 'vi' ? `Cập nhật villa "${v.name}" sẽ nối API ở phase sau.` : `Update villa "${v.name}" API will be connected in the next phase.`);
   };
 
   // 4. APPROVE Booking Pending Hold with confirmation
   const triggerApproveBooking = (code: string) => {
-    triggerConfirmModal({
-      title: language === 'vi' ? 'Duyệt chuyển khoản đặt cọc?' : 'Approve Booking deposit?',
-      message: language === 'vi'
-        ? `Xác nhận rằng bạn đã nhận được thanh toán cọc ngân hàng thành công cho mã đơn "${code}"?`
-        : `Verify that you have cleared the transfer deposit for code "${code}"?`,
-      type: 'info',
-      onConfirm: () => {
-        const bookingsList = [...recentBookings];
-        const bIdx = bookingsList.findIndex(item => item.code === code);
-        if (bIdx !== -1) {
-          bookingsList[bIdx].status = 'CONFIRMED';
-          localStorage.setItem('villastay_bookings', JSON.stringify(bookingsList));
-          
-          // Secure the booking dates into villa's bookedDates
-          const villasList = [...allVillas];
-          const vIdx = villasList.findIndex(item => item.id === bookingsList[bIdx].villaId);
-          if (vIdx !== -1) {
-            const checkIn = bookingsList[bIdx].checkIn;
-            // Add date check-in to bookedDates
-            if (!villasList[vIdx].bookedDates.includes(checkIn)) {
-              villasList[vIdx].bookedDates.push(checkIn);
-            }
-            // Remove from pending holds
-            villasList[vIdx].pendingDates = villasList[vIdx].pendingDates.filter(x => x !== checkIn);
-            localStorage.setItem('villastay_villas', JSON.stringify(villasList));
-          }
-          
-          loadAdminStats();
-          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-          showToast('success', language === 'vi' ? `Đã duyệt chính thức đơn mã "${code}"` : `Booking code "${code}" approved.`);
-        }
-      }
-    });
+    showToast('info', language === 'vi' ? `Duyệt booking "${code}" sẽ nối API ở phase sau.` : `Confirm booking "${code}" API will be connected in the next phase.`);
   };
 
   // 5. CANCEL/REJECT Booking Pending Hold with confirmation
   const triggerRejectBooking = (code: string) => {
-    triggerConfirmModal({
-      title: language === 'vi' ? 'Hủy giữ chỗ / Từ chối đơn?' : 'Cancel Hold / Decline booking?',
-      message: language === 'vi'
-        ? `Bạn có chắc chắn muốn hủy giữ phòng cho đơn mã "${code}"? Kho phòng sẽ được giải phóng lập tức.`
-        : `Are you sure you want to cancel the pending hold for "${code}"? Room will be unlocked.`,
-      type: 'danger',
-      onConfirm: () => {
-        const bookingsList = [...recentBookings];
-        const bIdx = bookingsList.findIndex(item => item.code === code);
-        if (bIdx !== -1) {
-          bookingsList[bIdx].status = 'CANCELLED';
-          localStorage.setItem('villastay_bookings', JSON.stringify(bookingsList));
-          
-          // Release dates from villa
-          const villasList = [...allVillas];
-          const vIdx = villasList.findIndex(item => item.id === bookingsList[bIdx].villaId);
-          if (vIdx !== -1) {
-            const checkIn = bookingsList[bIdx].checkIn;
-            villasList[vIdx].pendingDates = villasList[vIdx].pendingDates.filter(x => x !== checkIn);
-            villasList[vIdx].bookedDates = villasList[vIdx].bookedDates.filter(x => x !== checkIn);
-            localStorage.setItem('villastay_villas', JSON.stringify(villasList));
-          }
-          
-          loadAdminStats();
-          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-          showToast('info', language === 'vi' ? `Đã hủy giữ chỗ đơn mã "${code}"` : `Booking code "${code}" cancelled.`);
-        }
-      }
-    });
+    showToast('info', language === 'vi' ? `Hủy booking "${code}" sẽ nối API ở phase sau.` : `Cancel booking "${code}" API will be connected in the next phase.`);
   };
 
   // 6. TOGGLE VERIFIED Feedback showing/hiding
-  const handleToggleVerifyFeedback = (id: string) => {
-    const list = allFeedbacks.map(f => {
-      if (f.id === id) {
-        const updatedStatus = !f.isVerified;
-        showToast('info', updatedStatus 
-          ? (language === 'vi' ? 'Nhận xét đã hiển thị công khai.' : 'Review is now visible to public.')
-          : (language === 'vi' ? 'Đã ẩn nhận xét này khỏi trang công khai.' : 'Review is hidden from public.')
-        );
-        return { ...f, isVerified: updatedStatus };
-      }
-      return f;
-    });
-    localStorage.setItem('villastay_feedbacks', JSON.stringify(list));
-    loadAdminStats();
+  const handleToggleVerifyFeedback = (_id: string) => {
+    showToast('info', language === 'vi' ? 'Duyệt/ẩn feedback sẽ nối API ở phase sau.' : 'Feedback toggle API will be connected in the next phase.');
   };
 
   // 7. UPDATE Villa availability blocked/unblocked dates manually
-  const handleUpdateVillaAvailability = (villaId: number, bookedDates: string[], pendingDates: string[]) => {
-    const list = allVillas.map(v => {
-      if (v.id === villaId) {
-        return { ...v, bookedDates, pendingDates };
-      }
-      return v;
-    });
-    localStorage.setItem('villastay_villas', JSON.stringify(list));
-    loadAdminStats();
-    onVillaAddedNotification();
+  const handleUpdateVillaAvailability = (_villaId: EntityId, _bookedDates: string[], _pendingDates: string[]) => {
+    showToast('info', language === 'vi' ? 'Cập nhật lịch trống sẽ nối API ở phase sau.' : 'Availability update API will be connected in the next phase.');
   };
 
   // 8. DUPLICATE Villa
-  const handleDuplicateVilla = (id: number) => {
-    const target = allVillas.find(v => v.id === id);
-    if (!target) return;
-    const newId = allVillas.length > 0 ? Math.max(...allVillas.map(x => x.id)) + 1 : 1;
-    const duplicated: VillaDetail = {
-      ...target,
-      id: newId,
-      name: `${target.name} (Copy)`,
-      bookedDates: [],
-      pendingDates: [],
-      reviewsCount: 0,
-      rating: 5.0,
-      isActive: target.isActive !== undefined ? target.isActive : true
-    };
-    const list = [...allVillas, duplicated];
-    localStorage.setItem('villastay_villas', JSON.stringify(list));
-    loadAdminStats();
-    onVillaAddedNotification();
-    showToast('success', language === 'vi' ? `Đã nhân bản biệt thự "${target.name}"` : `Duplicated villa "${target.name}"`);
+  const handleDuplicateVilla = (id: EntityId) => {
+    const target = allVillas.find(v => String(v.id) === String(id));
+    showToast('info', language === 'vi' ? `Nhân bản villa "${target?.name || id}" sẽ nối API ở phase sau.` : `Duplicate villa "${target?.name || id}" API will be connected in the next phase.`);
   };
 
   // 9. BULK DELETE Villas
-  const handleBulkDeleteVillas = (ids: number[]) => {
-    triggerConfirmModal({
-      title: language === 'vi' ? `Xóa ${ids.length} biệt thự đã chọn?` : `Delete ${ids.length} selected?`,
-      message: language === 'vi'
-        ? `Bạn có chắc chắn muốn xóa vĩnh viễn ${ids.length} biệt thự khỏi cơ sở dữ liệu? Hành động này cực kỳ nguy hiểm và không thể khôi phục!`
-        : `Are you sure you want to permanently delete these ${ids.length} accommodations? This action is irreversible!`,
-      type: 'danger',
-      onConfirm: () => {
-        const filtered = allVillas.filter(v => !ids.includes(v.id));
-        localStorage.setItem('villastay_villas', JSON.stringify(filtered));
-        loadAdminStats();
-        onVillaAddedNotification();
-        setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-        showToast('info', language === 'vi' ? `Đã xóa ${ids.length} biệt thự thành công.` : `Removed ${ids.length} villas.`);
-      }
-    });
+  const handleBulkDeleteVillas = (ids: EntityId[]) => {
+    showToast('info', language === 'vi' ? `Xóa ${ids.length} villa sẽ nối API ở phase sau.` : `Bulk delete API for ${ids.length} villas will be connected in the next phase.`);
   };
 
   // 10. BULK STATUS UPDATE
-  const handleBulkStatusUpdateVillas = (ids: number[], active: boolean) => {
-    const list = allVillas.map(v => ids.includes(v.id) ? { ...v, isActive: active } : v);
-    localStorage.setItem('villastay_villas', JSON.stringify(list));
-    loadAdminStats();
-    onVillaAddedNotification();
-    showToast('success', language === 'vi'
-      ? `Đã cập nhật trạng thái hoạt động cho ${ids.length} biệt thự.`
-      : `Updated active status for ${ids.length} villas.`
+  const handleBulkStatusUpdateVillas = (ids: EntityId[], _active: boolean) => {
+    showToast('info', language === 'vi'
+      ? `Cập nhật trạng thái ${ids.length} villa sẽ nối API ở phase sau.`
+      : `Bulk status API for ${ids.length} villas will be connected in the next phase.`
     );
   };
 
@@ -366,7 +276,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
           <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                {language === 'ko' ? '사용자 이름 / 이메일' : language === 'en' ? 'Username / Email' : 'Tên đăng nhập / Email'}
+                {language === 'ko' ? '이메일' : language === 'en' ? 'Email' : 'Email'}
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-neutral-400">
@@ -376,7 +286,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                   id="admin-username-input"
                   type="text"
                   required
-                  placeholder={language === 'ko' ? '아이디를 입력해주세요...' : language === 'en' ? 'Enter admin username...' : 'Nhập tên đăng nhập...'}
+                  placeholder="admin@villa.com"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-300 rounded-xl py-2.5 pl-9 pr-4 text-xs font-semibold outline-none focus:bg-white focus:border-[#0071c2]"
@@ -446,8 +356,8 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                 {language === 'ko' 
                   ? '아이디: admin · 패스워드: admin123 또는 admin2026' 
                   : language === 'en' 
-                    ? 'Username: admin · Password: admin123 or admin2026' 
-                    : 'Tên đăng nhập: admin · Mật khẩu: admin123 hoặc admin2026'}
+                    ? 'Email: admin@villa.com · Password: admin123' 
+                    : 'Email: admin@villa.com · Mật khẩu: admin123'}
               </span>
             </div>
           </div>
@@ -481,6 +391,15 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
         </div>
       </div>
 
+      {adminDataError && (
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 pt-5">
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-bold flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{adminDataError}</span>
+          </div>
+        </div>
+      )}
+
       <AdminLayout
         villas={allVillas}
         bookings={recentBookings}
@@ -496,6 +415,8 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
         onToggleVerifyFeedback={handleToggleVerifyFeedback}
         onUpdateVillaAvailability={handleUpdateVillaAvailability}
         onLogout={triggerLogout}
+        adminStats={adminStats || undefined}
+        adminUser={adminUser || undefined}
       />
 
       {/* Global Confirmation modal */}
