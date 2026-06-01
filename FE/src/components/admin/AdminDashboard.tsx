@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Building2, CalendarCheck, Landmark, AlertCircle, Sparkles, 
-  ArrowUpRight, ArrowDownRight, PlusCircle, CalendarDays, 
-  ClipboardList, MessageSquare, Star, ArrowRight, User 
+  Building2, CalendarCheck, Landmark, AlertCircle,
+  ArrowUpRight, ArrowDownRight, PlusCircle, CalendarDays,
+  ClipboardList, MessageSquare, Star, ArrowRight, User
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AdminStats, VillaDetail, Booking, Feedback } from '../../types';
@@ -110,20 +110,18 @@ export default function AdminDashboard({
     <div className="flex flex-col gap-8 animate-fadeIn">
       {/* Operating Greeting Banner */}
       <div className="bg-gradient-to-r from-[#003b66] to-[#0071c2] text-white p-6 sm:p-8 rounded-3xl shadow-md relative overflow-hidden">
-        <div className="absolute right-0 bottom-0 top-0 opacity-10 flex items-center justify-center pr-12 pointer-events-none select-none">
-          <Sparkles className="w-56 h-56" />
-        </div>
+
         <div className="relative z-10 flex flex-col gap-2 max-w-xl">
           <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase self-start">
-            {language === 'vi' ? 'QUẢN TRỊ VIÊN' : 'OPERATING MANAGER'}
+            {language === 'vi' ? 'Quản trị viên' : 'Manager'}
           </div>
           <h2 className="text-xl sm:text-2xl font-display font-black leading-tight">
-            {language === 'vi' ? 'Chào buổi sáng, Nhà điều hành!' : 'Good morning, Operator!'}
+            {language === 'vi' ? 'Chào Anh Yêu, hôm nay mình kiểm tra nhanh tình hình đặt phòng nhé.' : 'Good morning. Here is today\'s booking overview.'}
           </h2>
           <p className="text-xs text-[#a1c9ff] font-semibold leading-relaxed font-sans">
             {language === 'vi' 
-              ? `Hệ thống tự động đang hoạt động (Thời gian giữ chỗ: ${getHoldTimeDisplay()}). Trực quan hóa dữ liệu thống kê, doanh số, tỉ lệ đặt phòng và phản hồi mới nhất của khách hàng.` 
-              : `VillaStay operational systems are active (Hold setting: ${getHoldTimeDisplay()}). Real-time metrics are synced with local databases and transaction histories below.`}
+              ? `Thời gian giữ chỗ hiện tại: ${getHoldTimeDisplay()}. Dưới đây là thống kê đặt phòng, doanh thu và phản hồi mới.` 
+              : `Current hold time: ${getHoldTimeDisplay()}. Below are booking, revenue, and feedback summaries.`}
           </p>
         </div>
       </div>
@@ -318,8 +316,8 @@ export default function AdminDashboard({
             <span className="text-sm">📈</span>
             <p>
               {language === 'vi' 
-                ? 'Tăng trưởng doanh số cọc được củng cố tốt nhờ lượng khách du lịch Đà Lạt & Vũng Tàu tăng đột biến.'
-                : 'Deposit collection growth is driven by local checks in high seasons.'}
+                ? 'Doanh thu được tính từ các đơn đã xác nhận trong hệ thống.'
+                : 'Revenue is calculated from confirmed bookings in the system.'}
             </p>
           </div>
         </div>
@@ -349,7 +347,7 @@ export default function AdminDashboard({
           <div className="flex-grow flex justify-between items-center leading-none">
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{language === 'vi' ? 'Xác nhận' : 'Confirmed'}</span>
-              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Đơn đã cọc' : 'Nights secured'}</span>
+              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Đã xác nhận' : 'Confirmed stays'}</span>
             </div>
             <span className="text-lg font-black text-emerald-600 font-mono">{confirmedCount}</span>
           </div>
@@ -591,7 +589,7 @@ export default function AdminDashboard({
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-xs font-bold text-neutral-800 group-hover:text-amber-800 transition-colors">{language === 'vi' ? 'Duyệt Booking' : 'Pending Bookings'}</span>
-              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Kiểm tra cọc ngân hàng' : 'Awaiting cọc holds'}</span>
+              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Chờ xác nhận' : 'Awaiting review'}</span>
             </div>
           </button>
 

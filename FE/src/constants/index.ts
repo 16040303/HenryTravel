@@ -29,10 +29,13 @@ export const BOOKING_STATUSES = {
   },
 };
 
-export const ZALO_PHONE = '0901 234 567';
+/** Fallback Zalo phone from env — used only when API is unavailable */
+export const ZALO_PHONE_FALLBACK = (import.meta.env.VITE_ZALO_PHONE as string) || '';
 
-export function getZaloLink(message?: string): string {
-  const cleanPhone = ZALO_PHONE.replace(/\s+/g, '');
+export function getZaloLink(phone: string, message?: string): string {
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  if (!cleanPhone) return '';
   const encodedText = message ? encodeURIComponent(message) : '';
   return `https://zalo.me/${cleanPhone}${encodedText ? `?text=${encodedText}` : ''}`;
 }
+

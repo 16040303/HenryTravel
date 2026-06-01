@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Search, ShieldAlert, Phone, Key, HelpCircle, MessageSquare, Star, Info, CalendarClock, CreditCard } from 'lucide-react';
 import { BookingStatus, Booking } from '../types';
-import { checkBooking, submitFeedback } from '../lib/api';
-import { BOOKING_STATUSES, getZaloLink } from '../constants';
+import { checkBooking, submitFeedback, getPublicSettings } from '../lib/api';
+import { BOOKING_STATUSES, getZaloLink, ZALO_PHONE_FALLBACK } from '../constants';
 import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LookupSkeleton } from './common/Skeleton';
@@ -17,6 +17,7 @@ export default function LookupView() {
   
   // Results structures
   const [lookupResult, setLookupResult] = useState<BookingStatus | null>(null);
+  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
 
   // Review states inside lookup page
   const [rating, setRating] = useState(5);
@@ -24,6 +25,22 @@ export default function LookupView() {
   const [reviewerName, setReviewerName] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState('');
+
+  React.useEffect(() => {
+    let mounted = true;
+    getPublicSettings()
+      .then((settings) => {
+        if (!mounted) return;
+        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLookupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,7 +214,7 @@ export default function LookupView() {
                         {t('look.pendingDesc')}
                       </p>
                       <a 
-                        href={getZaloLink(`Chốt giữ chỗ Booking mã ${lookupResult.booking?.code}`)}
+                        href={lookupResult.booking.zaloLinks?.fallback || lookupResult.booking.zaloLinks?.web || publicZaloUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase shadow"

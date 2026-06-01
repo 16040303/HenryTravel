@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildZaloLinks = buildZaloLinks;
+const settings_1 = require("./settings");
 function cleanPhone(phone) {
     return phone.replace(/[^0-9]/g, '');
 }
@@ -11,16 +12,18 @@ function formatDate(date) {
         day: '2-digit',
     });
 }
-function buildZaloLinks(params) {
-    const phone = cleanPhone(process.env.ZALO_PHONE || params.phone);
+async function buildZaloLinks(params) {
+    const phone = cleanPhone(await (0, settings_1.resolveZaloPhone)(params.phone));
     const message = [
-        `Xin chào, tôi vừa đặt giữ chỗ villa ${params.villaName}.`,
+        `Xin chào HenryTravel, tôi vừa đặt giữ chỗ villa ${params.villaName}.`,
         `Mã đặt phòng: ${params.bookingCode}`,
+        params.guestName ? `Tên khách: ${params.guestName}` : null,
+        `Số điện thoại: ${params.phone}`,
         `Ngày nhận phòng: ${formatDate(params.checkIn)}`,
         `Ngày trả phòng: ${formatDate(params.checkOut)}`,
         `Số khách: ${params.guestsCount}`,
         'Nhờ admin kiểm tra và xác nhận giúp tôi.',
-    ].join('\n');
+    ].filter(Boolean).join('\n');
     const encodedMessage = encodeURIComponent(message);
     return {
         phone,

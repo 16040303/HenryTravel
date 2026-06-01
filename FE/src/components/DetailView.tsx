@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { 
-  ArrowLeft, Star, MapPin, Calendar, Heart, Share2, Compass, Waves, Wifi, 
-  ParkingCircle, Utensils, Flame, Mountain, PawPrint, Users, MessageSquare, 
-  Clock, ShieldAlert, BadgeInfo, CheckCircle2, Copy 
+import {
+  ArrowLeft, Star, MapPin, Calendar, Share2, Compass, Waves, Wifi,
+  ParkingCircle, Utensils, Flame, Mountain, PawPrint, Users, MessageSquare,
+  Clock, ShieldAlert, BadgeInfo, CheckCircle2, Copy
 } from 'lucide-react';
 import { VillaDetail, Feedback, BookingResult } from '../types';
-import { getVillaById, createBooking, getVillaFeedbacks, submitFeedback } from '../lib/api';
-import { getZaloLink, FACILITIES } from '../constants';
+import { getVillaById, createBooking, getVillaFeedbacks, submitFeedback, getPublicSettings } from '../lib/api';
+import { getZaloLink, ZALO_PHONE_FALLBACK, FACILITIES } from '../constants';
 import { useBookingCountdown } from '../hooks/useBookingCountdown';
 import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
@@ -21,9 +21,15 @@ interface DetailViewProps {
   onBack: () => void;
   onNavigateToLookup: () => void;
   onBookingSuccessNotify?: () => void;
+  initialSearchParams?: {
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    rooms: number;
+  };
 }
 
-export default function DetailView({ villaId, onBack, onNavigateToLookup, onBookingSuccessNotify }: DetailViewProps) {
+export default function DetailView({ villaId, onBack, onNavigateToLookup, onBookingSuccessNotify, initialSearchParams }: DetailViewProps) {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
   const { id } = useParams<{ id: string }>();
@@ -33,7 +39,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
   const [villa, setVilla] = useState<VillaDetail | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [feedbackSummary, setFeedbackSummary] = useState({ avgRating: 0, total: 0 });
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [publicZaloPhone, setPublicZaloPhone] = useState(ZALO_PHONE_FALLBACK);
+  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
 
   // Review Form States
   const [newFeedbackName, setNewFeedbackName] = useState('');
@@ -48,10 +58,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   const [bookingName, setBookingName] = useState('');
   const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEmail, setBookingEmail] = useState('');
-  const [checkIn, setCheckIn] = useState('2026-06-20');
-  const [checkOut, setCheckOut] = useState('2026-06-23');
-  const [guestsCount, setGuestsCount] = useState(2);
-  const [roomsCount, setRoomsCount] = useState(1);
+  const [checkIn, setCheckIn] = useState(initialSearchParams?.checkIn || '2026-06-20');
+  const [checkOut, setCheckOut] = useState(initialSearchParams?.checkOut || '2026-06-23');
+  const [guestsCount, setGuestsCount] = useState(initialSearchParams?.guests || 2);
+  const [roomsCount, setRoomsCount] = useState(initialSearchParams?.rooms || 1);
+  const [activeBookingDateField, setActiveBookingDateField] = useState<'checkIn' | 'checkOut' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
 
   // Booking outcome state
@@ -72,9 +83,15 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       const data = await getVillaById(activeVillaId);
       if (data) {
         setVilla(data);
-        const fList = await getVillaFeedbacks(activeVillaId);
-        setFeedbacks(fList);
-        
+        setFeedbackLoading(true);
+        try {
+          const fList = await getVillaFeedbacks(data.id);
+          setFeedbacks(fList.feedbacks);
+          setFeedbackSummary({ avgRating: fList.avgRating, total: fList.total });
+        } finally {
+          setFeedbackLoading(false);
+        }
+
         // Populate standard configs
         setTotalCost(data.price * 3);
       }
@@ -82,6 +99,24 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     }
     loadVilla();
   }, [activeVillaId]);
+
+  useEffect(() => {
+    let mounted = true;
+    getPublicSettings()
+      .then((settings) => {
+        if (!mounted) return;
+        setPublicZaloPhone(settings.zaloPhone || ZALO_PHONE_FALLBACK);
+        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPublicZaloPhone(ZALO_PHONE_FALLBACK);
+        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Recalculate days and prices whenever check dates are updated
   useEffect(() => {
@@ -106,7 +141,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   if (!villa) {
     return (
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16 text-center">
-        <EmptyState 
+        <EmptyState
           title="Không tìm thấy biệt thự"
           description="Hệ thống không tìm thấy biệt thự tương ứng với mã yêu cầu. Vui lòng quay lại danh sách để khám phá các lựa chọn tuyệt vời khác!"
           actionText="Quay lại danh sách"
@@ -116,6 +151,88 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       </div>
     );
   }
+
+  const formatDisplayDate = (value: string) => {
+    const [year, month, day] = value.split('-');
+    return year && month && day ? `${day}/${month}/${year}` : value;
+  };
+
+  const formatFeedbackDate = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Đánh giá gần đây';
+    return `Đánh giá ngày ${new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date)}`;
+  };
+
+  const calculatedAvgRating = feedbacks.length > 0
+    ? Number((feedbacks.reduce((sum, feedback) => sum + feedback.rating, 0) / feedbacks.length).toFixed(1))
+    : 0;
+  const displayAvgRating = villa.avgRating || feedbackSummary.avgRating || calculatedAvgRating;
+  const displayFeedbackCount = villa.feedbackCount || feedbackSummary.total || feedbacks.length;
+
+  const renderBookingDateCalendar = (
+    field: 'checkIn' | 'checkOut',
+    value: string,
+    onSelect: (value: string) => void
+  ) => {
+    if (activeBookingDateField !== field) return null;
+    const selected = new Date(value);
+    const year = Number.isNaN(selected.getTime()) ? 2026 : selected.getFullYear();
+    const month = Number.isNaN(selected.getTime()) ? 5 : selected.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
+    const monthLabel = new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
+      month: 'long',
+      year: 'numeric'
+    }).format(new Date(year, month, 1));
+
+    return (
+      <div className="absolute left-0 top-[calc(100%+8px)] z-[250] w-[280px] rounded-2xl border border-neutral-100 bg-white p-3 shadow-2xl shadow-neutral-900/15 animate-scaleIn">
+        <div className="mb-3 flex items-center justify-between border-b border-neutral-100 pb-2">
+          <span className="text-xs font-black capitalize text-neutral-800">{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => setActiveBookingDateField(null)}
+            className="rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+          >
+            Đóng
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-400">
+          {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(day => (
+            <span key={day}>{day}</span>
+          ))}
+          {Array.from({ length: offset }).map((_, index) => (
+            <span key={`empty-${field}-${index}`} />
+          ))}
+          {Array.from({ length: daysInMonth }, (_, index) => index + 1).map(day => {
+            const dateValue = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isSelected = dateValue === value;
+            return (
+              <button
+                key={dateValue}
+                type="button"
+                onClick={() => {
+                  onSelect(dateValue);
+                  setActiveBookingDateField(null);
+                }}
+                className={`aspect-square rounded-xl text-[11px] font-bold transition-all ${isSelected
+                  ? 'bg-[#0071c2] text-white shadow-sm shadow-[#0071c2]/30'
+                  : 'text-neutral-700 hover:bg-[#edf3ff] hover:text-[#005899]'
+                  }`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,15 +292,16 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
         comment: newFeedbackComment
       });
 
-      setFeedbackSuccessMsg('Cực kỳ cảm ơn đánh giá của bạn! Đánh giá đã được lưu vào hệ thống.');
+      setFeedbackSuccessMsg('Cảm ơn bạn đã gửi đánh giá. Nhận xét đã được lưu lại.');
       setNewFeedbackName('');
       setNewFeedbackBookingCode('');
       setNewFeedbackPhone('');
       setNewFeedbackComment('');
-      
+
       // Reload feedbacks list
       const updatedFeedbacks = await getVillaFeedbacks(villa.id);
-      setFeedbacks(updatedFeedbacks);
+      setFeedbacks(updatedFeedbacks.feedbacks);
+      setFeedbackSummary({ avgRating: updatedFeedbacks.avgRating, total: updatedFeedbacks.total });
 
       // Reload villa info to reflect updated ratings in UI
       const refreshVilla = await getVillaById(villa.id);
@@ -205,19 +323,51 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     }
   };
 
-  // Build the Zalo Action button Link with context about booking
-  const zaloSupportMessage = bookingResult
-    ? `Xin chào VillaStay, tôi vừa đặt phòng với mã giữ chỗ [ ${bookingResult.bookingCode} ] tại ${villa.name}. Vui lòng xác nhận giao dịch giúp tôi.`
-    : `Xin chào VillaStay, tôi cần hỗ trợ đặt phòng tại ${villa.name}.`;
-  const zaloSupportUrl = getZaloLink(zaloSupportMessage);
+  const handleShareVilla = async () => {
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: villa.name,
+      text: `Khám phá ${villa.name} tại ${villa.location} trên HenryTravel`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      showToast('success', 'Đã sao chép liên kết villa.');
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        showToast('error', 'Chưa thể chia sẻ liên kết. Vui lòng thử lại.');
+      }
+    }
+  };
+
+  const fallbackZaloSupportMessage = bookingResult
+    ? `Xin chào HenryTravel, tôi vừa gửi yêu cầu giữ chỗ mã [ ${bookingResult.bookingCode} ] tại ${villa.name}. Nhờ anh/chị kiểm tra và xác nhận giúp tôi.`
+    : `Xin chào HenryTravel, tôi cần tư vấn thêm về ${villa.name}.`;
+  const zaloSupportMessage = bookingResult?.zaloLinks?.message || fallbackZaloSupportMessage;
+  const fallbackPublicZaloUrl = getZaloLink(publicZaloPhone || ZALO_PHONE_FALLBACK, zaloSupportMessage) || publicZaloUrl;
+  const zaloSupportUrl = bookingResult?.zaloLinks?.fallback || bookingResult?.zaloLinks?.web || fallbackPublicZaloUrl;
+
+  const copyZaloMessage = () => {
+    navigator.clipboard.writeText(zaloSupportMessage);
+    showToast('success', 'Đã sao chép tin nhắn Zalo. Bạn chỉ cần dán vào khung chat.');
+  };
+
+  const openZaloSupport = () => {
+    window.open(zaloSupportUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="bg-[#fcf9f8] min-h-screen pb-20">
-      
+
       {/* Breadcrumbs and navigation controls */}
       <div className="bg-white border-b border-neutral-100 py-3.5 px-4">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 flex items-center justify-between">
-          <button 
+          <button
             type="button"
             onClick={onBack}
             className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 hover:text-[#0071c2] cursor-pointer"
@@ -237,7 +387,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       </div>
 
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-8">
-        
+
         {/* Title Block Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
           <div>
@@ -247,8 +397,8 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               </span>
               <div className="flex items-center gap-1.5 text-xs font-black text-[#fe6a34]">
                 <Star className="w-3.5 h-3.5 fill-[#fe6a34] text-[#fe6a34]" />
-                <span>{villa.rating}</span>
-                <span className="text-neutral-400 font-normal">({feedbacks.length} bình luận)</span>
+                <span>{displayAvgRating}</span>
+                <span className="text-neutral-400 font-normal">({displayFeedbackCount} bình luận)</span>
               </div>
             </div>
 
@@ -263,11 +413,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
           </div>
 
           <div className="flex items-center gap-2 text-xs font-bold">
-            <button className="flex items-center gap-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg py-2 px-3.5 shadow-sm text-neutral-600 cursor-pointer">
-              <Heart className="w-4 h-4 hover:fill-red-500 text-neutral-400" />
-              <span>Yêu thích</span>
-            </button>
-            <button className="flex items-center gap-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg py-2 px-3.5 shadow-sm text-neutral-600 cursor-pointer">
+            <button
+              type="button"
+              onClick={handleShareVilla}
+              className="flex items-center gap-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg py-2 px-3.5 shadow-sm text-neutral-600 cursor-pointer"
+            >
               <Share2 className="w-4 h-4 text-neutral-400" />
               <span>Chia sẻ</span>
             </button>
@@ -278,9 +428,9 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden mb-10 shadow-sm">
           {/* Main big block */}
           <div className="md:col-span-2 relative aspect-[4/3] md:aspect-square bg-neutral-100">
-            <OptimizedImage 
-              src={villa.images[0] || villa.image} 
-              alt="Main angle" 
+            <OptimizedImage
+              src={villa.images[0] || villa.image}
+              alt="Main angle"
               className="w-full h-full object-cover hover:scale-101 transition-transform duration-500 cursor-zoom-in"
               isHero={true}
               aspectRatioClassName="h-full w-full"
@@ -290,17 +440,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
           {/* Sub blocks */}
           <div className="grid grid-cols-2 md:grid-cols-1 md:col-span-1 gap-3">
             <div className="relative aspect-[4/3] md:aspect-auto md:h-full bg-neutral-100">
-              <OptimizedImage 
-                src={villa.images[1] || 'https://picsum.photos/400/300?random=11'} 
-                alt="Room detail 1" 
+              <OptimizedImage
+                src={villa.images[1] || 'https://picsum.photos/400/300?random=11'}
+                alt="Room detail 1"
                 className="w-full h-full object-cover hover:scale-102 transition-transform duration-500 cursor-zoom-in"
                 aspectRatioClassName="h-full w-full"
               />
             </div>
             <div className="relative aspect-[4/3] md:aspect-auto md:h-full bg-neutral-100">
-              <OptimizedImage 
-                src={villa.images[2] || 'https://picsum.photos/400/300?random=12'} 
-                alt="Bathroom detail" 
+              <OptimizedImage
+                src={villa.images[2] || 'https://picsum.photos/400/300?random=12'}
+                alt="Bathroom detail"
                 className="w-full h-full object-cover hover:scale-102 transition-transform duration-500 cursor-zoom-in"
                 aspectRatioClassName="h-full w-full"
               />
@@ -309,17 +459,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
           <div className="grid grid-cols-2 md:grid-cols-1 md:col-span-1 gap-3">
             <div className="relative aspect-[4/3] md:aspect-auto md:h-full bg-neutral-100">
-              <OptimizedImage 
-                src={villa.images[3] || 'https://picsum.photos/400/300?random=13'} 
-                alt="Scenic detail" 
+              <OptimizedImage
+                src={villa.images[3] || 'https://picsum.photos/400/300?random=13'}
+                alt="Scenic detail"
                 className="w-full h-full object-cover hover:scale-102 transition-transform duration-500 cursor-zoom-in"
                 aspectRatioClassName="h-full w-full"
               />
             </div>
             <div className="relative aspect-[4/3] md:aspect-auto md:h-full bg-[#eee]">
-              <OptimizedImage 
-                src={villa.images[4] || 'https://picsum.photos/400/300?random=14'} 
-                alt="Outdoor view" 
+              <OptimizedImage
+                src={villa.images[4] || 'https://picsum.photos/400/300?random=14'}
+                alt="Outdoor view"
                 className="w-full h-full object-cover hover:scale-102 transition-transform duration-500 cursor-zoom-in opacity-80"
                 aspectRatioClassName="h-full w-full"
               />
@@ -332,10 +482,10 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
         {/* Splits Layout: Left info details vs Right secure Form trigger */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
+
           {/* Left Columns details */}
           <div className="lg:col-span-8 flex flex-col gap-10">
-            
+
             {/* Overview quick summaries section */}
             <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div className="flex flex-col items-center border-r border-neutral-100 last:border-0 py-1">
@@ -375,13 +525,12 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 {FACILITIES.map(key => {
                   const hasFacility = villa.facilities.includes(key.id);
                   return (
-                    <div 
+                    <div
                       key={key.id}
-                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-semibold ${
-                        hasFacility 
-                          ? 'bg-emerald-50/50 border-emerald-100/60 text-neutral-800' 
-                          : 'opacity-40 bg-neutral-50/50 border-neutral-100 text-neutral-400'
-                      }`}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-semibold ${hasFacility
+                        ? 'bg-emerald-50/50 border-emerald-100/60 text-neutral-800'
+                        : 'opacity-40 bg-neutral-50/50 border-neutral-100 text-neutral-400'
+                        }`}
                     >
                       <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasFacility ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-400'}`}>
                         {/* Static mapping of lucide icons for facilities */}
@@ -411,10 +560,10 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                   {language === 'vi' ? 'Lịch đặt phòng trực quan' : (language === 'ko' ? '실시간 예약 달력' : 'Interactive Reservation Calendar')}
                 </h3>
                 <span className="text-[9px] font-extrabold bg-[#edf3ff] text-[#005899] py-0.5 px-2 rounded-full uppercase tracking-wider">
-                  Real-time Available Map
+                  Lịch còn trống
                 </span>
               </div>
-              <BookingCalendar 
+              <BookingCalendar
                 bookedDates={villa.bookedDates}
                 pendingDates={villa.pendingDates}
                 checkIn={checkIn}
@@ -458,13 +607,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
             {/* Interactive Feedbacks reviews presentation box */}
             <div className="flex flex-col gap-5 pt-4 border-t border-neutral-100">
-              <h3 className="text-xl font-display font-black text-neutral-800">Đánh giá thực tế ({feedbacks.length})</h3>
-              
+              <h3 className="text-xl font-display font-black text-neutral-800">Đánh giá thực tế ({displayFeedbackCount})</h3>
+
               <div className="flex flex-col gap-4">
-                {feedbacks.length === 0 ? (
-                  <EmptyState 
-                    title={language === 'vi' ? 'Chưa có đánh giá nào' : (language === 'ko' ? '등록된 리뷰가 없습니다' : 'No reviews yet')}
-                    description={language === 'vi' ? 'Biệt thự này hiện chưa nhận được nhận xét nào từ khách lưu trú. Hãy chọn đặt phòng ngay để trở thành những vị khách đầu tiên gửi gắm trải nghiệm lưu trú thực tế tại đây!' : (language === 'ko' ? '투숙객들의 생생한 이용 후기가 아직 등록되지 않았습니다. 지금 바로 예약을 확정하시고 첫 투숙객들의 소중한 경험을 나누어 보세요!' : 'This villa has not received any guest reviews yet. Book now and be the first to share your vacation experiences here!')}
+                {feedbackLoading ? (
+                  <div className="bg-white p-5 rounded-xl border border-neutral-100 shadow-sm text-xs font-bold text-neutral-400 animate-pulse">
+                    Đang tải đánh giá thực tế...
+                  </div>
+                ) : feedbacks.length === 0 ? (
+                  <EmptyState
+                    title={language === 'vi' ? 'Chưa có đánh giá nào cho villa này.' : (language === 'ko' ? '등록된 리뷰가 없습니다' : 'No reviews yet for this villa.')}
+                    description={language === 'vi' ? 'Các đánh giá đã xác thực từ khách lưu trú sẽ hiển thị tại đây.' : (language === 'ko' ? '인증된 투숙객 리뷰가 여기에 표시됩니다.' : 'Verified guest reviews will appear here.')}
                     icon="feedback"
                   />
                 ) : (
@@ -481,7 +634,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                         {f.comment}
                       </p>
                       <div className="text-[10px] text-neutral-400 font-bold flex items-center gap-1">
-                        <span>Đã lưu kỳ nghỉ tháng 12/2024</span>
+                        <span>{formatFeedbackDate(f.createdAt)}</span>
                         {f.isVerified && <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">✓ Khách đặt thực tế</span>}
                       </div>
                     </div>
@@ -493,7 +646,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200/50 mt-4 flex flex-col gap-4">
                 <div>
                   <h4 className="font-bold text-sm text-neutral-800">Gửi nhận xét của bạn</h4>
-                  <p className="text-[11px] text-neutral-400 font-semibold mt-0.5">Chúng tôi trân quý phản hồi của bạn để nâng tầm chất lượng</p>
+                  <p className="text-[11px] text-neutral-400 font-semibold mt-0.5">Chia sẻ ngắn gọn để những khách sau dễ chọn hơn</p>
                 </div>
 
                 {feedbackSuccessMsg ? (
@@ -506,12 +659,12 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-bold text-neutral-600 uppercase">Họ và tên của bạn</span>
-                        <input 
+                        <input
                           type="text"
                           required
                           value={newFeedbackName}
                           onChange={(e) => setNewFeedbackName(e.target.value)}
-                          placeholder="Ví dụ: Nguyễn Văn Hải"
+                          placeholder="Ví dụ: Nguyễn Văn A"
                           className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
                         />
                       </div>
@@ -560,12 +713,12 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                         rows={3}
                         value={newFeedbackComment}
                         onChange={(e) => setNewFeedbackComment(e.target.value)}
-                        placeholder="Hãy chia sẻ trải nghiệm thực tế về phòng ốc, cách phục vụ của quản gia, khu nướng BBQ..."
+                        placeholder="Bạn có thể chia sẻ về phòng, vị trí, tiện nghi hoặc cách hỗ trợ của chủ nhà..."
                         className="bg-white border border-neutral-200 rounded-lg p-3 text-xs font-semibold outline-none focus:border-[#0071c2] resize-none"
                       />
                     </div>
 
-                    <button 
+                    <button
                       type="submit"
                       disabled={isSubmittingFeedback}
                       className="self-end bg-[#0071c2] hover:bg-[#005899] disabled:bg-neutral-400 text-white font-bold text-xs py-2 px-5 rounded-lg cursor-pointer"
@@ -582,9 +735,9 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
           {/* Right Columns secure sticky Booking parameters form */}
           <div className="lg:col-span-4">
             <div className="sticky top-24 bg-white p-6 rounded-2xl border border-neutral-100 shadow-xl flex flex-col gap-5">
-              
+
               <div>
-                <span className="text-[10px] uppercase font-bold text-neutral-400">Giá phòng bình quân</span>
+                <span className="text-[10px] uppercase font-bold text-neutral-400">Giá trung bình</span>
                 <div className="flex items-baseline gap-1 mt-0.5">
                   <span className="text-2xl font-black text-[#fe6a34] font-display">
                     {villa.price.toLocaleString('vi-VN')}₫
@@ -595,28 +748,30 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
               {/* Core Check form */}
               <form onSubmit={handleBookingSubmit} className="flex flex-col gap-4 border-t border-neutral-100 pt-4">
-                
+
                 {/* Dates pickers */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
+                  <div className="relative flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase">Check-in</label>
-                    <input 
-                      type="date"
-                      required
-                      value={checkIn}
-                      onChange={(e) => setCheckIn(e.target.value)}
-                      className="bg-neutral-50 border border-neutral-200 rounded-lg px-3.5 py-1.5 text-xs font-bold text-neutral-700 outline-none focus:border-[#0071c2]"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setActiveBookingDateField(activeBookingDateField === 'checkIn' ? null : 'checkIn')}
+                      className="bg-neutral-50 border border-neutral-200 rounded-lg px-3.5 py-1.5 text-left text-xs font-bold text-neutral-700 outline-none focus:border-[#0071c2]"
+                    >
+                      {formatDisplayDate(checkIn)}
+                    </button>
+                    {renderBookingDateCalendar('checkIn', checkIn, setCheckIn)}
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="relative flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase">Check-out</label>
-                    <input 
-                      type="date"
-                      required
-                      value={checkOut}
-                      onChange={(e) => setCheckOut(e.target.value)}
-                      className="bg-neutral-50 border border-neutral-200.rounded px-3.5 py-1.5 text-xs font-bold text-neutral-700 outline-none"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setActiveBookingDateField(activeBookingDateField === 'checkOut' ? null : 'checkOut')}
+                      className="bg-neutral-50 border border-neutral-200 rounded-lg px-3.5 py-1.5 text-left text-xs font-bold text-neutral-700 outline-none focus:border-[#0071c2]"
+                    >
+                      {formatDisplayDate(checkOut)}
+                    </button>
+                    {renderBookingDateCalendar('checkOut', checkOut, setCheckOut)}
                   </div>
                 </div>
 
@@ -629,7 +784,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       onChange={(e) => setGuestsCount(Number(e.target.value))}
                       className="bg-neutral-50 border border-neutral-200 px-3.5 py-1.5 text-xs font-bold text-neutral-700 rounded-lg outline-none cursor-pointer"
                     >
-                      {[1,2,3,4,6,8,10,12].map(g => (
+                      {[1, 2, 3, 4, 6, 8, 10, 12].map(g => (
                         <option key={g} value={g}>{g} Khách</option>
                       ))}
                     </select>
@@ -641,7 +796,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       onChange={(e) => setRoomsCount(Number(e.target.value))}
                       className="bg-neutral-50 border border-neutral-200 px-3.5 py-1.5 text-xs font-bold text-neutral-700 rounded-lg outline-none cursor-pointer"
                     >
-                      {[1,2,3,4,5].map(r => (
+                      {[1, 2, 3, 4, 5].map(r => (
                         <option key={r} value={r}>{r} Phòng</option>
                       ))}
                     </select>
@@ -651,22 +806,22 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 {/* Personal Information forms */}
                 <div className="flex flex-col gap-3.5 border-t border-neutral-100 pt-4">
                   <h4 className="font-bold text-xs uppercase text-neutral-400 tracking-wider">Thông tin khách hàng</h4>
-                  
+
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase">Họ và tên</label>
-                    <input 
+                    <input
                       type="text"
                       required
                       value={bookingName}
                       onChange={(e) => setBookingName(e.target.value)}
-                      placeholder="Nguyễn Văn Hải"
+                      placeholder="Nguyễn Văn A"
                       className="bg-neutral-50 border border-neutral-200 p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase">Số điện thoại liên hệ</label>
-                    <input 
+                    <input
                       type="tel"
                       required
                       value={bookingPhone}
@@ -678,11 +833,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase">Địa chỉ Email</label>
-                    <input 
+                    <input
                       type="email"
                       value={bookingEmail}
                       onChange={(e) => setBookingEmail(e.target.value)}
-                      placeholder="nhieu@example.com (không bắt buộc)"
+                      placeholder="vidu@gmail.com (không bắt buộc)"
                       className="bg-neutral-50 border border-neutral-200 p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
                     />
                   </div>
@@ -709,19 +864,19 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 {/* Urgency tag ticker (Screen 3 Spec) */}
                 <div className="flex items-center gap-1.5 bg-[#ffdbd0]/30 border border-red-100 px-3 py-2 rounded-xl text-[10px] text-red-900 font-extrabold leading-normal">
                   <BadgeInfo className="w-4 h-4 text-[#fe6a34] shrink-0" />
-                  <span>Cực kỳ gấp! Hiện có 4 khách nán lại đang xem villa này ngay lúc này. Hãy chốt giữ chỗ trước khi hết phòng!</span>
+                  <span>Nếu ngày này phù hợp, bạn có thể gửi yêu cầu giữ chỗ. Tư vấn viên sẽ liên hệ lại để xác nhận chi tiết.</span>
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   disabled={bookingLoading}
                   className="w-full bg-[#fe6a34] hover:bg-[#ab3500] disabled:bg-neutral-400 text-white font-black py-3 rounded-xl text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#fe6a34]/30"
                 >
-                  {bookingLoading ? 'Đang gửi thông tin...' : 'Đặt phòng ngay'}
+                  {bookingLoading ? 'Đang gửi...' : 'Gửi yêu cầu giữ chỗ'}
                 </button>
 
                 <p className="text-[10px] text-neutral-400 text-center font-semibold mt-1">
-                  * Hoàn lại bảo đảm giữ chỗ 15 phút. Bạn vui lòng liên hệ Zalo sau khi đặt để kích hoạt xác nhận phòng lập tức.
+                  * Phòng được giữ tạm trong 15 phút để bạn kịp xác nhận qua Zalo.
                 </p>
               </form>
 
@@ -736,20 +891,20 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       {showBookingModal && bookingResult && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-scaleIn border border-neutral-100">
-            
+
             {/* Header Success Accent */}
             <div className="bg-[#003b66] text-white p-6 text-center flex flex-col items-center">
               <div className="w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-3 shadow">
                 <CheckCircle2 className="w-8 h-8 font-black" />
               </div>
 
-              <h3 className="text-xl font-display font-black tracking-tight text-white leading-tight">Yêu cầu giữ chỗ thành công!</h3>
-              <p className="text-xs text-[#a1c9ff] font-bold mt-1 uppercase tracking-wider">Mã Booking: {bookingResult.bookingCode}</p>
+              <h3 className="text-xl font-display font-black tracking-tight text-white leading-tight">Đã gửi yêu cầu giữ chỗ</h3>
+              <p className="text-xs text-[#a1c9ff] font-bold mt-1 tracking-wider">Mã booking: {bookingResult.bookingCode}</p>
             </div>
 
             {/* Hold Ticker Counter Box (15 minutes countdown hold holdExpireAt) */}
             <div className="p-6 flex flex-col items-center text-center gap-5">
-              
+
               <div className="bg-amber-50 border border-amber-200 rounded-2xl py-4 px-6 w-full max-w-sm flex flex-col items-center gap-1 shadow-sm">
                 <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 animate-pulse">
                   <Clock className="w-3.5 h-3.5 text-[#fe6a34]" />
@@ -767,7 +922,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 )}
 
                 <p className="text-[10px] text-neutral-500 font-semibold leading-normal mt-2">
-                  * Tránh Overbooking, VillaStay tự động tạm hoãn giữ riêng phòng cho bạn trong <strong>15 phút</strong>. Quý khách vui lòng chốt phòng qua Zalo bên dưới để hoàn tất xác nhận chính thức.
+                  * Phòng được giữ tạm trong <strong>15 phút</strong>. Bạn vui lòng nhắn Zalo để tư vấn viên xác nhận lại thông tin.
                 </p>
               </div>
 
@@ -791,43 +946,64 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 </div>
               </div>
 
+              <div className="w-full rounded-2xl border border-[#a1c9ff]/40 bg-[#edf3ff]/60 p-4 text-left">
+                <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#005899]">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Nội dung gửi cho tư vấn viên</span>
+                </div>
+                <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-white/80 p-3 text-[11px] font-semibold leading-relaxed text-neutral-700 border border-white">
+                  {zaloSupportMessage}
+                </pre>
+                <p className="mt-2 text-[10px] font-semibold leading-normal text-neutral-500">
+                  Zalo không luôn tự điền nội dung khi mở từ web/QR. Hãy sao chép tin nhắn rồi dán vào khung chat Zalo.
+                </p>
+              </div>
+
               {/* Action Buttons trigger */}
               <div className="flex flex-col sm:flex-row gap-3 w-full">
-                {/* Zalo Button Action */}
-                <a 
-                  href={zaloSupportUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={copyZaloMessage}
                   className="flex-1 bg-[#fe6a34] hover:bg-[#ab3500] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#fe6a34]/30"
                 >
-                  <MessageSquare className="w-4 h-4 fill-white text-[#fe6a34]" />
-                  <span>Xác nhận qua Zalo</span>
-                </a>
+                  <Copy className="w-4 h-4" />
+                  <span>Sao chép tin nhắn</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openZaloSupport}
+                  className="flex-1 bg-[#0071c2] hover:bg-[#005899] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#0071c2]/20"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Mở Zalo</span>
+                </button>
 
                 {/* Neutral backup button */}
-                <button 
+                <button
+                  type="button"
                   onClick={copyBookingCode}
                   className="flex items-center justify-center gap-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-600 font-bold text-xs py-3 rounded-xl px-4"
                 >
                   <Copy className="w-4 h-4" />
-                  <span>Sao chép Code</span>
+                  <span>Code</span>
                 </button>
               </div>
 
               <div className="flex flex-col gap-2 w-full pt-4 border-t border-neutral-100 text-[10px] text-neutral-400 font-semibold">
-                <button 
+                <button
                   type="button"
                   onClick={onNavigateToLookup}
                   className="text-[#0071c2] font-black hover:underline cursor-pointer"
                 >
-                  Hoặc bạn có thể tự tra cứu trạng thái giữ phòng tại đây →
+                  Tra cứu trạng thái đặt phòng tại đây →
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowBookingModal(false)}
                   className="text-neutral-500 hover:text-neutral-800 font-bold"
                 >
-                  Đóng cửa sổ
+                  Đóng
                 </button>
               </div>
 

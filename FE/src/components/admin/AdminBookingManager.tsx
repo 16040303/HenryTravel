@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { 
-  ClipboardList, Search, Eye, Check, X, Copy, 
-  Calendar, Users, DollarSign, Clock, Phone, Mail, 
-  Download, Printer, ChevronRight, CheckCircle2, AlertCircle 
+import React, { useEffect, useState } from 'react';
+import {
+  ClipboardList, Search, Eye, Check, X, Copy,
+  Calendar, Users, DollarSign, Clock, Phone, Mail,
+  Download, Printer, ChevronRight, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { Booking } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -13,20 +13,32 @@ interface AdminBookingManagerProps {
   bookings: Booking[];
   onApproveBooking: (code: string) => void;
   onRejectBooking: (code: string) => void;
+  onCompleteBooking: (code: string) => void;
+  mutationLoading?: boolean;
 }
 
 export default function AdminBookingManager({
   bookings,
   onApproveBooking,
-  onRejectBooking
+  onRejectBooking,
+  onCompleteBooking,
+  mutationLoading = false
 }: AdminBookingManagerProps) {
   const { language } = useLanguage();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusTab, setActiveStatusTab] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
-  
+
   // Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  useEffect(() => {
+    if (!selectedBooking) return;
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [selectedBooking]);
 
   // 1. Calculate stats counts
   const totalPending = bookings.filter(b => b.status === 'PENDING').length;
@@ -36,8 +48,8 @@ export default function AdminBookingManager({
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    showToast('success', language === 'vi' 
-      ? `Đã sao chép mã đặt phòng: ${code}` 
+    showToast('success', language === 'vi'
+      ? `Đã sao chép mã đặt phòng: ${code}`
       : `Copied booking code: ${code}`
     );
   };
@@ -73,7 +85,7 @@ export default function AdminBookingManager({
       b.totalPrice
     ]);
 
-    const csvContent = 
+    const csvContent =
       '\uFEFF' + // UTF-8 BOM to prevent Vietnamese glitches in Excel
       [headers.join(','), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
 
@@ -81,7 +93,7 @@ export default function AdminBookingManager({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `villastay_bookings_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `HenryTravel_bookings_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -98,10 +110,10 @@ export default function AdminBookingManager({
     }
 
     const isCompleted = b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date();
-    const resolvedStatusText = 
+    const resolvedStatusText =
       isCompleted ? 'COMPLETED (HOÀN TẤT)' :
-      b.status === 'CONFIRMED' ? 'CONFIRMED (ĐÃ CỌC)' :
-      b.status === 'PENDING' ? 'PENDING (ĐỢI CỌC)' : 'CANCELLED (ĐÃ HỦY)';
+        b.status === 'CONFIRMED' ? 'CONFIRMED (ĐÃ CỌC)' :
+          b.status === 'PENDING' ? 'PENDING (ĐỢI CỌC)' : 'CANCELLED (ĐÃ HỦY)';
 
     const printHtml = `
       <html>
@@ -132,7 +144,7 @@ export default function AdminBookingManager({
         </head>
         <body>
           <div class="header">
-            <div class="brand">Villa<span>Stay</span></div>
+            <div class="brand">Henry<span>Travel</span></div>
             <div class="title">Hóa đơn thanh toán giữ chỗ</div>
             <div class="receipt-code">MÃ ĐƠN: ${b.code}</div>
           </div>
@@ -144,11 +156,10 @@ export default function AdminBookingManager({
               <div class="row"><span class="label">Số điện thoại:</span><span class="value">${b.phone}</span></div>
               <div class="row"><span class="label">Email:</span><span class="value">${b.email || 'N/A'}</span></div>
               <div class="row"><span class="label">Trạng thái:</span>
-                <span class="badge ${
-                  isCompleted ? 'badge-completed' :
-                  b.status === 'CONFIRMED' ? 'badge-confirmed' :
-                  b.status === 'PENDING' ? 'badge-pending' : 'badge-cancelled'
-                }">${resolvedStatusText}</span>
+                <span class="badge ${isCompleted ? 'badge-completed' :
+        b.status === 'CONFIRMED' ? 'badge-confirmed' :
+          b.status === 'PENDING' ? 'badge-pending' : 'badge-cancelled'
+      }">${resolvedStatusText}</span>
               </div>
             </div>
 
@@ -167,8 +178,8 @@ export default function AdminBookingManager({
           </div>
 
           <div class="footer">
-            Cảm ơn quý khách đã tin tưởng và lựa chọn đặt phòng tại VillaStay homestay.<br>
-            Hệ thống đặt phòng tự động VillaStay - Hotline 24/7: 0901 234 567
+            Cảm ơn quý khách đã tin tưởng và lựa chọn đặt phòng tại HenryTravel homestay.<br>
+            Hệ thống đặt phòng tự động HenryTravel - Hotline 24/7: 0901 234 567
           </div>
 
           <script>
@@ -188,12 +199,12 @@ export default function AdminBookingManager({
 
   // Filter bookings
   const filteredBookings = bookings.filter(b => {
-    const matchesSearch = 
+    const matchesSearch =
       b.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.villaName.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     const matchesTab = activeStatusTab === 'ALL' || b.status === activeStatusTab;
     return matchesSearch && matchesTab;
   });
@@ -288,11 +299,10 @@ export default function AdminBookingManager({
                 <button
                   key={tab}
                   onClick={() => setActiveStatusTab(tab)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                    activeStatusTab === tab
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeStatusTab === tab
                       ? 'bg-white text-neutral-800 shadow-sm'
                       : 'text-neutral-500 hover:text-neutral-800'
-                  }`}
+                    }`}
                 >
                   {labelMap[tab]}
                 </button>
@@ -304,8 +314,8 @@ export default function AdminBookingManager({
 
       {/* Bookings Queue table */}
       <div className="bg-white rounded-3xl border border-neutral-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="w-full overflow-x-auto scrollbar-safe">
+          <table className="w-full min-w-[900px] text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-neutral-100 font-bold text-neutral-400 uppercase tracking-widest text-[9px] bg-neutral-50/50">
                 <th className="p-4">{language === 'vi' ? 'Khách hàng' : 'Guest'}</th>
@@ -327,14 +337,14 @@ export default function AdminBookingManager({
               ) : (
                 filteredBookings.map((b) => {
                   const isCompleted = b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date();
-                  
-                  const statusColor = 
-                    isCompleted ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                    b.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                    b.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                    'bg-neutral-50 text-neutral-500 border-neutral-200';
 
-                  const statusText = 
+                  const statusColor =
+                    isCompleted ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                      b.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                        b.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                          'bg-neutral-50 text-neutral-500 border-neutral-200';
+
+                  const statusText =
                     isCompleted ? 'COMPLETED' : b.status;
 
                   return (
@@ -391,7 +401,7 @@ export default function AdminBookingManager({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          
+
                           {/* Print icon shortcut */}
                           <button
                             onClick={() => handlePrintBooking(b)}
@@ -405,19 +415,31 @@ export default function AdminBookingManager({
                             <>
                               <button
                                 onClick={() => onApproveBooking(b.code)}
-                                className="p-1.5 border border-[#a1c9ff] bg-[#edf3ff] hover:bg-[#0071c2] hover:text-white rounded-lg text-[#0071c2] transition-all cursor-pointer"
+                                disabled={mutationLoading}
+                                className="p-1.5 border border-[#a1c9ff] bg-[#edf3ff] hover:bg-[#0071c2] hover:text-white rounded-lg text-[#0071c2] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 title="Approve"
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => onRejectBooking(b.code)}
-                                className="p-1.5 border border-neutral-200 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-neutral-400 transition-colors cursor-pointer"
+                                disabled={mutationLoading}
+                                className="p-1.5 border border-neutral-200 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 title="Cancel Hold"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             </>
+                          )}
+                          {b.status === 'CONFIRMED' && (
+                            <button
+                              onClick={() => onCompleteBooking(b.code)}
+                              disabled={mutationLoading}
+                              className="p-1.5 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                              title="Complete"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -432,8 +454,8 @@ export default function AdminBookingManager({
 
       {/* Booking Receipt Detail Modal Popup overlay */}
       {selectedBooking && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-scaleIn border">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl animate-scaleIn border my-auto mx-auto">
             {/* Header banner */}
             <div className="bg-[#003b66] text-white p-6 text-center flex flex-col items-center relative">
               <button
@@ -450,8 +472,8 @@ export default function AdminBookingManager({
             </div>
 
             {/* Content Receipt Body */}
-            <div className="p-5 flex flex-col gap-4.5 text-xs font-semibold text-neutral-600 max-h-[75vh] overflow-y-auto">
-              
+            <div className="p-5 flex flex-col gap-4.5 text-xs font-semibold text-neutral-600 max-h-[75vh] overflow-y-auto overscroll-contain">
+
               {/* PRINT BUTTON TRIGGER */}
               <div className="flex justify-end border-b border-neutral-100 pb-2">
                 <button
@@ -466,7 +488,7 @@ export default function AdminBookingManager({
               {/* 3. BOOKING TIMELINE COMPONENT */}
               <div className="flex flex-col gap-1.5 bg-neutral-50 p-4.5 rounded-2xl border border-neutral-100/50">
                 <span className="text-[8px] uppercase font-bold text-neutral-400 tracking-wider">Lịch trình đơn hàng (Timeline)</span>
-                
+
                 {selectedBooking.status === 'CANCELLED' ? (
                   /* Cancelled Timeline */
                   <div className="flex items-center gap-2 mt-2 font-bold text-[10px]">
@@ -491,21 +513,19 @@ export default function AdminBookingManager({
                   (() => {
                     const isConfirmed = selectedBooking.status === 'CONFIRMED';
                     const isCompleted = isConfirmed && new Date(selectedBooking.checkOut) < new Date();
-                    
+
                     return (
                       <div className="flex items-center gap-2 mt-2 font-bold text-[10px]">
                         <div className="flex flex-col items-center">
                           <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[10px]">✓</div>
                           <div className="w-0.5 h-4 bg-emerald-500" />
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                            isConfirmed || isCompleted ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white animate-pulse'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${isConfirmed || isCompleted ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white animate-pulse'
+                            }`}>
                             {isConfirmed || isCompleted ? '✓' : '2'}
                           </div>
                           <div className={`w-0.5 h-4 ${isCompleted ? 'bg-emerald-500' : 'bg-neutral-200'}`} />
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                            isCompleted ? 'bg-[#0071c2] text-white' : 'bg-neutral-100 text-neutral-400 border border-neutral-250'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${isCompleted ? 'bg-[#0071c2] text-white' : 'bg-neutral-100 text-neutral-400 border border-neutral-250'
+                            }`}>
                             3
                           </div>
                         </div>
@@ -539,11 +559,10 @@ export default function AdminBookingManager({
               {/* Status Indicator */}
               <div className="flex justify-between items-center border-b border-neutral-100 pb-3 mt-1">
                 <span className="text-neutral-400 uppercase text-[9px] font-bold">{language === 'vi' ? 'Trạng thái cọc' : 'Deposit Status'}</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                  selectedBooking.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
-                  selectedBooking.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border-amber-100' :
-                  'bg-neutral-50 text-neutral-500 border-neutral-200'
-                }`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${selectedBooking.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
+                    selectedBooking.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border-amber-100' :
+                      'bg-neutral-50 text-neutral-500 border-neutral-200'
+                  }`}>
                   {selectedBooking.status}
                 </span>
               </div>
@@ -641,8 +660,8 @@ export default function AdminBookingManager({
                 ) : (
                   <button
                     onClick={() => {
-                      const msg = `Xin chào ${selectedBooking.fullName}, tôi cần liên hệ hỗ trợ về đơn hàng VillaStay mã ${selectedBooking.code}.`;
-                      window.open(getZaloLink(msg), '_blank');
+                      const msg = `Xin chào ${selectedBooking.fullName}, tôi cần liên hệ hỗ trợ về đơn hàng HenryTravel mã ${selectedBooking.code}.`;
+                      window.open(getZaloLink(selectedBooking.phone, msg), '_blank');
                     }}
                     className="w-full bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 rounded-xl cursor-pointer text-center transition-colors"
                   >

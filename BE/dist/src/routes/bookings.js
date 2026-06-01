@@ -99,12 +99,13 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             specialRequest,
             holdExpireAt,
         });
-        const zaloLinks = (0, zalo_1.buildZaloLinks)({
+        const zaloLinks = await (0, zalo_1.buildZaloLinks)({
             phone: guestPhone,
             villaName: villa.name,
             checkIn,
             checkOut,
             guestsCount,
+            guestName,
             bookingCode: booking.bookingCode,
         });
         await prisma_1.prisma.$transaction([
@@ -173,12 +174,13 @@ router.get('/check', async (req, res, next) => {
             responseBooking.holdExpireAt &&
             responseBooking.holdExpireAt.getTime() > now.getTime()) {
             response.remainingMinutes = Math.max(0, Math.ceil((responseBooking.holdExpireAt.getTime() - now.getTime()) / 60000));
-            response.zaloLinks = (0, zalo_1.buildZaloLinks)({
+            response.zaloLinks = await (0, zalo_1.buildZaloLinks)({
                 phone: responseBooking.guestPhone || phone,
                 villaName: booking.villa.name,
                 checkIn: responseBooking.checkIn,
                 checkOut: responseBooking.checkOut,
                 guestsCount: responseBooking.guestsCount,
+                guestName: responseBooking.guestName || undefined,
                 bookingCode: responseBooking.bookingCode,
             });
         }

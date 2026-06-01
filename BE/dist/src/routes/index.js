@@ -7,6 +7,7 @@ const express_1 = require("express");
 const admin_1 = __importDefault(require("./admin"));
 const bookings_1 = __importDefault(require("./bookings"));
 const feedbacks_1 = __importDefault(require("./feedbacks"));
+const settings_1 = __importDefault(require("./settings"));
 const villas_1 = __importDefault(require("./villas"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
@@ -19,5 +20,6 @@ router.get('/health', (_req, res) => {
 router.use('/admin', admin_1.default);
 router.use('/bookings', bookings_1.default);
 router.use('/feedbacks', feedbacks_1.default);
+router.use('/settings', settings_1.default);
 router.use('/villas', villas_1.default);
 exports.default = router;

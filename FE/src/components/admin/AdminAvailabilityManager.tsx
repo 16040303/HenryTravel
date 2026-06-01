@@ -195,7 +195,7 @@ export default function AdminAvailabilityManager({
       {activeVilla ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Calendar Grid Card */}
-          <div className="lg:col-span-8 bg-white rounded-3xl border border-neutral-100 shadow-sm p-6 flex flex-col gap-5">
+          <div className="lg:col-span-8 bg-white rounded-3xl border border-neutral-100 shadow-sm p-4 sm:p-6 flex flex-col gap-5 min-w-0 overflow-hidden">
             {/* Multi-day Selection control Panel */}
             <div className="bg-indigo-50/50 border border-indigo-150 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-neutral-750">
               <div className="flex flex-wrap items-center gap-2">
@@ -261,6 +261,8 @@ export default function AdminAvailabilityManager({
               </div>
             </div>
 
+            <div className="w-full overflow-x-auto scrollbar-safe overscroll-contain">
+              <div className="min-w-[520px] sm:min-w-0 flex flex-col gap-2">
             {/* Weekdays */}
             <div className="grid grid-cols-7 gap-2 text-center text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               {(language === 'vi' 
@@ -325,6 +327,8 @@ export default function AdminAvailabilityManager({
                   </button>
                 );
               })}
+            </div>
+            </div>
             </div>
 
             {/* Legend guide info */}

@@ -19,17 +19,23 @@ interface AdminLayoutProps {
   feedbacks: Feedback[];
   onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
-  onUpdateVilla: (v: VillaDetail) => void;
-  onDuplicateVilla: (id: EntityId) => void;
+  onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
+  onDuplicateVilla: (id: EntityId) => void | Promise<void>;
   onBulkDeleteVillas: (ids: EntityId[]) => void;
   onBulkStatusUpdateVillas: (ids: EntityId[], active: boolean) => void;
   onApproveBooking: (code: string) => void;
   onRejectBooking: (code: string) => void;
+  onCompleteBooking: (code: string) => void;
   onToggleVerifyFeedback: (id: string) => void;
   onUpdateVillaAvailability: (villaId: EntityId, bookedDates: string[], pendingDates: string[]) => void;
   onLogout: () => void;
   adminStats?: AdminStats;
   adminUser?: AdminUser;
+  mutationLoading?: boolean;
+  isRefreshing?: boolean;
+  activeTab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings';
+  onTabChange: (tab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings') => void;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function AdminLayout({
@@ -44,14 +50,19 @@ export default function AdminLayout({
   onBulkStatusUpdateVillas,
   onApproveBooking,
   onRejectBooking,
+  onCompleteBooking,
   onToggleVerifyFeedback,
   onUpdateVillaAvailability,
   onLogout,
   adminStats,
-  adminUser
+  adminUser,
+  mutationLoading = false,
+  isRefreshing = false,
+  activeTab,
+  onTabChange,
+  scrollRef
 }: AdminLayoutProps) {
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings'>('dashboard');
 
   // Trigger add villa modal directly from dashboard quick action
   const [directOpenAddVilla, setDirectOpenAddVilla] = useState(false);
@@ -66,7 +77,7 @@ export default function AdminLayout({
 
   const handleOpenAddVillaDirectly = () => {
     setDirectOpenAddVilla(true);
-    setActiveTab('villas');
+    onTabChange('villas');
   };
 
   interface MenuItem {
@@ -86,9 +97,9 @@ export default function AdminLayout({
   ];
 
   return (
-    <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-[calc(100vh-12rem)] animate-fadeIn">
+    <div className="flex h-full min-h-0 flex-col lg:flex-row gap-6 px-4 md:px-8 py-5 max-w-[1280px] mx-auto w-full overflow-hidden animate-fadeIn">
       {/* 1. Desktop Left Sidebar / Mobile Header Navigation Selector Tabs */}
-      <aside className="lg:col-span-3 bg-white border border-neutral-100 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col gap-5 sticky top-24 self-start w-full">
+      <aside className="lg:w-72 shrink-0 bg-white border border-neutral-100 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col gap-5 self-start lg:self-stretch w-full max-h-full overflow-hidden">
         {/* Admin profile snippet desktop */}
         <div className="hidden lg:flex items-center gap-3 bg-neutral-50 p-3 rounded-2xl border border-neutral-100">
           <div className="w-10 h-10 rounded-full bg-[#0071c2]/10 text-[#0071c2] flex items-center justify-center font-bold">
@@ -101,14 +112,14 @@ export default function AdminLayout({
         </div>
 
         {/* Sidebar Nav anchors */}
-        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible p-1 lg:p-0 bg-neutral-50 lg:bg-transparent rounded-2xl border lg:border-0 border-neutral-100 gap-1 scrollbar-none shrink-0 w-full">
+        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto overscroll-contain p-1 lg:p-0 bg-neutral-50 lg:bg-transparent rounded-2xl border lg:border-0 border-neutral-100 gap-1 scrollbar-safe shrink-0 lg:min-h-0 w-full">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveTab(item.id);
+                  onTabChange(item.id);
                   if (item.id !== 'villas') {
                     setDirectOpenAddVilla(false);
                   }
@@ -134,15 +145,20 @@ export default function AdminLayout({
         </nav>
       </aside>
 
-      {/* 2. Right Sub-Tab view Content Orchestrator */}
-      <section className="lg:col-span-9 w-full flex flex-col gap-6">
+      <section className="flex-1 min-h-0 w-full overflow-hidden flex flex-col relative">
+        {isRefreshing && (
+          <div className="absolute left-0 right-0 top-0 z-20 h-1 overflow-hidden rounded-full bg-[#edf3ff]">
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-[#0071c2]" />
+          </div>
+        )}
+        <div ref={scrollRef} className="app-scroll scrollbar-safe h-full min-h-0 w-full pr-0 lg:pr-1 pb-8 pt-1">
         {activeTab === 'dashboard' && (
           <AdminDashboard
             villas={villas}
             bookings={bookings}
             feedbacks={feedbacks}
             onNavigateToTab={(tab) => {
-              setActiveTab(tab);
+              onTabChange(tab);
               if (tab !== 'villas') {
                 setDirectOpenAddVilla(false);
               }
@@ -163,6 +179,7 @@ export default function AdminLayout({
             onBulkStatusUpdateVillas={onBulkStatusUpdateVillas}
             showAddModalDirectly={directOpenAddVilla}
             onCloseAddModalDirectly={() => setDirectOpenAddVilla(false)}
+            mutationLoading={mutationLoading}
           />
         )}
 
@@ -171,6 +188,8 @@ export default function AdminLayout({
             bookings={bookings}
             onApproveBooking={onApproveBooking}
             onRejectBooking={onRejectBooking}
+            onCompleteBooking={onCompleteBooking}
+            mutationLoading={mutationLoading}
           />
         )}
 
@@ -179,6 +198,7 @@ export default function AdminLayout({
             feedbacks={feedbacks}
             villas={villas}
             onToggleVerifyFeedback={onToggleVerifyFeedback}
+            mutationLoading={mutationLoading}
           />
         )}
 
@@ -194,6 +214,7 @@ export default function AdminLayout({
             onLogout={onLogout}
           />
         )}
+        </div>
       </section>
     </div>
   );

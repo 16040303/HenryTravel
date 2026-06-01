@@ -1,9 +1,12 @@
+import { resolveZaloPhone } from './settings';
+
 export interface ZaloLinkParams {
   phone: string;
   villaName: string;
   checkIn: Date;
   checkOut: Date;
   guestsCount: number;
+  guestName?: string;
   bookingCode: string;
 }
 
@@ -27,16 +30,18 @@ function formatDate(date: Date): string {
   });
 }
 
-export function buildZaloLinks(params: ZaloLinkParams): ZaloLinks {
-  const phone = cleanPhone(process.env.ZALO_PHONE || params.phone);
+export async function buildZaloLinks(params: ZaloLinkParams): Promise<ZaloLinks> {
+  const phone = cleanPhone(await resolveZaloPhone(params.phone));
   const message = [
-    `Xin chào, tôi vừa đặt giữ chỗ villa ${params.villaName}.`,
+    `Xin chào HenryTravel, tôi vừa đặt giữ chỗ villa ${params.villaName}.`,
     `Mã đặt phòng: ${params.bookingCode}`,
+    params.guestName ? `Tên khách: ${params.guestName}` : null,
+    `Số điện thoại: ${params.phone}`,
     `Ngày nhận phòng: ${formatDate(params.checkIn)}`,
     `Ngày trả phòng: ${formatDate(params.checkOut)}`,
     `Số khách: ${params.guestsCount}`,
     'Nhờ admin kiểm tra và xác nhận giúp tôi.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
   const encodedMessage = encodeURIComponent(message);
 
   return {

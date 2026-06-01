@@ -39,6 +39,7 @@ enum BookingStatus {
   pending_hold
   confirmed
   cancelled
+  completed
 }
 
 enum BookingSource {
@@ -196,6 +197,16 @@ model BookingAttempt {
   @@index([phone, attemptedAt])
   @@map("booking_attempts")
 }
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
 ```
 
 ---
@@ -205,7 +216,7 @@ model BookingAttempt {
 ```typescript
 // Tất cả type dùng chung giữa FE và BE
 
-export type BookingStatus = 'pending_hold' | 'confirmed' | 'cancelled';
+export type BookingStatus = 'pending_hold' | 'confirmed' | 'cancelled' | 'completed';
 export type VillaStatus = 'available' | 'maintenance' | 'hidden';
 export type PriceType = 'fixed' | 'contact';
 export type DepositStatus = 'none' | 'pending' | 'paid' | 'refunded';
@@ -367,13 +378,16 @@ Response 200:
 #### `GET /villas/:id/feedbacks`
 ```
 Query params:
-  page?: number
+  page?: number (default 1)
+  limit?: number (default 10, max 50)
 
 Response 200:
   {
     feedbacks: Feedback[],
     avgRating: number,
-    total: number
+    total: number,
+    page: number,
+    totalPages: number
   }
 Note: Chỉ trả feedback với verified = true
 ```
@@ -408,6 +422,7 @@ Body: SubmitFeedbackRequest
 Response 201: Feedback
 Response 403: { error: 'BOOKING_NOT_CONFIRMED' | 'NOT_CHECKED_OUT' }
 Response 409: { error: 'ALREADY_REVIEWED' }
+Rule: Cho phép submit khi booking đã `confirmed` hoặc `completed`, đã qua ngày check-out, và chưa có feedback trước đó.
 ```
 
 ---
@@ -482,7 +497,14 @@ Side effect: ghi booking_history, ghi admin_log, gửi email admin + khách
 Headers: Authorization: Bearer <token>
 Body: { reason?: string }
 Response 200: Booking
-Side effect: ghi booking_history, ghi admin_log, gửi email khách
+Side effect: ghi booking_history, ghi admin_log, gửi email khách nếu email thật đã bật
+```
+
+#### `PUT /admin/bookings/:id/complete`
+```
+Headers: Authorization: Bearer <token>
+Response 200: Booking
+Side effect: status `confirmed` → `completed`, ghi booking_history, ghi admin_log
 ```
 
 #### `GET /admin/bookings/export`
@@ -510,6 +532,28 @@ Side effect: ghi admin_log
 ```
 Headers: Authorization: Bearer <token>
 Response 200: AdminStats
+```
+
+#### `GET /admin/settings`
+```
+Headers: Authorization: Bearer <token>
+Response 200: { zaloPhone: string, zaloUrl: string }
+Note: Đọc ZALO_PHONE từ `system_settings` trước, fallback `process.env.ZALO_PHONE`, cuối cùng là chuỗi rỗng.
+```
+
+#### `PUT /admin/settings`
+```
+Headers: Authorization: Bearer <token>
+Body: { zaloPhone?: string, zaloUrl?: string }
+Response 200: { zaloPhone: string, zaloUrl: string }
+Side effect: lưu cấu hình Zalo vào `system_settings`, không ghi ngược vào `.env`.
+```
+
+#### `GET /settings/public`
+```
+Headers: none
+Response 200: { zaloPhone: string, zaloUrl: string }
+Note: Endpoint public-safe, không expose private/admin-only settings.
 ```
 
 ---
@@ -611,6 +655,10 @@ interface ImageUploaderProps {
 // apps/api/src/jobs/releaseHold.ts
 // Chạy mỗi 1 phút bằng node-cron hoặc setInterval
 
+// Booking lifecycle hiện tại:
+// pending_hold → confirmed → completed
+// pending_hold → cancelled
+
 async function releaseExpiredHolds() {
   const expiredBookings = await prisma.booking.findMany({
     where: {
@@ -689,8 +737,8 @@ export async function validateAndSubmitFeedback(
   const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
 
   // Kiểm tra theo thứ tự — không được thay đổi
-  if (booking.status !== 'confirmed') {
-    throw new AppError(403, 'BOOKING_NOT_CONFIRMED', 'Booking chưa được xác nhận');
+  if (!['confirmed', 'completed'].includes(booking.status)) {
+    throw new AppError(403, 'BOOKING_NOT_CONFIRMED', 'Booking chưa được xác nhận hoặc hoàn tất');
   }
   if (new Date(booking.checkOut) > new Date()) {
     throw new AppError(403, 'NOT_CHECKED_OUT', 'Chưa đến ngày check-out');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Building2, Trash2, Edit, PlusCircle, Search, MapPin, 
   Users, CheckCircle2, AlertCircle, X, Copy, Eye, 
@@ -12,12 +12,13 @@ interface AdminVillaManagerProps {
   villas: VillaDetail[];
   onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
-  onUpdateVilla: (v: VillaDetail) => void;
-  onDuplicateVilla: (id: EntityId) => void;
+  onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
+  onDuplicateVilla: (id: EntityId) => void | Promise<void>;
   onBulkDeleteVillas: (ids: EntityId[]) => void;
   onBulkStatusUpdateVillas: (ids: EntityId[], active: boolean) => void;
   showAddModalDirectly?: boolean;
   onCloseAddModalDirectly?: () => void;
+  mutationLoading?: boolean;
 }
 
 export default function AdminVillaManager({
@@ -29,7 +30,8 @@ export default function AdminVillaManager({
   onBulkDeleteVillas,
   onBulkStatusUpdateVillas,
   showAddModalDirectly = false,
-  onCloseAddModalDirectly
+  onCloseAddModalDirectly,
+  mutationLoading = false
 }: AdminVillaManagerProps) {
   const { language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +62,15 @@ export default function AdminVillaManager({
   const [villaImageUrl, setVillaImageUrl] = useState('https://picsum.photos/400/300?random=20');
   const [villaStatus, setVillaStatus] = useState<'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('Available');
   const [villaIsActive, setVillaIsActive] = useState(true);
+
+  useEffect(() => {
+    const isModalOpen = showAddModal || showEditModal;
+    if (!isModalOpen) return;
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showAddModal, showEditModal]);
 
   // Load details to editor
   const handleOpenEdit = (v: VillaDetail) => {
@@ -128,10 +139,10 @@ export default function AdminVillaManager({
     handleCloseAdd();
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVilla) return;
-    onUpdateVilla({
+    await onUpdateVilla({
       ...editingVilla,
       name: villaName,
       location: villaLocation,
@@ -444,7 +455,8 @@ export default function AdminVillaManager({
                   {/* Clone duplication button */}
                   <button
                     onClick={() => onDuplicateVilla(v.id)}
-                    className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-indigo-600 rounded-lg text-neutral-400 transition-colors cursor-pointer"
+                    disabled={mutationLoading}
+                    className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-indigo-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title={language === 'vi' ? 'Sao chép / Nhân bản' : 'Clone Property'}
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -460,7 +472,8 @@ export default function AdminVillaManager({
 
                   <button
                     onClick={() => onDeleteVilla(v.id, v.name)}
-                    className="p-2 border border-neutral-200 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-400 transition-colors cursor-pointer"
+                    disabled={mutationLoading}
+                    className="p-2 border border-neutral-200 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title={language === 'vi' ? 'Xoá' : 'Delete'}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -474,8 +487,8 @@ export default function AdminVillaManager({
 
       {/* Add / Edit Villa Modal Dialog */}
       {(showAddModal || showEditModal) && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto max-h-[90vh] shadow-2xl animate-scaleIn border">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto overscroll-contain max-h-[90vh] shadow-2xl animate-scaleIn border my-auto mx-auto">
             
             <div className="flex justify-between items-center mb-6 pb-2 border-b border-neutral-100">
               <div>
@@ -485,7 +498,9 @@ export default function AdminVillaManager({
                     : (language === 'vi' ? 'Cập nhật thông tin biệt thự' : 'Modify Accommodation')}
                 </h3>
                 <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-                  {language === 'vi' ? 'Khai báo chi tiết thông số để cập nhật hệ thống' : 'Specify exact lodging attributes'}
+                  {language === 'vi'
+                    ? 'Chỉ lưu các field backend hỗ trợ. Loại dịch vụ, địa chỉ, phòng ngủ/phòng tắm hiện là UI-only.'
+                    : 'Only backend-supported fields are saved. Type, address, bedrooms/bathrooms are UI-only for now.'}
                 </p>
               </div>
               <button 
@@ -559,7 +574,7 @@ export default function AdminVillaManager({
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Loại dịch vụ' : 'Dwelling Type'}</span>
                   <select
                     value={villaType}
-                    onChange={(e) => setVillaType(e.target.value as any)}
+                    onChange={(e) => setVillaType(e.target.value as 'Villa' | 'Homestay' | 'Căn hộ')}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
                   >
                     <option value="Villa">Villa (Biệt thự)</option>
@@ -572,7 +587,7 @@ export default function AdminVillaManager({
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Trạng thái hoạt động' : 'Status'}</span>
                   <select
                     value={villaStatus}
-                    onChange={(e) => setVillaStatus(e.target.value as any)}
+                    onChange={(e) => setVillaStatus(e.target.value as 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance')}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
                   >
                     <option value="Available">Available</option>
@@ -683,11 +698,14 @@ export default function AdminVillaManager({
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 px-6 rounded-xl cursor-pointer"
+                  disabled={mutationLoading}
+                  className="bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 px-6 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {showAddModal 
-                    ? (language === 'vi' ? 'Đăng ký ngay' : 'Register Villa') 
-                    : (language === 'vi' ? 'Lưu thay đổi' : 'Save Changes')}
+                  {mutationLoading
+                    ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...')
+                    : showAddModal 
+                      ? (language === 'vi' ? 'Đăng ký ngay' : 'Register Villa') 
+                      : (language === 'vi' ? 'Lưu thay đổi' : 'Save Changes')}
                 </button>
               </div>
             </form>

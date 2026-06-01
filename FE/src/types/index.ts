@@ -224,3 +224,29 @@ export interface AdminLogResponse {
   page: number;
   totalPages: number;
 }
+
+export interface AdminVillaMutationPayload {
+  name?: string;
+  location?: string;
+  description?: string;
+  price?: number;
+  priceType?: 'fixed' | 'contact';
+  status?: 'available' | 'maintenance' | 'hidden';
+  maxGuests?: number;
+  images?: string[];
+  facilities?: string[];
+  holdMinutes?: number;
+  depositRequired?: boolean;
+  depositAmount?: number | null;
+}
+
+export interface AdminBookingHistoryResponse {
+  history: Array<{
+    id: string;
+    bookingId: string;
+    status: string;
+    changedBy?: string | null;
+    note?: string | null;
+    timestamp: string;
+  }>;
+}

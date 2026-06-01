@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, Sparkles, MessageSquare, ShieldCheck, Heart } from 'lucide-react';
+import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart } from 'lucide-react';
 import { Villa } from '../types';
 import { getVillas } from '../lib/api';
 import { LOCATIONS, FACILITIES } from '../constants';
@@ -150,9 +150,8 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
         {/* Hero Content */}
         <div className="relative z-10 w-full max-w-[1000px] mx-auto text-center flex flex-col items-center">
           
-          <div className="inline-flex items-center gap-2 bg-[#edf3ff]/35 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs text-indigo-50 font-medium mb-6 animate-pulse">
-            <Sparkles className="w-3.5 h-3.5 text-[#ffb59d]" />
-            <span>{t('home.heroTitle')}</span>
+          <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs text-indigo-50 font-medium mb-6">
+            <span>{t('home.guaranteeTitle')}</span>
           </div>
 
           <h1 className="text-white text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight max-w-[850px] font-display drop-shadow-md">
@@ -163,12 +162,12 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
           </p>
 
           {/* Search Main Box Container */}
-          <div className="w-full max-w-[920px] bg-white rounded-2xl shadow-2xl p-4 sm:p-6 text-left border border-white/25">
+          <div className="w-full max-w-[920px] bg-white rounded-2xl shadow-xl p-4 sm:p-6 text-left border border-white/25">
             <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               
               {/* Location selection */}
               <div className="md:col-span-3 flex flex-col gap-1.5 min-w-0">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.popularLocations')}
                 </label>
@@ -188,7 +187,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
               {/* Check-In */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.checkIn')}
                 </label>
@@ -212,7 +211,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
               {/* Check-Out */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.checkOut')}
                 </label>
@@ -228,7 +227,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
               {/* Guests Selection */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
                   <Users className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.guests')}
                 </label>
@@ -244,7 +243,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
               {/* Rooms Selection */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
                   <Users className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.rooms')}
                 </label>
@@ -284,7 +283,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               </button>
 
               <div className="text-[10px] text-neutral-400 font-semibold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                 <span>{t('home.filterActive')}</span>
               </div>
             </div>
@@ -295,7 +294,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Property type selection buttons */}
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">{t('list.propertyType')}</span>
+                    <span className="text-xs font-bold text-neutral-500 tracking-wide">{t('list.propertyType')}</span>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {['All', 'Villa', 'Homestay', 'Căn hộ'].map((type) => (
                         <button
@@ -341,7 +340,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
                 {/* Amenities */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">{t('list.amenities')}</span>
+                  <span className="text-xs font-bold text-neutral-500 tracking-wide">{t('list.amenities')}</span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mt-1.5">
                     {FACILITIES.map(facility => {
                       const isChecked = selectedFacilities.includes(facility.id);
@@ -393,7 +392,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
       <section className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
           <div>
-            <span className="text-[#fe6a34] text-xs font-extrabold tracking-widest uppercase">{t('home.popularLocationsDesc')}</span>
+            <span className="text-[#fe6a34] text-xs font-bold tracking-wide">{t('home.popularLocationsDesc')}</span>
             <h2 className="text-3xl font-display font-black tracking-tight text-neutral-800 mt-1">{t('home.popularLocations')}</h2>
           </div>
         </div>
@@ -437,7 +436,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
       <section className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16 border-t border-neutral-100">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-4 border-b border-neutral-100 gap-4">
           <div>
-            <span className="text-[#fe6a34] text-xs font-extrabold tracking-widest uppercase">{t('home.popularLocationsDesc')}</span>
+            <span className="text-[#fe6a34] text-xs font-bold tracking-wide">{t('home.popularLocationsDesc')}</span>
             <h2 className="text-3xl font-display font-black tracking-tight text-neutral-800 mt-1">{t('home.featuredVillas')}</h2>
           </div>
           <button 
@@ -517,7 +516,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                     {/* Footer Row */}
                     <div className="flex items-end justify-between pt-4 border-t border-neutral-100 font-mono">
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">{t('home.from')}</span>
+                        <span className="text-[10px] font-bold text-neutral-400 tracking-wide">{t('home.from')}</span>
                         <span className="text-lg font-black text-[#fe6a34] font-display">
                           {villa.price.toLocaleString('vi-VN')}₫
                           <span className="text-xs text-neutral-400 font-normal"> / {t('home.night')}</span>
@@ -543,7 +542,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
       {/* Why Choose Us */}
       <section className="bg-neutral-50 border-t border-b border-neutral-100 py-16">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 text-center">
-          <span className="text-[#fe6a34] text-xs font-extrabold tracking-widest uppercase">{t('home.guaranteeTag')}</span>
+          <span className="text-[#fe6a34] text-xs font-bold tracking-wide">{t('home.guaranteeTag')}</span>
           <h2 className="text-3xl font-display font-black tracking-tight text-neutral-800 mt-1 mb-12">{t('home.guaranteeTitle')}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

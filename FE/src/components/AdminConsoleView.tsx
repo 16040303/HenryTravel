@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { 
+import React, { useState, useEffect, useRef } from 'react';
+import {
   ShieldCheck, AlertCircle, Lock, User, LogIn, Eye, EyeOff, LogOut
 } from 'lucide-react';
 import {
   adminLogin,
   adminLogout,
+  cancelAdminBooking,
+  completeAdminBooking,
+  confirmAdminBooking,
+  createAdminVilla,
+  deleteAdminVilla,
   getAdminBookings,
   getAdminFeedbacks,
   getAdminStats,
@@ -14,8 +19,10 @@ import {
   mapAdminBookingToFrontendBooking,
   mapAdminFeedbackToFrontendFeedback,
   mapAdminVillaToFrontendVilla,
+  toggleAdminFeedback,
+  updateAdminVilla,
 } from '../lib/api';
-import { AdminStats, AdminUser, EntityId, VillaDetail, Booking, Feedback } from '../types';
+import { AdminStats, AdminUser, AdminVillaMutationPayload, EntityId, VillaDetail, Booking, Feedback } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from './Toast';
 import { AdminDashboardSkeleton } from './common/Skeleton';
@@ -45,7 +52,20 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [adminDataError, setAdminDataError] = useState('');
+  const [mutationLoading, setMutationLoading] = useState(false);
+  const adminScrollRef = useRef<HTMLDivElement>(null);
+  type AdminTab = 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings';
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>(() => {
+    const stored = localStorage.getItem('henrytravel_admin_active_tab') as AdminTab | null;
+    return stored || 'dashboard';
+  });
+
+  const handleAdminTabChange = (tab: AdminTab) => {
+    setActiveAdminTab(tab);
+    localStorage.setItem('henrytravel_admin_active_tab', tab);
+  };
 
   // Global Confirmation modal configuration state
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
@@ -61,7 +81,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     title: '',
     message: '',
     type: 'warning',
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   const triggerConfirmModal = (config: Omit<typeof confirmModalConfig, 'isOpen'>) => {
@@ -97,8 +117,66 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     return status === 401 || status === 403;
   };
 
-  const loadAdminStats = async () => {
-    setLoading(true);
+  const handleMutationError = (error: unknown, fallback: string) => {
+    if (isAuthError(error)) {
+      logoutToLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      return;
+    }
+
+    const code = (error as Error & { code?: string }).code;
+    if (code === 'DATE_OVERLAP') {
+      showToast('error', 'Không thể xác nhận vì ngày đã bị trùng với booking khác.');
+      return;
+    }
+    if (code === 'VILLA_HAS_ACTIVE_BOOKINGS' || code === 'VILLA_HAS_BOOKINGS') {
+      showToast('error', 'Không thể xóa villa vì đang có booking liên quan.');
+      return;
+    }
+
+    showToast('error', error instanceof Error && error.message ? error.message : fallback);
+  };
+
+  const toAdminVillaPayload = (v: Partial<VillaDetail>): AdminVillaMutationPayload => {
+    const status: AdminVillaMutationPayload['status'] = v.status === 'Maintenance'
+      ? 'maintenance'
+      : v.isActive === false || v.status === 'Hết phòng'
+        ? 'hidden'
+        : 'available';
+
+    return {
+      name: v.name?.trim(),
+      location: v.location?.trim(),
+      description: v.description?.trim() || '',
+      price: Number(v.price) || 0,
+      priceType: Number(v.price) > 0 ? 'fixed' : 'contact',
+      status,
+      maxGuests: Number(v.guestsCount) || 1,
+      images: v.image ? [v.image, ...(Array.isArray(v.images) ? v.images.filter((item) => item && item !== v.image) : [])] : [],
+      facilities: Array.isArray(v.facilities) ? v.facilities : [],
+      holdMinutes: 15,
+      depositRequired: true,
+      depositAmount: null,
+    };
+  };
+
+  const validateVillaPayload = (payload: AdminVillaMutationPayload) => {
+    if (!payload.name) throw new Error('Tên villa là bắt buộc.');
+    if (!payload.location) throw new Error('Địa điểm villa là bắt buộc.');
+    if (!payload.price || payload.price <= 0) throw new Error('Giá villa phải lớn hơn 0.');
+    if (!payload.maxGuests || payload.maxGuests <= 0) throw new Error('Số khách tối đa phải lớn hơn 0.');
+    if (!Array.isArray(payload.images)) throw new Error('Images phải là mảng.');
+    if (!Array.isArray(payload.facilities)) throw new Error('Facilities phải là mảng.');
+  };
+
+  const bookingApiId = (booking: Booking | undefined) => String(booking?.id || '');
+
+  const loadAdminStats = async (options?: { preserveScroll?: boolean; silent?: boolean }) => {
+    const previousScrollTop = options?.preserveScroll ? (adminScrollRef.current?.scrollTop ?? 0) : 0;
+    if (options?.silent) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setAdminDataError('');
     const errors: string[] = [];
 
@@ -144,6 +222,14 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       setAdminDataError(errors.join(' '));
     }
     setLoading(false);
+    setIsRefreshing(false);
+    if (options?.preserveScroll) {
+      requestAnimationFrame(() => {
+        if (adminScrollRef.current) {
+          adminScrollRef.current.scrollTop = previousScrollTop;
+        }
+      });
+    }
   };
 
   // Login handler
@@ -188,34 +274,167 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     });
   };
 
-  // 1. ADD Villa
   const handleAddVilla = async (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => {
-    showToast('info', language === 'vi' ? `Thêm villa "${v.name}" sẽ nối API ở phase sau.` : `Add villa "${v.name}" API will be connected in the next phase.`);
+    if (mutationLoading) return;
+    setMutationLoading(true);
+    try {
+      const payload = toAdminVillaPayload(v);
+      validateVillaPayload(payload);
+      await createAdminVilla(payload);
+      await loadAdminStats({ preserveScroll: true, silent: true });
+      onVillaAddedNotification();
+      showToast('success', language === 'vi' ? `Đã tạo villa "${v.name}".` : `Villa "${v.name}" created.`);
+    } catch (error) {
+      handleMutationError(error, 'Không thể tạo villa.');
+      throw error;
+    } finally {
+      setMutationLoading(false);
+    }
   };
 
   // 2. DELETE Villa with double confirm modal
-  const triggerDeleteVilla = (_id: EntityId, name: string) => {
-    showToast('info', language === 'vi' ? `Xóa villa "${name}" sẽ nối API ở phase sau.` : `Delete villa "${name}" API will be connected in the next phase.`);
+  const triggerDeleteVilla = (id: EntityId, name: string) => {
+    triggerConfirmModal({
+      title: language === 'vi' ? 'Xóa villa?' : 'Delete Villa?',
+      message: language === 'vi'
+        ? `Bạn chắc chắn muốn xóa villa "${name}"? Nếu villa đang có booking liên quan, hệ thống sẽ từ chối.`
+        : `Delete villa "${name}"? The backend will reject villas with related bookings.`,
+      type: 'danger',
+      onConfirm: async () => {
+        if (mutationLoading) return;
+        setMutationLoading(true);
+        try {
+          await deleteAdminVilla(String(id));
+          await loadAdminStats({ preserveScroll: true, silent: true });
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+          showToast('success', language === 'vi' ? `Đã xóa villa "${name}".` : `Villa "${name}" deleted.`);
+        } catch (error) {
+          handleMutationError(error, 'Không thể xóa villa.');
+        } finally {
+          setMutationLoading(false);
+        }
+      }
+    });
   };
 
   // 3. UPDATE Villa properties
-  const handleUpdateVilla = (v: VillaDetail) => {
-    showToast('info', language === 'vi' ? `Cập nhật villa "${v.name}" sẽ nối API ở phase sau.` : `Update villa "${v.name}" API will be connected in the next phase.`);
+  const handleUpdateVilla = async (v: VillaDetail) => {
+    if (mutationLoading) return;
+    setMutationLoading(true);
+    try {
+      const payload = toAdminVillaPayload(v);
+      validateVillaPayload(payload);
+      await updateAdminVilla(String(v.id), payload);
+      await loadAdminStats({ preserveScroll: true, silent: true });
+      onVillaAddedNotification();
+      showToast('success', language === 'vi' ? `Đã cập nhật villa "${v.name}".` : `Villa "${v.name}" updated.`);
+    } catch (error) {
+      handleMutationError(error, 'Không thể cập nhật villa.');
+      throw error;
+    } finally {
+      setMutationLoading(false);
+    }
   };
 
   // 4. APPROVE Booking Pending Hold with confirmation
   const triggerApproveBooking = (code: string) => {
-    showToast('info', language === 'vi' ? `Duyệt booking "${code}" sẽ nối API ở phase sau.` : `Confirm booking "${code}" API will be connected in the next phase.`);
+    const booking = recentBookings.find(item => item.code === code || item.bookingCode === code);
+    const id = bookingApiId(booking);
+    if (!id) {
+      showToast('error', 'Không tìm thấy ID booking để xác nhận.');
+      return;
+    }
+    triggerConfirmModal({
+      title: language === 'vi' ? 'Xác nhận booking?' : 'Confirm Booking?',
+      message: language === 'vi' ? `Xác nhận booking "${code}"?` : `Confirm booking "${code}"?`,
+      type: 'info',
+      onConfirm: async () => {
+        if (mutationLoading) return;
+        setMutationLoading(true);
+        try {
+          await confirmAdminBooking(id);
+          await loadAdminStats({ preserveScroll: true, silent: true });
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+          showToast('success', language === 'vi' ? `Đã xác nhận booking "${code}".` : `Booking "${code}" confirmed.`);
+        } catch (error) {
+          handleMutationError(error, 'Không thể xác nhận booking.');
+        } finally {
+          setMutationLoading(false);
+        }
+      }
+    });
   };
 
   // 5. CANCEL/REJECT Booking Pending Hold with confirmation
   const triggerRejectBooking = (code: string) => {
-    showToast('info', language === 'vi' ? `Hủy booking "${code}" sẽ nối API ở phase sau.` : `Cancel booking "${code}" API will be connected in the next phase.`);
+    const booking = recentBookings.find(item => item.code === code || item.bookingCode === code);
+    const id = bookingApiId(booking);
+    if (!id) {
+      showToast('error', 'Không tìm thấy ID booking để hủy.');
+      return;
+    }
+    triggerConfirmModal({
+      title: language === 'vi' ? 'Hủy booking?' : 'Cancel Booking?',
+      message: language === 'vi' ? `Hủy booking "${code}"?` : `Cancel booking "${code}"?`,
+      type: 'danger',
+      onConfirm: async () => {
+        if (mutationLoading) return;
+        setMutationLoading(true);
+        try {
+          await cancelAdminBooking(id, 'Admin cancelled booking');
+          await loadAdminStats({ preserveScroll: true, silent: true });
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+          showToast('success', language === 'vi' ? `Đã hủy booking "${code}".` : `Booking "${code}" cancelled.`);
+        } catch (error) {
+          handleMutationError(error, 'Không thể hủy booking.');
+        } finally {
+          setMutationLoading(false);
+        }
+      }
+    });
+  };
+
+  const triggerCompleteBooking = (code: string) => {
+    const booking = recentBookings.find(item => item.code === code || item.bookingCode === code);
+    const id = bookingApiId(booking);
+    if (!id) {
+      showToast('error', 'Không tìm thấy ID booking để hoàn tất.');
+      return;
+    }
+    triggerConfirmModal({
+      title: language === 'vi' ? 'Hoàn tất booking?' : 'Complete Booking?',
+      message: language === 'vi' ? `Đánh dấu booking "${code}" đã hoàn tất?` : `Mark booking "${code}" as completed?`,
+      type: 'info',
+      onConfirm: async () => {
+        if (mutationLoading) return;
+        setMutationLoading(true);
+        try {
+          await completeAdminBooking(id);
+          await loadAdminStats({ preserveScroll: true, silent: true });
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+          showToast('success', language === 'vi' ? `Đã hoàn tất booking "${code}".` : `Booking "${code}" completed.`);
+        } catch (error) {
+          handleMutationError(error, 'Không thể hoàn tất booking.');
+        } finally {
+          setMutationLoading(false);
+        }
+      }
+    });
   };
 
   // 6. TOGGLE VERIFIED Feedback showing/hiding
-  const handleToggleVerifyFeedback = (_id: string) => {
-    showToast('info', language === 'vi' ? 'Duyệt/ẩn feedback sẽ nối API ở phase sau.' : 'Feedback toggle API will be connected in the next phase.');
+  const handleToggleVerifyFeedback = async (id: string) => {
+    if (mutationLoading) return;
+    setMutationLoading(true);
+    try {
+      await toggleAdminFeedback(id);
+      await loadAdminStats({ preserveScroll: true, silent: true });
+      showToast('success', language === 'vi' ? 'Đã cập nhật trạng thái feedback.' : 'Feedback visibility updated.');
+    } catch (error) {
+      handleMutationError(error, 'Không thể cập nhật feedback.');
+    } finally {
+      setMutationLoading(false);
+    }
   };
 
   // 7. UPDATE Villa availability blocked/unblocked dates manually
@@ -224,21 +443,34 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   };
 
   // 8. DUPLICATE Villa
-  const handleDuplicateVilla = (id: EntityId) => {
+  const handleDuplicateVilla = async (id: EntityId) => {
     const target = allVillas.find(v => String(v.id) === String(id));
-    showToast('info', language === 'vi' ? `Nhân bản villa "${target?.name || id}" sẽ nối API ở phase sau.` : `Duplicate villa "${target?.name || id}" API will be connected in the next phase.`);
+    if (!target || mutationLoading) return;
+    setMutationLoading(true);
+    try {
+      const payload = toAdminVillaPayload({ ...target, name: `${target.name} (Copy)` });
+      validateVillaPayload(payload);
+      await createAdminVilla(payload);
+      await loadAdminStats({ preserveScroll: true, silent: true });
+      onVillaAddedNotification();
+      showToast('success', language === 'vi' ? `Đã nhân bản villa "${target.name}".` : `Villa "${target.name}" duplicated.`);
+    } catch (error) {
+      handleMutationError(error, 'Không thể nhân bản villa.');
+    } finally {
+      setMutationLoading(false);
+    }
   };
 
   // 9. BULK DELETE Villas
   const handleBulkDeleteVillas = (ids: EntityId[]) => {
-    showToast('info', language === 'vi' ? `Xóa ${ids.length} villa sẽ nối API ở phase sau.` : `Bulk delete API for ${ids.length} villas will be connected in the next phase.`);
+    showToast('info', language === 'vi' ? `Bulk delete ${ids.length} villa sẽ nối ở phase sau.` : `Bulk delete for ${ids.length} villas will be connected later.`);
   };
 
   // 10. BULK STATUS UPDATE
   const handleBulkStatusUpdateVillas = (ids: EntityId[], _active: boolean) => {
     showToast('info', language === 'vi'
-      ? `Cập nhật trạng thái ${ids.length} villa sẽ nối API ở phase sau.`
-      : `Bulk status API for ${ids.length} villas will be connected in the next phase.`
+      ? `Bulk cập nhật trạng thái ${ids.length} villa sẽ nối ở phase sau.`
+      : `Bulk status update for ${ids.length} villas will be connected later.`
     );
   };
 
@@ -253,16 +485,16 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
             <div className="w-14 h-14 rounded-2xl bg-[#edf3ff] text-[#0071c2] flex items-center justify-center shadow-inner font-bold">
               AD
             </div>
-            
+
             <h2 id="admin-login-title" className="text-xl font-display font-black text-neutral-800 mt-2">
               {language === 'ko' ? '관리자 Portal 로그인' : language === 'en' ? 'Admin Portal Sign In' : 'Đăng nhập hệ thống quản trị'}
             </h2>
             <p className="text-xs text-neutral-500 max-w-[320px] font-normal leading-relaxed">
-              {language === 'ko' 
-                ? '숙소 제어용 제한 구역입니다. 계속하려면 관리자 정보를 입력하십시오.' 
-                : language === 'en' 
-                  ? 'Restricted area. Please supply administrative credentials to access.' 
-                  : 'Khu vực giới hạn dành riêng cho nhà điều hành VillaStay. Vui lòng đăng nhập để tiếp tục.'}
+              {language === 'ko'
+                ? '숙소 제어용 제한 구역입니다. 계속하려면 관리자 정보를 입력하십시오.'
+                : language === 'en'
+                  ? 'Restricted area. Please supply administrative credentials to access.'
+                  : 'Khu vực giới hạn dành riêng cho nhà điều hành HenryTravel. Vui lòng đăng nhập để tiếp tục.'}
             </p>
           </div>
 
@@ -282,7 +514,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                 <span className="absolute left-3 top-2.5 text-neutral-400">
                   <User className="w-4 h-4" />
                 </span>
-                <input 
+                <input
                   id="admin-username-input"
                   type="text"
                   required
@@ -302,7 +534,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                 <span className="absolute left-3 top-2.5 text-neutral-400">
                   <Lock className="w-4 h-4 animate-pulse" />
                 </span>
-                <input 
+                <input
                   id="admin-password-input"
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -311,7 +543,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-300 rounded-xl py-2.5 pl-9 pr-10 text-xs font-semibold outline-none focus:bg-white focus:border-[#0071c2]"
                 />
-                
+
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -324,7 +556,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input 
+                <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
@@ -336,7 +568,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
               </label>
             </div>
 
-            <button 
+            <button
               id="admin-login-submit"
               type="submit"
               className="mt-2 bg-[#0071c2] hover:bg-[#005899] text-white py-3 px-4 rounded-xl text-xs font-black tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#0071c2]/10 active:scale-95 transition-all duration-200 cursor-pointer"
@@ -353,10 +585,10 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
                 {language === 'ko' ? '데모 계정 정보:' : language === 'en' ? 'Demo credentials:' : 'Tài khoản thử nghiệm hệ thống:'}
               </span>
               <span className="text-neutral-600 font-semibold font-mono">
-                {language === 'ko' 
-                  ? '아이디: admin · 패스워드: admin123 또는 admin2026' 
-                  : language === 'en' 
-                    ? 'Email: admin@villa.com · Password: admin123' 
+                {language === 'ko'
+                  ? '아이디: admin · 패스워드: admin123 또는 admin2026'
+                  : language === 'en'
+                    ? 'Email: admin@villa.com · Password: admin123'
                     : 'Email: admin@villa.com · Mật khẩu: admin123'}
               </span>
             </div>
@@ -373,13 +605,13 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   // Logged-in admin layout
   return (
-    <div className="bg-[#f8f9fc] min-h-screen pb-16">
+    <div className="bg-[#f8f9fc] h-full min-h-0 overflow-hidden flex flex-col">
       {/* Visual Admin header */}
-      <div className="bg-white border-b border-neutral-100 py-4.5 px-4 sticky top-16 left-0 right-0 z-40 shadow-sm flex items-center justify-between">
+      <div className="bg-white border-b border-neutral-100 py-4.5 px-4 shrink-0 z-40 shadow-sm flex items-center justify-between">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 w-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="bg-[#0071c2]/10 text-[#0071c2] px-2.5 py-0.5 rounded-full font-black text-[10px] tracking-wider uppercase">ADMIN PORTAL</span>
-            <h1 className="text-sm font-black text-neutral-800 tracking-tight font-display">VillaStay Operating Console</h1>
+            <h1 className="text-sm font-black text-neutral-800 tracking-tight font-display">HenryTravel Operating Console</h1>
           </div>
           <button
             onClick={triggerLogout}
@@ -412,11 +644,17 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
         onBulkStatusUpdateVillas={handleBulkStatusUpdateVillas}
         onApproveBooking={triggerApproveBooking}
         onRejectBooking={triggerRejectBooking}
+        onCompleteBooking={triggerCompleteBooking}
         onToggleVerifyFeedback={handleToggleVerifyFeedback}
         onUpdateVillaAvailability={handleUpdateVillaAvailability}
         onLogout={triggerLogout}
         adminStats={adminStats || undefined}
         adminUser={adminUser || undefined}
+        mutationLoading={mutationLoading}
+        isRefreshing={isRefreshing}
+        activeTab={activeAdminTab}
+        onTabChange={handleAdminTabChange}
+        scrollRef={adminScrollRef}
       />
 
       {/* Global Confirmation modal */}

@@ -10,58 +10,63 @@
 
 ### 🗄️ Database
 
-- [ ] Tạo Prisma schema đầy đủ theo v2:
-  - [ ] Bảng `users` (bao gồm `is_guest`, `guest_token`)
-  - [ ] Bảng `villas` (bao gồm `hold_minutes`, `deposit_required`, `deposit_amount`, `max_guests`)
-  - [ ] Bảng `bookings` (bao gồm `booking_code`, `guest_token`, `hold_expire_at`, `deposit_*`)
-  - [ ] Bảng `zalo_messages`
-  - [ ] Bảng `feedbacks`
-  - [ ] Bảng `admin_logs`
-  - [ ] Bảng `booking_history`
-  - [ ] Bảng `booking_attempts` (rate limiting)
-- [ ] Tạo toàn bộ DB indexes (xem mục 3.9 trong plan)
-- [ ] Seed data: 3–5 villa mẫu với đủ thông tin
+- [x] Tạo Prisma schema đầy đủ theo v2:
+  - [x] Bảng `users` (bao gồm `is_guest`, `guest_token`)
+  - [x] Bảng `villas` (bao gồm `hold_minutes`, `deposit_required`, `deposit_amount`, `max_guests`)
+  - [x] Bảng `bookings` (bao gồm `booking_code`, `guest_token`, `hold_expire_at`, `deposit_*`)
+  - [x] Bảng `zalo_messages`
+  - [x] Bảng `feedbacks`
+  - [x] Bảng `admin_logs`
+  - [x] Bảng `booking_history`
+  - [x] Bảng `booking_attempts` (rate limiting)
+  - [x] Bảng `system_settings` (Zalo/settings DB-first)
+- [x] Tạo toàn bộ DB indexes (xem mục 3.9 trong plan)
+- [x] Seed data: 3–5 villa mẫu với đủ thông tin
 
 ### 🔐 Auth
 
-- [ ] JWT middleware cho admin (Bearer token, expire 8h)
+- [x] JWT middleware cho admin (Bearer token, expire 8h)
 - [ ] Refresh token flow cho admin
-- [ ] `guest_token` UUID v4 — tạo khi booking, lưu vào cookie
-- [ ] Middleware xác thực route admin (`/admin/*`)
+- [x] `guest_token` UUID v4 — tạo khi booking, lưu vào cookie
+- [x] Middleware xác thực route admin (`/admin/*`)
 
 ### 🏠 Backend — Villa
 
-- [ ] `GET /villas` — danh sách + filter (location, giá, tiện ích, ngày available)
-- [ ] `GET /villas/:id` — chi tiết, tăng `views_count`
-- [ ] `GET /villas/:id/availability` — trả calendar booked/pending/available
-- [ ] `GET /villas/:id/feedbacks` — chỉ trả feedback `verified = true`
+- [x] `GET /villas` — danh sách + filter (location, giá, tiện ích, ngày available)
+- [x] `GET /villas/:id` — chi tiết, tăng `views_count`
+- [x] `GET /villas/:id/availability` — trả calendar booked/pending/available
+- [x] `GET /villas/:id/feedbacks` — chỉ trả feedback `verified = true`
 
 ### 📅 Backend — Booking
 
-- [ ] `POST /bookings` — tạo `pending_hold`, sinh `booking_code` (VB-YYYY-NNN), sinh `guest_token`, build link Zalo
-- [ ] Rate limiting `POST /bookings`: max 3 lần/IP/15 phút + max 2 lần/SĐT/giờ (ghi vào `booking_attempts`)
-- [ ] `GET /bookings/check` — tra cứu bằng `booking_code` + `phone`
-- [ ] Validate: check-in < check-out, guests_count ≤ max_guests, không overlap booking confirmed/pending
+- [x] `POST /bookings` — tạo `pending_hold`, sinh `booking_code` (VB-YYYY-NNN), sinh `guest_token`, build link Zalo
+- [x] Rate limiting `POST /bookings`: max 3 lần/IP/15 phút + max 2 lần/SĐT/giờ (ghi vào `booking_attempts`)
+- [x] `GET /bookings/check` — tra cứu bằng `booking_code` + `phone`
+- [x] Validate: check-in < check-out, guests_count ≤ max_guests, không overlap booking confirmed/pending
 
 ### ⚙️ Background Job
 
-- [ ] Job chạy mỗi 1 phút: scan `pending_hold` hết hạn (`hold_expire_at < NOW()`)
-- [ ] Auto set `status = 'cancelled'`, ghi vào `booking_history`, phòng trở lại available
-- [ ] Log lỗi job nếu fail, không làm crash server
+- [x] Job chạy mỗi 1 phút: scan `pending_hold` hết hạn (`hold_expire_at < NOW()`)
+- [x] Auto set `status = 'cancelled'`, ghi vào `booking_history`, phòng trở lại available
+- [x] Log lỗi job nếu fail, không làm crash server
 
 ### 📱 Zalo Link Builder
 
-- [ ] Service tạo 3 loại link: `zalo://`, `zalo.me`, `zalo.me?text=`
-- [ ] Encode message đầy đủ: tên villa, ngày, số khách, mã booking
-- [ ] Lưu 3 link vào bảng `zalo_messages`
+- [x] Service tạo 3 loại link: `zalo://`, `zalo.me`, `zalo.me?text=`
+- [x] Encode message đầy đủ: tên villa, ngày, số khách, mã booking
+- [x] Lưu 3 link vào bảng `zalo_messages`
+- [x] Zalo phone/settings đọc từ `system_settings`, env chỉ là fallback
+- [x] Public endpoint `GET /settings/public` cho footer/detail/booking links
 
 ### 🖥️ Frontend — User Pages
 
-- [ ] **Home (`/`)**: widget check-in/check-out + số khách/phòng + filter nâng cao
-- [ ] **Danh sách villa (`/villas`)**: VillaCard + CalendarMini + filter từ Home
-- [ ] **Chi tiết villa (`/villas/:id`)**: Gallery + tiện ích + BookingForm pre-fill + ZaloLinkButton
-- [ ] **Booking Success (`/booking/success`)**: mã booking + CountdownTimer hold + nút Zalo + link tra cứu
-- [ ] **Tra cứu booking (`/booking/check`)**: input mã + SĐT → hiển thị trạng thái
+- [x] **Home (`/`)**: widget check-in/check-out + số khách/phòng + filter nâng cao
+- [x] **Danh sách villa (`/villas`)**: VillaCard + CalendarMini + filter từ Home
+- [x] **Chi tiết villa (`/villas/:id`)**: Gallery + tiện ích + BookingForm pre-fill + ZaloLinkButton
+- [x] **Booking Success (`/booking/success`)**: mã booking + CountdownTimer hold + nút Zalo + link tra cứu
+- [x] **Tra cứu booking (`/booking/check`)**: input mã + SĐT → hiển thị trạng thái
+- [x] Public FE API integration: home/list/detail/booking/lookup/settings/feedback nối API thật
+- [x] Scroll behavior fix khi chuyển view/trang
 
 ### 🧩 Components (Phase 1)
 
@@ -80,17 +85,18 @@
 
 ### 🔑 Admin Auth
 
-- [ ] `POST /admin/auth/login` — trả JWT + refresh token
+- [x] `POST /admin/auth/login` — trả JWT
 - [ ] `POST /admin/auth/refresh` — làm mới token
-- [ ] Trang login admin (`/admin/login`) với form + error handling
+- [x] Trang login admin (`/admin/login`) với form + error handling
 
 ### 🏠 Admin — Quản lý Villa
 
-- [ ] `GET /admin/villas` — danh sách + thống kê views/booking/feedback
-- [ ] `POST /admin/villas` — tạo villa mới
-- [ ] `PUT /admin/villas/:id` — sửa villa (tên, giá, hold_minutes, trạng thái, tiện ích)
-- [ ] `DELETE /admin/villas/:id` — xóa villa (soft delete hoặc hard delete nếu không có booking)
-- [ ] Trang admin villas với form CRUD, preview gallery
+- [x] `GET /admin/villas` — danh sách + thống kê views/booking/feedback
+- [x] `POST /admin/villas` — tạo villa mới
+- [x] `PUT /admin/villas/:id` — sửa villa (tên, giá, hold_minutes, trạng thái, tiện ích)
+- [x] `DELETE /admin/villas/:id` — xóa villa (soft delete hoặc hard delete nếu không có booking)
+- [x] Trang admin villas với form CRUD, preview gallery
+- [x] Admin FE API integration cho villas
 
 ### 📤 Image Upload
 
@@ -100,27 +106,31 @@
 
 ### 📅 Admin — Quản lý Booking
 
-- [ ] `GET /admin/bookings` — filter theo villa/ngày/status/SĐT
-- [ ] `PUT /admin/bookings/:id/confirm` — xác nhận booking, ghi booking_history, gửi email
-- [ ] `PUT /admin/bookings/:id/cancel` — huỷ booking, ghi booking_history, gửi email khách
-- [ ] `GET /admin/bookings/:id/history` — lịch sử thay đổi trạng thái
-- [ ] Trang admin bookings với bảng filter + action confirm/cancel + xem history
+- [x] `GET /admin/bookings` — filter theo villa/ngày/status/SĐT
+- [x] `PUT /admin/bookings/:id/confirm` — xác nhận booking, ghi booking_history
+- [x] `PUT /admin/bookings/:id/cancel` — huỷ booking, ghi booking_history
+- [x] `PUT /admin/bookings/:id/complete` — hoàn tất booking, ghi booking_history
+- [x] `GET /admin/bookings/:id/history` — lịch sử thay đổi trạng thái
+- [x] Trang admin bookings với bảng filter + action confirm/cancel/complete + xem history
+- [x] Admin actions ghi `admin_log` cho thao tác quản trị chính
 
 ### ⭐ Feedback
 
-- [ ] `POST /feedbacks` — validate đủ điều kiện (confirmed + checked-out + chưa review)
-- [ ] `GET /admin/feedbacks` — danh sách theo villa, rating, comment
-- [ ] `PUT /admin/feedbacks/:id/toggle` — ẩn/hiện feedback (soft delete)
-- [ ] Hiển thị FeedbackList trên trang chi tiết villa (chỉ verified = true)
-- [ ] Component `FeedbackList` + `RatingStars`
-- [ ] Tính điểm trung bình hiển thị trên VillaCard và VillaDetail
+- [x] `POST /feedbacks` — validate đủ điều kiện (confirmed/completed + checked-out + chưa review)
+- [x] `GET /admin/feedbacks` — danh sách theo villa, rating, comment
+- [x] `PUT /admin/feedbacks/:id/toggle` — ẩn/hiện feedback (soft delete)
+- [x] Hiển thị FeedbackList trên trang chi tiết villa (chỉ verified = true)
+- [x] Component `FeedbackList` + `RatingStars`
+- [x] Tính điểm trung bình hiển thị trên VillaCard và VillaDetail
+- [x] Villa feedback loading từ API thật `GET /villas/:id/feedbacks`
 
 ### 📊 Admin Dashboard
 
-- [ ] Thống kê tổng quan: tổng villa, booking tuần/tháng, feedback mới, pending chờ xử lý
-- [ ] Biểu đồ: lượt xem theo villa, booking theo trạng thái, rating trung bình (Recharts)
-- [ ] Alert: pending booking mới (badge + notification banner)
-- [ ] Component `StatsChart`, `AlertBanner`, `AdminTable`
+- [x] Thống kê tổng quan: tổng villa, booking tuần/tháng, feedback mới, pending chờ xử lý
+- [x] Biểu đồ: lượt xem theo villa, booking theo trạng thái, rating trung bình
+- [x] Alert: pending booking mới (badge + notification banner)
+- [x] Component `StatsChart`, `AlertBanner`, `AdminTable`
+- [x] Admin FE API integration cho dashboard/bookings/feedback/settings
 
 ### 📧 Notification / Email
 

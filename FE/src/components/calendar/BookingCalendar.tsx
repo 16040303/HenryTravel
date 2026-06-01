@@ -194,7 +194,7 @@ export default function BookingCalendar({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-4 sm:p-5 flex flex-col gap-4 animate-scaleIn">
+    <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-4 sm:p-5 flex flex-col gap-4 animate-scaleIn min-w-0 overflow-hidden">
       {/* Calendar Header with navigation switches */}
       <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
         <h4 className="font-bold text-sm text-neutral-800 flex items-center gap-1.5 font-display">
@@ -222,6 +222,8 @@ export default function BookingCalendar({
         </div>
       </div>
 
+      <div className="w-full overflow-x-auto scrollbar-safe overscroll-contain">
+        <div className="min-w-[320px] flex flex-col gap-3">
       {/* Weekdays Row */}
       <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
         {(language === 'vi' 
@@ -286,6 +288,8 @@ export default function BookingCalendar({
             </button>
           );
         })}
+      </div>
+      </div>
       </div>
 
       {/* Legend Block */}

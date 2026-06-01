@@ -2,17 +2,52 @@
 @import "tailwindcss";
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   html {
     scroll-behavior: smooth;
   }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   body {
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
+
+  body.modal-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', system-ui, sans-serif;
   }
+}
+
+.app-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollbar-safe {
+  scrollbar-gutter: stable;
+}
+
+.no-horizontal-scroll {
+  overflow-x: hidden;
 }
 
 /* Custom modern range slider style */

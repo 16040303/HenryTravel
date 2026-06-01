@@ -155,6 +155,67 @@ router.get('/:id/availability', async (req, res, next) => {
   }
 });
 
+router.get('/:id/feedbacks', async (req, res, next) => {
+  try {
+    const villaId = req.params.id;
+    const page = parsePositiveInt(req.query.page, 1, 10_000);
+    const limit = parsePositiveInt(req.query.limit, 10, 50);
+
+    const villa = await prisma.villa.findUnique({
+      where: { id: villaId },
+      select: { id: true },
+    });
+
+    if (!villa) {
+      throw new AppError(404, 'VILLA_NOT_FOUND', 'Villa not found');
+    }
+
+    const where: Prisma.FeedbackWhereInput = {
+      villaId,
+      verified: true,
+    };
+
+    const [total, aggregate, feedbacks] = await Promise.all([
+      prisma.feedback.count({ where }),
+      prisma.feedback.aggregate({
+        where,
+        _avg: { rating: true },
+      }),
+      prisma.feedback.findMany({
+        where,
+        select: {
+          id: true,
+          villaId: true,
+          bookingId: true,
+          rating: true,
+          comment: true,
+          verified: true,
+          createdAt: true,
+          booking: {
+            select: {
+              guestName: true,
+              bookingCode: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    res.json({
+      feedbacks,
+      avgRating: aggregate._avg.rating ? Number(aggregate._avg.rating.toFixed(1)) : 0,
+      total,
+      page,
+      totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const villa = await prisma.villa.update({

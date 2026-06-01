@@ -11,12 +11,14 @@ interface AdminFeedbackManagerProps {
   feedbacks: Feedback[];
   villas: VillaDetail[];
   onToggleVerifyFeedback: (id: string) => void;
+  mutationLoading?: boolean;
 }
 
 export default function AdminFeedbackManager({
   feedbacks,
   villas,
-  onToggleVerifyFeedback
+  onToggleVerifyFeedback,
+  mutationLoading = false
 }: AdminFeedbackManagerProps) {
   const { language } = useLanguage();
   const [selectedVillaId, setSelectedVillaId] = useState<EntityId | 'ALL'>('ALL');
@@ -127,7 +129,8 @@ export default function AdminFeedbackManager({
                   {f.isVerified ? (
                     <button
                       onClick={() => onToggleVerifyFeedback(String(f.id))}
-                      className="bg-emerald-50 hover:bg-rose-50 text-emerald-600 hover:text-rose-600 border border-emerald-200 hover:border-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      disabled={mutationLoading}
+                      className="bg-emerald-50 hover:bg-rose-50 text-emerald-600 hover:text-rose-600 border border-emerald-200 hover:border-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
                       title="Click to Hide from Public site"
                     >
                       <Eye className="w-4 h-4 shrink-0" />
@@ -136,7 +139,8 @@ export default function AdminFeedbackManager({
                   ) : (
                     <button
                       onClick={() => onToggleVerifyFeedback(String(f.id))}
-                      className="bg-neutral-50 hover:bg-emerald-50 text-neutral-500 hover:text-emerald-700 border border-neutral-200 hover:border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      disabled={mutationLoading}
+                      className="bg-neutral-50 hover:bg-emerald-50 text-neutral-500 hover:text-emerald-700 border border-neutral-200 hover:border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       title="Click to Show on Public site"
                     >
                       <EyeOff className="w-4 h-4 shrink-0" />

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { 
-  Sliders, MessageSquare, Clock, Globe, Shield, 
-  LogOut, CheckCircle2, Phone, Compass, AlertCircle 
+import React, { useEffect, useState } from 'react';
+import {
+  Sliders, MessageSquare, Clock, Globe, Shield,
+  LogOut, CheckCircle2, Phone, Compass, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getAdminSettings, updateAdminSettings } from '../../lib/api';
+import { useToast } from '../Toast';
 
 interface AdminSettingsProps {
   onLogout: () => void;
@@ -11,7 +13,8 @@ interface AdminSettingsProps {
 
 export default function AdminSettings({ onLogout }: AdminSettingsProps) {
   const { language } = useLanguage();
-  
+  const { showToast } = useToast();
+
   // Persisted configurations prefilled from localStorage or default values
   const [holdTimeMode, setHoldTimeMode] = useState<'preset' | 'custom'>(() => {
     return (localStorage.getItem('bookingHoldTimeMode') || 'preset') as 'preset' | 'custom';
@@ -24,13 +27,11 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
   const [customMinutes, setCustomMinutes] = useState(() => {
     return Number(localStorage.getItem('bookingHoldTimeMinutes') || 45);
   });
-  
-  const [zaloUrl, setZaloUrl] = useState(() => {
-    return localStorage.getItem('admin_zalo_url') || 'https://zalo.me/0901234567';
-  });
+
+  const [zaloUrl, setZaloUrl] = useState('');
 
   const [whatsappUrl, setWhatsappUrl] = useState(() => {
-    return localStorage.getItem('admin_whatsapp_url') || 'https://wa.me/0901234567';
+    return localStorage.getItem('admin_whatsapp_url') || '';
   });
 
   const [currency, setCurrency] = useState(() => {
@@ -43,16 +44,33 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveConfigs = (e: React.FormEvent) => {
+  useEffect(() => {
+    let mounted = true;
+    getAdminSettings()
+      .then((settings) => {
+        if (mounted) setZaloUrl(settings.zaloUrl);
+      })
+      .catch((error) => {
+        if (mounted) {
+          setValidationError(error instanceof Error ? error.message : 'Không thể tải cấu hình Zalo.');
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSaveConfigs = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let resolvedMinutes = holdMinutes;
     if (holdTimeMode === 'custom') {
       if (!Number.isInteger(customMinutes) || customMinutes < 5 || customMinutes > 1440) {
         setValidationError(
-          language === 'vi' 
-            ? 'Số phút tùy chỉnh phải là số nguyên dương trong khoảng từ 5 đến 1440 phút!' 
+          language === 'vi'
+            ? 'Số phút tùy chỉnh phải là số nguyên dương trong khoảng từ 5 đến 1440 phút!'
             : 'Custom hold minutes must be a positive integer between 5 and 1440 minutes!'
         );
         return; // Do not save!
@@ -61,20 +79,31 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
     }
 
     setValidationError(''); // Clear error
+    setIsSaving(true);
 
-    localStorage.setItem('bookingHoldTimeMode', holdTimeMode);
-    if (holdTimeMode === 'custom') {
-      localStorage.setItem('bookingHoldTimeMinutes', String(customMinutes));
+    try {
+      const settings = await updateAdminSettings({ zaloUrl });
+      setZaloUrl(settings.zaloUrl);
+      localStorage.setItem('bookingHoldTimeMode', holdTimeMode);
+      if (holdTimeMode === 'custom') {
+        localStorage.setItem('bookingHoldTimeMinutes', String(customMinutes));
+      }
+      localStorage.setItem('admin_hold_minutes', String(resolvedMinutes));
+      localStorage.setItem('admin_whatsapp_url', whatsappUrl);
+      localStorage.setItem('admin_currency_type', currency);
+      localStorage.setItem('admin_timezone', timezone);
+      setSaveSuccess(true);
+      showToast('success', language === 'vi' ? 'Cập nhật cấu hình thành công!' : 'Settings updated successfully!');
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 2000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể lưu cấu hình hệ thống.';
+      setValidationError(message);
+      showToast('error', message);
+    } finally {
+      setIsSaving(false);
     }
-    localStorage.setItem('admin_hold_minutes', String(resolvedMinutes));
-    localStorage.setItem('admin_zalo_url', zaloUrl);
-    localStorage.setItem('admin_whatsapp_url', whatsappUrl);
-    localStorage.setItem('admin_currency_type', currency);
-    localStorage.setItem('admin_timezone', timezone);
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 2000);
   };
 
   return (
@@ -84,7 +113,7 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
         <div>
           <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-1.5">
             <Sliders className="w-4 h-4 text-[#0071c2]" />
-            <span>{language === 'vi' ? 'Cấu hình hệ thống VillaStay' : 'System Configuration Settings'}</span>
+            <span>{language === 'vi' ? 'Cấu hình hệ thống HenryTravel' : 'System Configuration Settings'}</span>
           </h3>
           <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
             {language === 'vi' ? 'Căn chỉnh holding time, hotline liên lạc và các cài đặt tiền tệ hiển thị toàn trang' : 'Tune reservation holds timeline, support deep-links, and operational formats'}
@@ -111,7 +140,7 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
         )}
 
         <form onSubmit={handleSaveConfigs} className="flex flex-col gap-5 text-xs font-semibold text-neutral-600">
-          
+
           {/* Config 1: Hold Time */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-bold text-neutral-400 uppercase flex items-center gap-1">
@@ -155,8 +184,8 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
                   className="bg-white border border-neutral-200 rounded-lg p-2 font-mono text-xs text-neutral-850 outline-none focus:border-[#0071c2] w-full max-w-xs font-bold"
                 />
                 <p className="text-[9px] text-[#0071c2] font-semibold leading-normal font-sans mt-0.5">
-                  * {language === 'vi' 
-                    ? 'Thời gian khách được giữ phòng trước khi admin xác nhận hoặc hệ thống tự hủy.' 
+                  * {language === 'vi'
+                    ? 'Thời gian khách được giữ phòng trước khi admin xác nhận hoặc hệ thống tự hủy.'
                     : 'Duration a guest is allowed to hold dates block before manual confirm or auto-expiration.'}
                 </p>
               </div>
@@ -174,7 +203,7 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
               {language === 'vi' ? 'Đường dẫn liên kết Zalo hỗ trợ (Zalo URL)' : 'Zalo Support URL'}
             </label>
             <input
-              type="url"
+              type="text"
               required
               value={zaloUrl}
               onChange={(e) => setZaloUrl(e.target.value)}
@@ -182,7 +211,7 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
               placeholder="https://zalo.me/..."
             />
             <p className="text-[9px] text-neutral-400 font-normal leading-normal">
-              * {language === 'vi' ? 'URL deep-link cưng chiều khách mở trực tiếp khung chat ứng dụng Zalo.' : 'Deep-link URL to launch Zalo chat conversation window.'}
+              * {language === 'vi' ? 'Nhập số điện thoại Zalo hoặc URL https://zalo.me/... Backend sẽ chuẩn hóa và lưu vào DB.' : 'Enter a Zalo phone number or https://zalo.me/... URL. The backend will normalize and store it in DB.'}
             </p>
           </div>
 
@@ -194,7 +223,6 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
             </label>
             <input
               type="url"
-              required
               value={whatsappUrl}
               onChange={(e) => setWhatsappUrl(e.target.value)}
               className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs"
@@ -238,9 +266,10 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
           {/* Submit Actions */}
           <button
             type="submit"
-            className="self-end bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 px-6 rounded-xl cursor-pointer shadow hover:scale-101 transition-all"
+            disabled={isSaving}
+            className="self-end bg-[#0071c2] hover:bg-[#005899] disabled:bg-neutral-400 text-white font-black py-2.5 px-6 rounded-xl cursor-pointer shadow hover:scale-101 transition-all"
           >
-            {language === 'vi' ? 'Cập nhật cấu hình' : 'Update Configurations'}
+            {isSaving ? (language === 'vi' ? 'Đang lưu...' : 'Saving...') : (language === 'vi' ? 'Cập nhật cấu hình' : 'Update Configurations')}
           </button>
         </form>
       </div>
@@ -260,7 +289,7 @@ export default function AdminSettings({ onLogout }: AdminSettingsProps) {
         <div className="bg-neutral-50 border border-neutral-100 p-4 rounded-xl flex items-center justify-between text-xs">
           <div className="flex flex-col gap-0.5 leading-none font-semibold">
             <span className="text-neutral-400 uppercase text-[8px] font-black">{language === 'vi' ? 'Tài khoản' : 'Account'}</span>
-            <span className="text-neutral-800 font-bold mt-1 text-sm">admin (Quản trị cao cấp)</span>
+            <span className="text-neutral-800 font-bold mt-1 text-sm">admin (Quản trị viên)</span>
           </div>
 
           <button

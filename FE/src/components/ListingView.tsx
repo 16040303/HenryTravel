@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sparkles, Sliders, CheckSquare, RefreshCw } from 'lucide-react';
+import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sliders, CheckSquare, RefreshCw } from 'lucide-react';
 import { Villa } from '../types';
 import { getVillas } from '../lib/api';
 import { LOCATIONS, FACILITIES } from '../constants';
@@ -24,9 +24,10 @@ interface ListingViewProps {
   };
   onViewDetail: (id: string) => void;
   villasTriggerUpdate?: number;
+  onSearchParamsUpdate?: (params: ListingViewProps['initialSearchParams']) => void;
 }
 
-export default function ListingView({ initialSearchParams, initialFilterParams, onViewDetail, villasTriggerUpdate = 0 }: ListingViewProps) {
+export default function ListingView({ initialSearchParams, initialFilterParams, onViewDetail, villasTriggerUpdate = 0, onSearchParamsUpdate }: ListingViewProps) {
   const { t, language } = useLanguage();
 
   // Configured check-in state
@@ -38,6 +39,8 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   const [villas, setVillas] = useState<Villa[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'popular' | 'priceAsc' | 'priceDesc'>('popular');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [activeEditDateField, setActiveEditDateField] = useState<'checkIn' | 'checkOut' | null>(null);
 
   // Input states for editing search parameters
   const [editLocation, setEditLocation] = useState(params.location);
@@ -69,18 +72,17 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
   const handleApplyEditSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setParams({
+    const nextParams = {
       location: editLocation,
       checkIn: editCheckIn,
       checkOut: editCheckOut,
       guests: editGuests,
       rooms: editRooms
-    });
+    };
+    setParams(nextParams);
+    onSearchParamsUpdate?.(nextParams);
     setShowEditSearch(false);
-  };
-
-  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortBy(e.target.value as any);
+    setActiveEditDateField(null);
   };
 
   // Sort villas
@@ -132,6 +134,73 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     });
   };
 
+  const formatDisplayDate = (value: string) => {
+    const [year, month, day] = value.split('-');
+    return year && month && day ? `${day}/${month}/${year}` : value;
+  };
+
+  const renderEditDateCalendar = (
+    field: 'checkIn' | 'checkOut',
+    value: string,
+    onSelect: (value: string) => void
+  ) => {
+    if (activeEditDateField !== field) return null;
+    const selected = new Date(value);
+    const year = Number.isNaN(selected.getTime()) ? 2026 : selected.getFullYear();
+    const month = Number.isNaN(selected.getTime()) ? 5 : selected.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
+    const monthLabel = new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
+      month: 'long',
+      year: 'numeric'
+    }).format(new Date(year, month, 1));
+
+    return (
+      <div className="absolute left-0 top-[calc(100%+8px)] z-[200] w-[280px] rounded-2xl border border-neutral-100 bg-white p-3 shadow-2xl shadow-neutral-900/15 animate-scaleIn">
+        <div className="mb-3 flex items-center justify-between border-b border-neutral-100 pb-2">
+          <span className="text-xs font-black capitalize text-neutral-800">{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => setActiveEditDateField(null)}
+            className="rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+          >
+            {language === 'vi' ? 'Đóng' : 'Close'}
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-400">
+          {(language === 'vi' ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']).map(day => (
+            <span key={day}>{day}</span>
+          ))}
+          {Array.from({ length: offset }).map((_, index) => (
+            <span key={`empty-${index}`} />
+          ))}
+          {Array.from({ length: daysInMonth }, (_, index) => index + 1).map(day => {
+            const dateValue = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isSelected = dateValue === value;
+            return (
+              <button
+                key={dateValue}
+                type="button"
+                onClick={() => {
+                  onSelect(dateValue);
+                  setActiveEditDateField(null);
+                }}
+                className={`aspect-square rounded-xl text-[11px] font-bold transition-all ${
+                  isSelected
+                    ? 'bg-[#0071c2] text-white shadow-sm shadow-[#0071c2]/30'
+                    : 'text-neutral-700 hover:bg-[#edf3ff] hover:text-[#005899]'
+                }`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // Safe mapping of location string for translation looks
   const getLocationLabel = useCallback((loc: string): string => {
     const keyMap: Record<string, string> = {
@@ -148,11 +217,19 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
   // Mini-calendar formatter which highlights reservation states of a villa
   const renderMiniCalendar = (villaId: number) => {
-    // We will render days of some testing dates: May 20, 21, 24 (booked), May 28 (pending booking) 
-    // And search bounds days June 20-23
-    const days = Array.from({ length: 14 }, (_, i) => i + 18); // Days 18 to 31
-    const checkInDay = 20;
-    const checkOutDay = 23;
+    const checkInDate = new Date(params.checkIn);
+    const checkOutDate = new Date(params.checkOut);
+    const safeBaseDate = Number.isNaN(checkInDate.getTime()) ? new Date('2026-06-01') : checkInDate;
+    const year = safeBaseDate.getFullYear();
+    const month = safeBaseDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const visibleStart = Math.max(1, safeBaseDate.getDate() - 2);
+    const visibleEnd = Math.min(daysInMonth, visibleStart + 13);
+    const days = Array.from({ length: visibleEnd - visibleStart + 1 }, (_, i) => visibleStart + i);
+    const checkInDay = Number.isNaN(checkInDate.getTime()) ? null : checkInDate.getDate();
+    const checkOutDay = Number.isNaN(checkOutDate.getTime()) ? null : checkOutDate.getDate();
+    const isSameDisplayMonth = !Number.isNaN(checkOutDate.getTime()) && checkOutDate.getFullYear() === year && checkOutDate.getMonth() === month;
+    const monthLabel = `${String(month + 1).padStart(2, '0')}/${year}`;
 
     return (
       <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 flex flex-col gap-1.5 animate-fadeIn">
@@ -160,7 +237,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
           <span className="text-[9px] font-extrabold bg-[#edf3ff] text-[#005899] py-0.5 px-2 rounded-full uppercase tracking-wider">
             {t('list.calendarTitle')}
           </span>
-          <span className="text-[#0071c2]">06/2026</span>
+          <span className="text-[#0071c2]">{monthLabel}</span>
         </div>
         
         {/* Days grid row */}
@@ -173,7 +250,9 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             let bgClass = 'bg-white hover:bg-neutral-100 text-neutral-700';
             let title = 'Có phòng trống';
 
-            if (d >= checkInDay && d <= checkOutDay) {
+            const isSelectedRange = checkInDay !== null && checkOutDay !== null && isSameDisplayMonth && d >= checkInDay && d <= checkOutDay;
+
+            if (isSelectedRange) {
               bgClass = 'bg-[#0071c2] text-white font-extrabold rounded-md';
               title = 'Ngày bạn tìm kiếm';
             } else if (d === 25 || d === 26) {
@@ -204,7 +283,6 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1.5 text-xs text-blue-100 uppercase font-black tracking-widest leading-none">
-              <Sparkles className="w-4 h-4 text-orange-400" />
               <span>{getLocationLabel(params.location)} — {params.guests} {t('home.guests')}</span>
             </div>
             <h1 className="text-2xl md:text-3.5xl font-display font-black tracking-tight text-white leading-none">
@@ -249,23 +327,27 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
+                <div className="relative flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('home.checkIn')}</span>
-                  <input 
-                    type="date" 
-                    value={editCheckIn} 
-                    onChange={e => setEditCheckIn(e.target.value)}
-                    className="bg-neutral-50 border p-2 rounded-lg text-xs font-bold font-mono outline-none"
-                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveEditDateField(activeEditDateField === 'checkIn' ? null : 'checkIn')}
+                    className="bg-neutral-50 border p-2 rounded-lg text-xs font-bold font-mono outline-none text-left hover:border-[#0071c2] hover:bg-white transition-colors"
+                  >
+                    {formatDisplayDate(editCheckIn)}
+                  </button>
+                  {renderEditDateCalendar('checkIn', editCheckIn, setEditCheckIn)}
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="relative flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('home.checkOut')}</span>
-                  <input 
-                    type="date" 
-                    value={editCheckOut} 
-                    onChange={e => setEditCheckOut(e.target.value)}
-                    className="bg-neutral-50 border p-2 rounded-lg text-xs font-bold font-mono outline-none"
-                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveEditDateField(activeEditDateField === 'checkOut' ? null : 'checkOut')}
+                    className="bg-neutral-50 border p-2 rounded-lg text-xs font-bold font-mono outline-none text-left hover:border-[#0071c2] hover:bg-white transition-colors"
+                  >
+                    {formatDisplayDate(editCheckOut)}
+                  </button>
+                  {renderEditDateCalendar('checkOut', editCheckOut, setEditCheckOut)}
                 </div>
               </div>
 
@@ -303,7 +385,10 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                 </button>
                 <button 
                   type="button" 
-                  onClick={() => setShowEditSearch(false)}
+                  onClick={() => {
+                    setShowEditSearch(false);
+                    setActiveEditDateField(null);
+                  }}
                   className="border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-600 py-1.5 px-3 rounded-lg font-bold"
                 >
                   {t('list.closeBtn')}
@@ -395,24 +480,72 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         <section className="md:col-span-9 flex flex-col gap-6">
           
           {/* Top Info sorting controller row */}
-          <div className="bg-white p-4 rounded-xl border border-neutral-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs font-semibold text-neutral-500">
-              {t('list.foundPrefix')} 
-              <strong className="text-neutral-800 text-sm font-extrabold">{sortedVillas.length}</strong> 
-              {t('list.foundSuffix')}
-            </div>
+          <div className="relative z-50 overflow-visible rounded-2xl border border-white/80 bg-white/90 p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)] backdrop-blur-md sm:p-5">
+            <div className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-[#0071c2]/10 blur-2xl" />
+            <div className="pointer-events-none absolute -left-8 bottom-0 h-20 w-20 rounded-full bg-[#fe6a34]/10 blur-2xl" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#edf3ff] text-[#0071c2] shadow-inner">
+                  <Search className="h-4.5 w-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">
+                    {language === 'vi' ? 'Kết quả tìm kiếm' : 'Search results'}
+                  </p>
+                  <div className="mt-1 flex items-baseline gap-1.5 text-sm font-semibold text-neutral-600">
+                    <span>{t('list.foundPrefix')}</span>
+                    <strong className="font-display text-2xl font-black leading-none text-[#005899]">{sortedVillas.length}</strong>
+                    <span>{t('list.foundSuffix')}</span>
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-neutral-500 uppercase tracking-wider">{t('list.sortLabel')}</span>
-              <select 
-                value={sortBy} 
-                onChange={handleSortChange}
-                className="bg-neutral-50 border border-neutral-200 rounded-lg py-1 px-3 text-xs font-bold text-neutral-700 outline-none focus:border-[#0071c2]"
-              >
-                <option value="popular">{t('list.sortPopular')}</option>
-                <option value="priceAsc">{t('list.sortPriceAsc')}</option>
-                <option value="priceDesc">{t('list.sortPriceDesc')}</option>
-              </select>
+              <div className="relative w-full sm:w-auto sm:min-w-[250px]">
+                <button
+                  type="button"
+                  onClick={() => setSortMenuOpen(prev => !prev)}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-neutral-200/80 bg-neutral-50/90 px-3 py-2.5 shadow-inner transition-all hover:border-[#a1c9ff] hover:bg-white"
+                >
+                  <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-neutral-400">
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-[#0071c2]" />
+                    {t('list.sortLabel')}
+                  </span>
+                  <span className="text-xs font-black text-neutral-800">
+                    {sortBy === 'popular'
+                      ? t('list.sortPopular')
+                      : sortBy === 'priceAsc'
+                        ? t('list.sortPriceAsc')
+                        : t('list.sortPriceDesc')}
+                  </span>
+                </button>
+
+                {sortMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-[999] w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white p-1.5 shadow-2xl shadow-neutral-900/10 animate-scaleIn">
+                    {([
+                      ['popular', t('list.sortPopular')],
+                      ['priceAsc', t('list.sortPriceAsc')],
+                      ['priceDesc', t('list.sortPriceDesc')]
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(value);
+                          setSortMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-bold transition-colors ${
+                          sortBy === value
+                            ? 'bg-[#0071c2] text-white shadow-sm'
+                            : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
+                        }`}
+                      >
+                        <span>{label}</span>
+                        {sortBy === value && <CheckSquare className="h-3.5 w-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -430,7 +563,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             />
           ) : (
 
-            <div className="flex flex-col gap-6">
+            <div className="relative z-0 flex flex-col gap-6">
               {sortedVillas.map((villa) => {
                 
                 const hasMatchingStatus = villa.status === 'Available';

@@ -4,6 +4,7 @@ import authRouter from './auth';
 import bookingsRouter from './bookings';
 import feedbacksRouter from './feedbacks';
 import logsRouter from './logs';
+import settingsRouter from './settings';
 import statsRouter from './stats';
 import villasRouter from './villas';
 
@@ -14,6 +15,7 @@ router.use('/villas', adminAuthMiddleware, villasRouter);
 router.use('/bookings', adminAuthMiddleware, bookingsRouter);
 router.use('/feedbacks', adminAuthMiddleware, feedbacksRouter);
 router.use('/logs', adminAuthMiddleware, logsRouter);
+router.use('/settings', adminAuthMiddleware, settingsRouter);
 router.use('/stats', adminAuthMiddleware, statsRouter);
 
 export default router;

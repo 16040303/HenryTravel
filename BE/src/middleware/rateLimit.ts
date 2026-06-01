@@ -42,7 +42,10 @@ export async function bookingRateLimit(req: Request, _res: Response, next: NextF
         : Promise.resolve(0),
     ]);
 
-    if (ipCount >= 3 || phoneCount >= 2) {
+    const maxIpAttempts = process.env.NODE_ENV === 'production' ? 3 : 30;
+    const maxPhoneAttempts = process.env.NODE_ENV === 'production' ? 2 : 20;
+
+    if (ipCount >= maxIpAttempts || phoneCount >= maxPhoneAttempts) {
       throw new AppError(
         429,
         'RATE_LIMITED',

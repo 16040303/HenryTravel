@@ -1,14 +1,17 @@
 import {
+  AdminBookingHistoryResponse,
   AdminBookingResponse,
   AdminFeedbackResponse,
   AdminLogResponse,
   AdminLoginResponse,
   AdminStats,
   AdminUser,
+  AdminVillaMutationPayload,
   AdminVillaResponse,
   Booking,
   BookingResult,
   BookingStatus,
+  EntityId,
   Feedback,
   FilterParams,
   SearchParams,
@@ -17,13 +20,17 @@ import {
   VillaDetail,
   ZaloLinks,
 } from '../types';
-import { MOCK_VILLAS, MOCK_FEEDBACKS } from '../data/mockVillas';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 interface ApiErrorBody {
   error?: string;
   message?: string;
+}
+
+export interface PublicSettings {
+  zaloPhone: string;
+  zaloUrl: string;
 }
 
 interface BackendVilla {
@@ -64,11 +71,21 @@ interface BackendBooking {
 interface BackendFeedback {
   id: string;
   villaId: string;
-  booking?: { guestName?: string | null };
+  bookingId?: string;
+  guestName?: string | null;
+  booking?: { guestName?: string | null; bookingCode?: string | null };
   rating: number;
   comment?: string | null;
   createdAt: string;
   verified: boolean;
+}
+
+export interface VillaFeedbackResponse {
+  feedbacks: Feedback[];
+  avgRating: number;
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 function normalizeDate(value?: string | null): string {
@@ -127,6 +144,10 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   return data as T;
 }
 
+export async function getPublicSettings(): Promise<PublicSettings> {
+  return apiRequest<PublicSettings>('/settings/public');
+}
+
 export function mapBackendVillaToFrontendVilla(villa: BackendVilla): VillaDetail {
   const images = Array.isArray(villa.images) && villa.images.length > 0
     ? villa.images
@@ -177,7 +198,7 @@ export function mapBackendBookingToFrontendBooking(booking: BackendBooking, vill
     fullName: booking.guestName || '',
     email: booking.guestEmail || '',
     villaId: booking.villaId || villaData?.id || '',
-    villaName: villaData?.name || 'VillaStay',
+    villaName: villaData?.name || 'HenryTravel',
     checkIn,
     checkOut,
     guests: booking.guestsCount || 1,
@@ -196,7 +217,7 @@ export function mapBackendFeedbackToFrontendFeedback(feedback: BackendFeedback):
   return {
     id: feedback.id,
     villaId: feedback.villaId,
-    guestName: feedback.booking?.guestName || 'Khách VillaStay',
+    guestName: feedback.guestName || feedback.booking?.guestName || 'Khách đã lưu trú',
     rating: feedback.rating,
     comment: feedback.comment || '',
     createdAt: feedback.createdAt,
@@ -333,10 +354,22 @@ export async function submitFeedback(data: {
   });
 }
 
-export async function getVillaFeedbacks(_villaId: string): Promise<Feedback[]> {
-  // Public BE Phase 1 does not expose GET feedbacks by villa yet.
-  // Keep an explicit empty response instead of silently reading stale mock data.
-  return [];
+export async function getVillaFeedbacks(villaId: EntityId, page = 1, limit = 10): Promise<VillaFeedbackResponse> {
+  const response = await apiRequest<{
+    feedbacks: BackendFeedback[];
+    avgRating: number;
+    total: number;
+    page: number;
+    totalPages: number;
+  }>(`/villas/${encodeURIComponent(String(villaId))}/feedbacks${buildQuery({ page, limit })}`);
+
+  return {
+    feedbacks: response.feedbacks.map(mapBackendFeedbackToFrontendFeedback),
+    avgRating: response.avgRating,
+    total: response.total,
+    page: response.page,
+    totalPages: response.totalPages,
+  };
 }
 
 export const ADMIN_TOKEN_KEY = 'henrytravel_admin_token';
@@ -368,8 +401,8 @@ export function getStoredAdminUser(): AdminUser | null {
 export function adminLogout(): void {
   clearAdminToken();
   localStorage.removeItem(ADMIN_USER_KEY);
-  localStorage.removeItem('villastay_admin_authenticated');
-  sessionStorage.removeItem('villastay_admin_authenticated');
+  localStorage.removeItem('HenryTravel_admin_authenticated');
+  sessionStorage.removeItem('HenryTravel_admin_authenticated');
 }
 
 export async function adminApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -479,47 +512,68 @@ export function mapAdminFeedbackToFrontendFeedback(feedback: AdminFeedbackRespon
   return mapBackendFeedbackToFrontendFeedback(feedback);
 }
 
-// Admin mutation helpers below remain mock/localStorage by design until FE API Phase 3.
-const STORAGE_KEYS = {
-  VILLAS: 'villastay_villas',
-  FEEDBACKS: 'villastay_feedbacks',
-};
-
-function getStoredVillas(): VillaDetail[] {
-  const data = localStorage.getItem(STORAGE_KEYS.VILLAS);
-  if (!data) {
-    localStorage.setItem(STORAGE_KEYS.VILLAS, JSON.stringify(MOCK_VILLAS));
-    return MOCK_VILLAS as VillaDetail[];
-  }
-  return JSON.parse(data);
+export async function createAdminVilla(data: AdminVillaMutationPayload): Promise<AdminVillaResponse['villas'][number]> {
+  return adminApiRequest<AdminVillaResponse['villas'][number]>('/admin/villas', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
-function saveStoredVillas(villas: VillaDetail[]) {
-  localStorage.setItem(STORAGE_KEYS.VILLAS, JSON.stringify(villas));
+export async function updateAdminVilla(id: string, data: AdminVillaMutationPayload): Promise<AdminVillaResponse['villas'][number]> {
+  return adminApiRequest<AdminVillaResponse['villas'][number]>(`/admin/villas/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }
 
-export async function addVilla(v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>): Promise<VillaDetail> {
-  const list = getStoredVillas();
-  const newVilla: VillaDetail = {
-    ...v,
-    id: `mock-${Date.now()}`,
-    rating: 5.0,
-    reviewsCount: 1,
-    images: [v.image, 'https://picsum.photos/800/600?random=10'],
-    bookedDates: [],
-    pendingDates: [],
-  };
-  list.push(newVilla);
-  saveStoredVillas(list);
-  return newVilla;
+export async function deleteAdminVilla(id: string): Promise<void> {
+  await adminApiRequest<void>(`/admin/villas/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }
 
-export async function confirmBookingAdmin(_code: string): Promise<boolean> {
-  return false;
+export async function confirmAdminBooking(id: string): Promise<AdminBookingResponse['bookings'][number]> {
+  return adminApiRequest<AdminBookingResponse['bookings'][number]>(`/admin/bookings/${encodeURIComponent(id)}/confirm`, {
+    method: 'PUT',
+  });
 }
 
-export function getStoredFeedbacksForAdmin(): Feedback[] {
-  const data = localStorage.getItem(STORAGE_KEYS.FEEDBACKS);
-  if (!data) return MOCK_FEEDBACKS as Feedback[];
-  return JSON.parse(data);
+export async function cancelAdminBooking(id: string, reason = 'Admin cancelled booking'): Promise<AdminBookingResponse['bookings'][number]> {
+  return adminApiRequest<AdminBookingResponse['bookings'][number]>(`/admin/bookings/${encodeURIComponent(id)}/cancel`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
 }
+
+export async function completeAdminBooking(id: string): Promise<AdminBookingResponse['bookings'][number]> {
+  return adminApiRequest<AdminBookingResponse['bookings'][number]>(`/admin/bookings/${encodeURIComponent(id)}/complete`, {
+    method: 'PUT',
+  });
+}
+
+export async function getAdminBookingHistory(id: string): Promise<AdminBookingHistoryResponse> {
+  return adminApiRequest<AdminBookingHistoryResponse>(`/admin/bookings/${encodeURIComponent(id)}/history`);
+}
+
+export async function toggleAdminFeedback(id: string): Promise<{ id: string; verified: boolean }> {
+  return adminApiRequest<{ id: string; verified: boolean }>(`/admin/feedbacks/${encodeURIComponent(id)}/toggle`, {
+    method: 'PUT',
+  });
+}
+
+export interface AdminSettingsResponse {
+  zaloPhone: string;
+  zaloUrl: string;
+}
+
+export async function getAdminSettings(): Promise<AdminSettingsResponse> {
+  return adminApiRequest<AdminSettingsResponse>('/admin/settings');
+}
+
+export async function updateAdminSettings(data: { zaloUrl?: string; zaloPhone?: string }): Promise<AdminSettingsResponse> {
+  return adminApiRequest<AdminSettingsResponse>('/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+

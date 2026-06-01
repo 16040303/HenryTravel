@@ -16,14 +16,17 @@ import { ToastProvider } from './components/Toast';
 
 import { SearchParams, FilterParams } from './types';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
+import { getPublicSettings } from './lib/api';
+import { getZaloLink, ZALO_PHONE_FALLBACK } from './constants';
 import { motion, AnimatePresence } from 'motion/react';
 
 function AppContent() {
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // Scroll to top on route change
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  // Scroll to top on route change only; admin mutations/refetches do not navigate.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [location.pathname]);
@@ -31,21 +34,41 @@ function AppContent() {
   // Dynamic page title based on route
   useEffect(() => {
     const path = location.pathname;
-    let title = 'VillaStay';
-    if (path === '/') title = `VillaStay — ${t('home.heroTitle')}`;
-    else if (path === '/villas') title = `${t('nav.listings')} — VillaStay`;
-    else if (path.startsWith('/villas/')) title = `${t('home.viewDetails')} — VillaStay`;
-    else if (path === '/lookup') title = `${t('nav.lookup')} — VillaStay`;
-    else if (path === '/admin') title = `${t('nav.admin')} — VillaStay`;
+    let title = 'HenryTravel';
+    if (path === '/') title = `HenryTravel — ${t('home.heroTitle')}`;
+    else if (path === '/villas') title = `${t('nav.listings')} — HenryTravel`;
+    else if (path.startsWith('/villas/')) title = `${t('home.viewDetails')} — HenryTravel`;
+    else if (path === '/lookup') title = `${t('nav.lookup')} — HenryTravel`;
+    else if (path === '/admin') title = `${t('nav.admin')} — HenryTravel`;
     document.title = title;
   }, [location.pathname, t]);
 
   // Trigger state increments to re-fetch villas list from storage across components
   const [villasTriggerUpdate, setVillasTriggerUpdate] = useState<number>(0);
+  const [publicZaloPhone, setPublicZaloPhone] = useState(ZALO_PHONE_FALLBACK);
+  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
+
+  useEffect(() => {
+    let mounted = true;
+    getPublicSettings()
+      .then((settings) => {
+        if (!mounted) return;
+        setPublicZaloPhone(settings.zaloPhone || ZALO_PHONE_FALLBACK);
+        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPublicZaloPhone(ZALO_PHONE_FALLBACK);
+        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Extracted search & filter query criteria backed by sessionStorage for refresh persistence
   const [activeSearchParams, setActiveSearchParams] = useState<SearchParams>(() => {
-    const saved = sessionStorage.getItem('villastay_search');
+    const saved = sessionStorage.getItem('HenryTravel_search');
     return saved ? JSON.parse(saved) : {
       location: 'Đà Lạt',
       checkIn: '2026-06-20',
@@ -56,7 +79,7 @@ function AppContent() {
   });
 
   const [activeFilterParams, setActiveFilterParams] = useState<FilterParams>(() => {
-    const saved = sessionStorage.getItem('villastay_filters');
+    const saved = sessionStorage.getItem('HenryTravel_filters');
     return saved ? JSON.parse(saved) : {
       priceMin: 0,
       priceMax: 10000000,
@@ -67,10 +90,15 @@ function AppContent() {
 
   const handleSearchSubmitFromHome = (search: SearchParams, filter: FilterParams) => {
     setActiveSearchParams(search);
-    sessionStorage.setItem('villastay_search', JSON.stringify(search));
+    sessionStorage.setItem('HenryTravel_search', JSON.stringify(search));
     setActiveFilterParams(filter);
-    sessionStorage.setItem('villastay_filters', JSON.stringify(filter));
+    sessionStorage.setItem('HenryTravel_filters', JSON.stringify(filter));
     navigate('/villas');
+  };
+
+  const handleListingSearchParamsUpdate = (search: SearchParams) => {
+    setActiveSearchParams(search);
+    sessionStorage.setItem('HenryTravel_search', JSON.stringify(search));
   };
 
   const handleVillaAddedGlobally = () => {
@@ -99,18 +127,17 @@ function AppContent() {
   };
 
   return (
-    <div id="app-root" className="min-h-screen bg-[#fcf9f8] font-sans antialiased selection:bg-[#fe6a34]/20 selection:text-[#fe6a34] flex flex-col justify-between">
-      
-      <div>
+    <div id="app-root" className={`min-h-screen bg-[#fcf9f8] font-sans antialiased selection:bg-[#fe6a34]/20 selection:text-[#fe6a34] flex flex-col no-horizontal-scroll ${isAdminRoute ? 'h-screen overflow-hidden' : 'justify-between'}`}>
+
+      <div className={isAdminRoute ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : ''}>
         {/* Persisted Branding Navbar Header */}
-        <Navbar 
-          currentView={getActiveView()} 
-          onNavigate={handleNavigateFromNavbar} 
+        <Navbar
+          currentView={getActiveView()}
+          onNavigate={handleNavigateFromNavbar}
           selectedVillaIdForDetail={null}
         />
 
-        {/* Main View Router switch layout with smooth 2026 core animations */}
-        <main className="min-h-[calc(100vh-8rem)]">
+        <main className={isAdminRoute ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-[calc(100vh-8rem)]'}>
           <AnimatePresence mode="wait">
             <Routes>
               <Route path="/" element={
@@ -120,8 +147,8 @@ function AppContent() {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
                 >
-                  <HomeView 
-                    onSearch={handleSearchSubmitFromHome} 
+                  <HomeView
+                    onSearch={handleSearchSubmitFromHome}
                     onViewDetail={(id) => navigate(`/villas/${id}`)}
                     villasTriggerUpdate={villasTriggerUpdate}
                   />
@@ -135,11 +162,12 @@ function AppContent() {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
                 >
-                  <ListingView 
+                  <ListingView
                     initialSearchParams={activeSearchParams}
                     initialFilterParams={activeFilterParams}
                     onViewDetail={(id) => navigate(`/villas/${id}`)}
                     villasTriggerUpdate={villasTriggerUpdate}
+                    onSearchParamsUpdate={handleListingSearchParamsUpdate}
                   />
                 </motion.div>
               } />
@@ -151,10 +179,11 @@ function AppContent() {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
                 >
-                  <DetailView 
+                  <DetailView
                     onBack={() => navigate('/villas')}
                     onNavigateToLookup={() => navigate('/lookup')}
                     onBookingSuccessNotify={handleVillaAddedGlobally}
+                    initialSearchParams={activeSearchParams}
                   />
                 </motion.div>
               } />
@@ -172,12 +201,13 @@ function AppContent() {
 
               <Route path="/admin" element={
                 <motion.div
+                  className="h-full min-h-0 overflow-hidden"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
                 >
-                  <AdminConsoleView 
+                  <AdminConsoleView
                     onVillaAddedNotification={handleVillaAddedGlobally}
                   />
                 </motion.div>
@@ -190,96 +220,103 @@ function AppContent() {
         </main>
       </div>
 
-      {/* Floating back-to-top button */}
-      <ScrollToTop />
+      {!isAdminRoute && <ScrollToTop />}
 
       {/* Persistence brand footer element translated dynamically */}
-      <footer className="bg-neutral-900 text-neutral-400 py-12 px-4 border-t border-neutral-800 shrink-0 mt-12">
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-12 gap-8 text-sm">
-          
-          <div className="md:col-span-4 flex flex-col gap-3">
-            <span className="text-xl font-extrabold text-white">
-              Villa<span className="text-[#fe6a34]">Stay</span>
-            </span>
-            <p className="text-xs text-neutral-500 leading-relaxed font-normal">
-              {t('home.heroSubtitle')}
-            </p>
-          </div>
+      {!isAdminRoute && (
+        <footer className="bg-neutral-900 text-neutral-400 py-12 px-4 border-t border-neutral-800 shrink-0 mt-12">
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8 grid grid-cols-1 md:grid-cols-12 gap-8 text-sm">
 
-          <div className="md:col-span-3 flex flex-col gap-2.5">
-            <span className="text-white font-bold uppercase text-xs tracking-wider">{t('home.popularLocations')}</span>
-            <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
-              <Link 
-                to="/villas" 
-                onClick={() => {
-                  const updated = { ...activeSearchParams, location: 'Đà Lạt' };
-                  setActiveSearchParams(updated);
-                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
-                }} 
-                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
-              >
-                {t('fac.landscape')} - {t('loc.dalat')}
-              </Link>
-              <Link 
-                to="/villas" 
-                onClick={() => {
-                  const updated = { ...activeSearchParams, location: 'Vũng Tàu' };
-                  setActiveSearchParams(updated);
-                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
-                }} 
-                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
-              >
-                {t('fac.beach_access')} - {t('loc.vungtau')}
-              </Link>
-              <Link 
-                to="/villas" 
-                onClick={() => {
-                  const updated = { ...activeSearchParams, location: 'Phú Quốc' };
-                  setActiveSearchParams(updated);
-                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
-                }} 
-                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
-              >
-                {t('nav.listings')} - {t('loc.phuquoc')}
-              </Link>
-              <Link 
-                to="/villas" 
-                onClick={() => {
-                  const updated = { ...activeSearchParams, location: 'Hội An' };
-                  setActiveSearchParams(updated);
-                  sessionStorage.setItem('villastay_search', JSON.stringify(updated));
-                }} 
-                className="hover:text-white text-left cursor-pointer transition-colors duration-200"
-              >
-                {t('nav.home')} - {t('loc.hoian')}
-              </Link>
+            <div className="md:col-span-4 flex flex-col gap-3">
+              <span className="text-xl font-extrabold text-white">
+                Henry<span className="text-[#fe6a34]">Travel</span>
+              </span>
+              <p className="text-xs text-neutral-500 leading-relaxed font-normal">
+                {t('home.heroSubtitle')}
+              </p>
             </div>
-          </div>
 
-          <div className="md:col-span-3 flex flex-col gap-2.5">
-            <span className="text-white font-bold uppercase text-xs tracking-wider">{t('look.bookingDetails')}</span>
-            <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
-              <Link to="/lookup" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.lookup')}</Link>
-              <a href="https://zalo.me/0901234567" target="_blank" rel="noopener noreferrer" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.zaloSupport')} ({t('footer.hotline')})</a>
-              <span className="text-neutral-600 block mt-1">{t('footer.workingHours')}</span>
+            <div className="md:col-span-3 flex flex-col gap-2.5">
+              <span className="text-white font-bold uppercase text-xs tracking-wider">{t('home.popularLocations')}</span>
+              <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
+                <Link
+                  to="/villas"
+                  onClick={() => {
+                    const updated = { ...activeSearchParams, location: 'Đà Lạt' };
+                    setActiveSearchParams(updated);
+                    sessionStorage.setItem('HenryTravel_search', JSON.stringify(updated));
+                  }}
+                  className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+                >
+                  {t('fac.landscape')} - {t('loc.dalat')}
+                </Link>
+                <Link
+                  to="/villas"
+                  onClick={() => {
+                    const updated = { ...activeSearchParams, location: 'Vũng Tàu' };
+                    setActiveSearchParams(updated);
+                    sessionStorage.setItem('HenryTravel_search', JSON.stringify(updated));
+                  }}
+                  className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+                >
+                  {t('fac.beach_access')} - {t('loc.vungtau')}
+                </Link>
+                <Link
+                  to="/villas"
+                  onClick={() => {
+                    const updated = { ...activeSearchParams, location: 'Phú Quốc' };
+                    setActiveSearchParams(updated);
+                    sessionStorage.setItem('HenryTravel_search', JSON.stringify(updated));
+                  }}
+                  className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+                >
+                  {t('nav.listings')} - {t('loc.phuquoc')}
+                </Link>
+                <Link
+                  to="/villas"
+                  onClick={() => {
+                    const updated = { ...activeSearchParams, location: 'Hội An' };
+                    setActiveSearchParams(updated);
+                    sessionStorage.setItem('HenryTravel_search', JSON.stringify(updated));
+                  }}
+                  className="hover:text-white text-left cursor-pointer transition-colors duration-200"
+                >
+                  {t('nav.home')} - {t('loc.hoian')}
+                </Link>
+              </div>
             </div>
-          </div>
 
-          <div className="md:col-span-2 flex flex-col gap-2.5">
-            <span className="text-white font-bold uppercase text-xs tracking-wider">{t('footer.policies')}</span>
-            <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
-              <span>{t('detail.policies')}</span>
-              <span>{t('footer.holdGuarantee')}</span>
-              <span>{t('footer.secureTransaction')}</span>
+            <div className="md:col-span-3 flex flex-col gap-2.5">
+              <span className="text-white font-bold uppercase text-xs tracking-wider">{t('look.bookingDetails')}</span>
+              <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
+                <Link to="/lookup" className="hover:text-white text-left cursor-pointer transition-colors duration-200">{t('nav.lookup')}</Link>
+                {publicZaloUrl ? (
+                  <a href={publicZaloUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white text-left cursor-pointer transition-colors duration-200">
+                    {t('nav.zaloSupport')}{publicZaloPhone ? ` (${publicZaloPhone})` : ''}
+                  </a>
+                ) : (
+                  <span className="text-neutral-600">{t('nav.zaloSupport')}</span>
+                )}
+                <span className="text-neutral-600 block mt-1">{t('footer.workingHours')}</span>
+              </div>
             </div>
+
+            <div className="md:col-span-2 flex flex-col gap-2.5">
+              <span className="text-white font-bold uppercase text-xs tracking-wider">{t('footer.policies')}</span>
+              <div className="flex flex-col gap-1.5 text-xs text-neutral-500 font-semibold">
+                <span>{t('detail.policies')}</span>
+                <span>{t('footer.holdGuarantee')}</span>
+                <span>{t('footer.secureTransaction')}</span>
+              </div>
+            </div>
+
           </div>
 
-        </div>
-
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 border-t border-neutral-800 mt-10 pt-6 text-center text-xs text-neutral-600 font-semibold">
-          {t('footer.copyright')}
-        </div>
-      </footer>
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8 border-t border-neutral-800 mt-10 pt-6 text-center text-xs text-neutral-600 font-semibold">
+            {t('footer.copyright')}
+          </div>
+        </footer>
+      )}
 
     </div>
   );

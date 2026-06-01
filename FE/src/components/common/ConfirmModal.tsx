@@ -26,7 +26,7 @@ export default function ConfirmModal({
   const { language } = useLanguage();
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close on ESC key press
+  // Close on ESC key press and lock background scroll only while open.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -35,6 +35,7 @@ export default function ConfirmModal({
     };
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
+      document.body.classList.add('modal-open');
       // Accessibility: focus modal or confirm button initially
       setTimeout(() => {
         modalRef.current?.focus();
@@ -42,6 +43,7 @@ export default function ConfirmModal({
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      document.body.classList.remove('modal-open');
     };
   }, [isOpen, onClose]);
 
@@ -61,7 +63,7 @@ export default function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-[300] overflow-y-auto overscroll-contain p-4 bg-neutral-900/60 backdrop-blur-sm animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
@@ -70,7 +72,7 @@ export default function ConfirmModal({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn my-auto mx-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button top-right */}

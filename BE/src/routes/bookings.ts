@@ -150,12 +150,13 @@ router.post('/', bookingRateLimit, async (req, res, next) => {
       holdExpireAt,
     });
 
-    const zaloLinks = buildZaloLinks({
+    const zaloLinks = await buildZaloLinks({
       phone: guestPhone,
       villaName: villa.name,
       checkIn,
       checkOut,
       guestsCount,
+      guestName,
       bookingCode: booking.bookingCode,
     });
 
@@ -242,12 +243,13 @@ router.get('/check', async (req, res, next) => {
         0,
         Math.ceil((responseBooking.holdExpireAt.getTime() - now.getTime()) / 60_000)
       );
-      response.zaloLinks = buildZaloLinks({
+      response.zaloLinks = await buildZaloLinks({
         phone: responseBooking.guestPhone || phone,
         villaName: booking.villa.name,
         checkIn: responseBooking.checkIn,
         checkOut: responseBooking.checkOut,
         guestsCount: responseBooking.guestsCount,
+        guestName: responseBooking.guestName || undefined,
         bookingCode: responseBooking.bookingCode,
       });
     }

@@ -134,6 +134,62 @@ router.get('/:id/availability', async (req, res, next) => {
         next(error);
     }
 });
+router.get('/:id/feedbacks', async (req, res, next) => {
+    try {
+        const villaId = req.params.id;
+        const page = (0, validators_1.parsePositiveInt)(req.query.page, 1, 10000);
+        const limit = (0, validators_1.parsePositiveInt)(req.query.limit, 10, 50);
+        const villa = await prisma_1.prisma.villa.findUnique({
+            where: { id: villaId },
+            select: { id: true },
+        });
+        if (!villa) {
+            throw new errors_1.AppError(404, 'VILLA_NOT_FOUND', 'Villa not found');
+        }
+        const where = {
+            villaId,
+            verified: true,
+        };
+        const [total, aggregate, feedbacks] = await Promise.all([
+            prisma_1.prisma.feedback.count({ where }),
+            prisma_1.prisma.feedback.aggregate({
+                where,
+                _avg: { rating: true },
+            }),
+            prisma_1.prisma.feedback.findMany({
+                where,
+                select: {
+                    id: true,
+                    villaId: true,
+                    bookingId: true,
+                    rating: true,
+                    comment: true,
+                    verified: true,
+                    createdAt: true,
+                    booking: {
+                        select: {
+                            guestName: true,
+                            bookingCode: true,
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+        ]);
+        res.json({
+            feedbacks,
+            avgRating: aggregate._avg.rating ? Number(aggregate._avg.rating.toFixed(1)) : 0,
+            total,
+            page,
+            totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.get('/:id', async (req, res, next) => {
     try {
         const villa = await prisma_1.prisma.villa.update({
