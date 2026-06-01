@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum VillaStatus {
+  available
+  maintenance
+  hidden
+}
+
+enum PriceType {
+  fixed
+  contact
+}
+
+enum BookingStatus {
+  pending_hold
+  confirmed
+  cancelled
+  completed
+}
+
+enum BookingSource {
+  web
+  admin_manual
+}
+
+enum DepositStatus {
+  none
+  pending
+  paid
+  refunded
+}
+
+model User {
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  phone       String?
+  password    String?
+  role        UserRole  @default(user)
+  isGuest     Boolean   @default(false) @map("is_guest")
+  guestToken  String?   @map("guest_token")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  bookings    Booking[]
+  adminLogs   AdminLog[]
+
+  @@map("users")
+}
+
+model Villa {
+  id              String      @id @default(uuid())
+  name            String
+  location        String
+  description     String?
+  status          VillaStatus @default(available)
+  price           Decimal     @default(0)
+  priceType       PriceType   @default(fixed) @map("price_type")
+  facilities      Json        @default("[]")
+  images          Json        @default("[]")
+  viewsCount      Int         @default(0) @map("views_count")
+  holdMinutes     Int         @default(15) @map("hold_minutes")
+  depositRequired Boolean     @default(false) @map("deposit_required")
+  depositAmount   Decimal?    @map("deposit_amount")
+  maxGuests       Int         @default(10) @map("max_guests")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  bookings        Booking[]
+  feedbacks       Feedback[]
+
+  @@map("villas")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  bookingCode     String        @unique @map("booking_code")
+  userId          String?       @map("user_id")
+  villaId         String        @map("villa_id")
+  guestName       String?       @map("guest_name")
+  guestPhone      String?       @map("guest_phone")
+  guestEmail      String?       @map("guest_email")
+  guestToken      String?       @map("guest_token")
+  checkIn         DateTime      @map("check_in")
+  checkOut        DateTime      @map("check_out")
+  guestsCount     Int           @map("guests_count")
+  roomsCount      Int           @default(1) @map("rooms_count")
+  specialRequest  String?       @map("special_request")
+  status          BookingStatus @default(pending_hold)
+  source          BookingSource @default(web)
+  holdExpireAt    DateTime?     @map("hold_expire_at")
+  depositStatus   DepositStatus @default(none) @map("deposit_status")
+  depositMethod   String?       @map("deposit_method")
+  depositPaidAt   DateTime?     @map("deposit_paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  user            User?         @relation(fields: [userId], references: [id])
+  villa           Villa         @relation(fields: [villaId], references: [id])
+  feedback        Feedback?
+  zaloMessages    ZaloMessage[]
+  history         BookingHistory[]
+
+  @@index([villaId])
+  @@index([userId])
+  @@index([checkIn])
+  @@index([status])
+  @@index([bookingCode])
+  @@map("bookings")
+}
+
+model ZaloMessage {
+  id                String   @id @default(uuid())
+  bookingId         String   @map("booking_id")
+  messageUrlMobile  String   @map("message_url_mobile")
+  messageUrlWeb     String   @map("message_url_web")
+  messageUrlFallback String  @map("message_url_fallback")
+  sentAt            DateTime @default(now()) @map("sent_at")
+
+  booking           Booking  @relation(fields: [bookingId], references: [id])
+
+  @@map("zalo_messages")
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  bookingId String   @unique @map("booking_id")
+  villaId   String   @map("villa_id")
+  rating    Int
+  comment   String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  villa     Villa    @relation(fields: [villaId], references: [id])
+
+  @@index([villaId])
+  @@map("feedbacks")
+}
+
+model AdminLog {
+  id         String   @id @default(uuid())
+  adminId    String   @map("admin_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  timestamp  DateTime @default(now())
+
+  admin      User     @relation(fields: [adminId], references: [id])
+
+  @@map("admin_logs")
+}
+
+model BookingHistory {
+  id         String   @id @default(uuid())
+  bookingId  String   @map("booking_id")
+  status     String
+  changedBy  String?  @map("changed_by")
+  note       String?
+  timestamp  DateTime @default(now())
+
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+
+  @@map("booking_history")
+}
+
+model BookingAttempt {
+  id          String   @id @default(uuid())
+  ipAddress   String   @map("ip_address")
+  phone       String
+  villaId     String   @map("villa_id")
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  @@index([ipAddress, attemptedAt])
+  @@index([phone, attemptedAt])
+  @@map("booking_attempts")
+}

@@ -11,6 +11,8 @@ trigger: always_on
 
 ## ⚠️ BƯỚC ĐẦU TIÊN — BẮT BUỘC TRƯỚC KHI LÀM BẤT CỨ ĐIỀU GÌ
 
+Gọi tôi là Anh Yêu - xưng em
+
 Trước khi viết code, tạo file, sửa logic, hoặc trả lời bất kỳ câu hỏi kỹ thuật nào, AI **phải đọc** 3 file sau theo thứ tự:
 
 ```
