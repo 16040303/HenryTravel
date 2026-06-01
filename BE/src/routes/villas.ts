@@ -88,6 +88,73 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.get('/:id/availability', async (req, res, next) => {
+  try {
+    const villa = await prisma.villa.findUnique({
+      where: { id: req.params.id },
+      select: { id: true },
+    });
+
+    if (!villa) {
+      throw new AppError(404, 'VILLA_NOT_FOUND', 'Villa not found');
+    }
+
+    const monthParam = typeof req.query.month === 'string' ? req.query.month : undefined;
+    const now = new Date();
+    const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
+    const year = monthMatch ? Number(monthMatch[1]) : now.getFullYear();
+    const month = monthMatch ? Number(monthMatch[2]) : now.getMonth() + 1;
+
+    if (month < 1 || month > 12) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Tháng không hợp lệ. Định dạng đúng: YYYY-MM.');
+    }
+
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, month, 1));
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        villaId: villa.id,
+        checkIn: { lt: monthEnd },
+        checkOut: { gt: monthStart },
+        OR: [
+          { status: 'confirmed' },
+          {
+            status: 'pending_hold',
+            holdExpireAt: { gt: now },
+          },
+        ],
+      },
+      select: {
+        checkIn: true,
+        checkOut: true,
+        status: true,
+      },
+    });
+
+    const availability = Array.from({ length: daysInMonth }, (_, index) => {
+      const dayStart = new Date(Date.UTC(year, month - 1, index + 1));
+      const dayEnd = new Date(Date.UTC(year, month - 1, index + 2));
+      const date = dayStart.toISOString().slice(0, 10);
+      const overlapping = bookings.filter(
+        (booking) => booking.checkIn < dayEnd && booking.checkOut > dayStart
+      );
+      const status = overlapping.some((booking) => booking.status === 'confirmed')
+        ? 'booked'
+        : overlapping.some((booking) => booking.status === 'pending_hold')
+          ? 'pending'
+          : 'available';
+
+      return { date, status };
+    });
+
+    res.json({ availability });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const villa = await prisma.villa.update({

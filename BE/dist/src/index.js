@@ -7,6 +7,7 @@ require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const routes_1 = __importDefault(require("./routes"));
+const releaseHold_1 = require("./jobs/releaseHold");
 const errorHandler_1 = require("./middleware/errorHandler");
 const prisma_1 = require("./lib/prisma");
 const app = (0, express_1.default)();
@@ -22,10 +23,12 @@ app.use('/api', routes_1.default);
 app.use(errorHandler_1.errorHandler);
 const server = app.listen(port, () => {
     console.log(`HenryTravel API is running on http://localhost:${port}`);
+    (0, releaseHold_1.startBookingJobs)();
 });
 async function shutdown(signal) {
     console.log(`${signal} received. Shutting down HenryTravel API...`);
     server.close(async () => {
+        (0, releaseHold_1.stopBookingJobs)();
         await (0, prisma_1.disconnectPrisma)();
         process.exit(0);
     });

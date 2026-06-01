@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import routes from './routes';
+import { startBookingJobs, stopBookingJobs } from './jobs/releaseHold';
 import { errorHandler } from './middleware/errorHandler';
 import { disconnectPrisma } from './lib/prisma';
 
@@ -23,11 +24,13 @@ app.use(errorHandler);
 
 const server = app.listen(port, () => {
   console.log(`HenryTravel API is running on http://localhost:${port}`);
+  startBookingJobs();
 });
 
 async function shutdown(signal: string) {
   console.log(`${signal} received. Shutting down HenryTravel API...`);
   server.close(async () => {
+    stopBookingJobs();
     await disconnectPrisma();
     process.exit(0);
   });
