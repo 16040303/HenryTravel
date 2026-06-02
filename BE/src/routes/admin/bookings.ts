@@ -6,6 +6,7 @@ import { checkOverlap } from '../../services/booking';
 import { logAdminAction } from '../../services/adminLog';
 import { AppError } from '../../utils/errors';
 import { parseDate, parsePositiveInt } from '../../utils/validators';
+import { notifyGuestBookingCancelled, notifyGuestBookingConfirmed } from '../../services/notifications';
 
 const router = Router();
 const statuses: BookingStatus[] = ['pending_hold', 'confirmed', 'cancelled', 'completed'];
@@ -123,8 +124,8 @@ async function updateStatus(req: Request, status: BookingStatus, note: string, a
     return b;
   });
   await logAdminAction({ adminId: adminId(req), action, targetType: 'booking', targetId: booking.id, req });
-  if (status === 'confirmed') console.log('[MOCK_EMAIL] Booking confirmed', booking.bookingCode);
-  if (status === 'cancelled') console.log('[MOCK_EMAIL] Booking cancelled', booking.bookingCode);
+  if (status === 'confirmed') void notifyGuestBookingConfirmed(updated);
+  if (status === 'cancelled') void notifyGuestBookingCancelled(updated, note);
   return sanitize(updated);
 }
 

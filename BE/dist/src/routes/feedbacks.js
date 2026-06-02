@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const errors_1 = require("../utils/errors");
+const notifications_1 = require("../services/notifications");
 const router = (0, express_1.Router)();
 router.post('/', async (req, res, next) => {
     try {
@@ -29,7 +30,9 @@ router.post('/', async (req, res, next) => {
             throw new errors_1.AppError(409, 'FEEDBACK_ALREADY_EXISTS', 'Booking này đã được đánh giá.');
         const feedback = await prisma_1.prisma.feedback.create({
             data: { bookingId: booking.id, villaId: booking.villaId, rating, comment, verified: true },
+            include: { villa: { select: { name: true } }, booking: { select: { bookingCode: true, guestName: true } } },
         });
+        void (0, notifications_1.notifyAdminFeedbackCreated)(feedback);
         res.status(201).json(feedback);
     }
     catch (error) {

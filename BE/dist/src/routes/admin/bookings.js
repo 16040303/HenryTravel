@@ -6,6 +6,7 @@ const booking_1 = require("../../services/booking");
 const adminLog_1 = require("../../services/adminLog");
 const errors_1 = require("../../utils/errors");
 const validators_1 = require("../../utils/validators");
+const notifications_1 = require("../../services/notifications");
 const router = (0, express_1.Router)();
 const statuses = ['pending_hold', 'confirmed', 'cancelled', 'completed'];
 const sanitize = (booking) => {
@@ -139,9 +140,9 @@ async function updateStatus(req, status, note, action) {
     });
     await (0, adminLog_1.logAdminAction)({ adminId: adminId(req), action, targetType: 'booking', targetId: booking.id, req });
     if (status === 'confirmed')
-        console.log('[MOCK_EMAIL] Booking confirmed', booking.bookingCode);
+        void (0, notifications_1.notifyGuestBookingConfirmed)(updated);
     if (status === 'cancelled')
-        console.log('[MOCK_EMAIL] Booking cancelled', booking.bookingCode);
+        void (0, notifications_1.notifyGuestBookingCancelled)(updated, note);
     return sanitize(updated);
 }
 router.put('/:id/confirm', async (req, res, next) => { try {

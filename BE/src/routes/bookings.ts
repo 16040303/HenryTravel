@@ -9,6 +9,7 @@ import {
   createBookingWithRetry,
 } from '../services/booking';
 import { buildZaloLinks } from '../services/zalo';
+import { notifyAdminBookingPending } from '../services/notifications';
 import { AppError } from '../utils/errors';
 import { isValidDateRange, parseDate, parsePositiveInt } from '../utils/validators';
 
@@ -178,6 +179,8 @@ router.post('/', bookingRateLimit, async (req, res, next) => {
         },
       }),
     ]);
+
+    void notifyAdminBookingPending({ ...booking, villa });
 
     res.cookie('guest_token', guestToken, {
       httpOnly: true,

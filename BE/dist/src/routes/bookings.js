@@ -6,6 +6,7 @@ const prisma_1 = require("../lib/prisma");
 const rateLimit_1 = require("../middleware/rateLimit");
 const booking_1 = require("../services/booking");
 const zalo_1 = require("../services/zalo");
+const notifications_1 = require("../services/notifications");
 const errors_1 = require("../utils/errors");
 const validators_1 = require("../utils/validators");
 const router = (0, express_1.Router)();
@@ -126,6 +127,7 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
                 },
             }),
         ]);
+        void (0, notifications_1.notifyAdminBookingPending)({ ...booking, villa });
         res.cookie('guest_token', guestToken, {
             httpOnly: true,
             sameSite: 'lax',

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/errors';
+import { notifyAdminFeedbackCreated } from '../services/notifications';
 
 const router = Router();
 
@@ -24,7 +25,9 @@ router.post('/', async (req, res, next) => {
 
     const feedback = await prisma.feedback.create({
       data: { bookingId: booking.id, villaId: booking.villaId, rating, comment, verified: true },
+      include: { villa: { select: { name: true } }, booking: { select: { bookingCode: true, guestName: true } } },
     });
+    void notifyAdminFeedbackCreated(feedback);
     res.status(201).json(feedback);
   } catch (error) {
     next(error);
