@@ -151,7 +151,11 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       priceType: Number(v.price) > 0 ? 'fixed' : 'contact',
       status,
       maxGuests: Number(v.guestsCount) || 1,
-      images: v.image ? [v.image, ...(Array.isArray(v.images) ? v.images.filter((item) => item && item !== v.image) : [])] : [],
+      images: Array.isArray(v.images) && v.images.length > 0
+        ? v.images.filter(Boolean)
+        : v.image
+          ? [v.image]
+          : [],
       facilities: Array.isArray(v.facilities) ? v.facilities : [],
       holdMinutes: 15,
       depositRequired: true,
@@ -274,7 +278,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     });
   };
 
-  const handleAddVilla = async (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => {
+  const handleAddVilla = async (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates'>) => {
     if (mutationLoading) return;
     setMutationLoading(true);
     try {

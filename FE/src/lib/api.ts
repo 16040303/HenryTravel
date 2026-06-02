@@ -122,7 +122,8 @@ function buildQuery(params: Record<string, unknown>): string {
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  if (options.body && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -408,8 +409,9 @@ export function adminLogout(): void {
 export async function adminApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAdminToken();
   const headers = new Headers(options.headers);
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
-  if (options.body && !headers.has('Content-Type')) {
+  if (options.body && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   if (token) {
@@ -523,6 +525,26 @@ export async function updateAdminVilla(id: string, data: AdminVillaMutationPaylo
   return adminApiRequest<AdminVillaResponse['villas'][number]>(`/admin/villas/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(data),
+  });
+}
+
+export interface UploadedImage {
+  url: string;
+  secureUrl: string;
+  publicId: string;
+  width: number;
+  height: number;
+  format: string;
+  bytes: number;
+}
+
+export async function uploadAdminImages(files: File[]): Promise<{ urls: string[]; files: UploadedImage[] }> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('images', file));
+
+  return adminApiRequest<{ urls: string[]; files: UploadedImage[] }>('/admin/upload', {
+    method: 'POST',
+    body: formData,
   });
 }
 

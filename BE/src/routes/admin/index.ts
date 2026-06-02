@@ -6,6 +6,7 @@ import feedbacksRouter from './feedbacks';
 import logsRouter from './logs';
 import settingsRouter from './settings';
 import statsRouter from './stats';
+import uploadRouter from './upload';
 import villasRouter from './villas';
 
 const router = Router();
@@ -17,5 +18,6 @@ router.use('/feedbacks', adminAuthMiddleware, feedbacksRouter);
 router.use('/logs', adminAuthMiddleware, logsRouter);
 router.use('/settings', adminAuthMiddleware, settingsRouter);
 router.use('/stats', adminAuthMiddleware, statsRouter);
+router.use('/upload', adminAuthMiddleware, uploadRouter);
 
 export default router;

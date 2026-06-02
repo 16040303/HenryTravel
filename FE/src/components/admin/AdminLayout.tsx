@@ -17,7 +17,7 @@ interface AdminLayoutProps {
   villas: VillaDetail[];
   bookings: Booking[];
   feedbacks: Feedback[];
-  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
+  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
   onDuplicateVilla: (id: EntityId) => void | Promise<void>;

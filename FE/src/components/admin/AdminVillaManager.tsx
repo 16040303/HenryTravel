@@ -7,10 +7,11 @@ import {
 import { EntityId, VillaDetail } from '../../types';
 import { LOCATIONS, FACILITIES } from '../../constants';
 import { useLanguage } from '../../contexts/LanguageContext';
+import ImageUploader from './ImageUploader';
 
 interface AdminVillaManagerProps {
   villas: VillaDetail[];
-  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'images'>) => Promise<void>;
+  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
   onDuplicateVilla: (id: EntityId) => void | Promise<void>;
@@ -59,7 +60,8 @@ export default function AdminVillaManager({
   const [villaBedrooms, setVillaBedrooms] = useState(4);
   const [villaBathrooms, setVillaBathrooms] = useState(4);
   const [villaFacilities, setVillaFacilities] = useState<string[]>(['wifi', 'kitchen']);
-  const [villaImageUrl, setVillaImageUrl] = useState('https://picsum.photos/400/300?random=20');
+  const [villaImageUrl, setVillaImageUrl] = useState('');
+  const [villaImages, setVillaImages] = useState<string[]>([]);
   const [villaStatus, setVillaStatus] = useState<'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('Available');
   const [villaIsActive, setVillaIsActive] = useState(true);
 
@@ -85,7 +87,8 @@ export default function AdminVillaManager({
     setVillaBedrooms(v.bedroomsCount);
     setVillaBathrooms(v.bathroomsCount);
     setVillaFacilities(v.facilities);
-    setVillaImageUrl(v.image);
+    setVillaImages(Array.isArray(v.images) && v.images.length > 0 ? v.images : v.image ? [v.image] : []);
+    setVillaImageUrl(v.image || '');
     setVillaStatus(v.status);
     setVillaIsActive(v.isActive !== false);
     setShowEditModal(true);
@@ -102,7 +105,8 @@ export default function AdminVillaManager({
     setVillaBedrooms(4);
     setVillaBathrooms(4);
     setVillaFacilities(['wifi', 'kitchen']);
-    setVillaImageUrl(`https://picsum.photos/400/300?random=${Math.floor(Math.random() * 50) + 10}`);
+    setVillaImages([]);
+    setVillaImageUrl('');
     setVillaStatus('Available');
     setVillaIsActive(true);
     setShowAddModal(true);
@@ -128,7 +132,8 @@ export default function AdminVillaManager({
       bedroomsCount: villaBedrooms,
       bathroomsCount: villaBathrooms,
       facilities: villaFacilities,
-      image: villaImageUrl,
+      image: villaImages[0] || villaImageUrl,
+      images: villaImages,
       status: villaStatus,
       isActive: villaIsActive,
       policies: {
@@ -154,7 +159,8 @@ export default function AdminVillaManager({
       bedroomsCount: villaBedrooms,
       bathroomsCount: villaBathrooms,
       facilities: villaFacilities,
-      image: villaImageUrl,
+      image: villaImages[0] || villaImageUrl,
+      images: villaImages,
       status: villaStatus,
       isActive: villaIsActive
     });
@@ -512,23 +518,14 @@ export default function AdminVillaManager({
             </div>
 
             <form onSubmit={showAddModal ? handleAddSubmit : handleEditSubmit} className="flex flex-col gap-5 text-xs font-semibold text-neutral-600">
-              {/* Visual drag/click mock image container */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-neutral-450 uppercase">{language === 'vi' ? 'Ảnh đại diện (Mock upload)' : 'Mock Image URL'}</span>
-                <div 
-                  onClick={() => {
-                    const id = Math.floor(Math.random() * 50) + 10;
-                    setVillaImageUrl(`https://picsum.photos/800/600?random=${id}`);
-                  }}
-                  className="border-2 border-dashed border-neutral-200 bg-neutral-50 rounded-2xl p-5 text-center cursor-pointer hover:bg-neutral-100/50 transition-colors flex flex-col items-center justify-center gap-2"
-                >
-                  <img src={villaImageUrl} alt="Thumb preview" className="w-32 h-20 object-cover rounded-xl border shadow-sm" />
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[11px] font-bold text-[#0071c2]">{language === 'vi' ? 'Click để đổi ảnh ngẫu nhiên' : 'Click to cycle random mocks'}</span>
-                    <span className="text-[9px] text-neutral-400 font-semibold mt-1">Chuẩn 4:3 (JPG, PNG, WEBP)</span>
-                  </div>
-                </div>
-              </div>
+              <ImageUploader
+                value={villaImages}
+                onChange={(urls) => {
+                  setVillaImages(urls);
+                  setVillaImageUrl(urls[0] || '');
+                }}
+                disabled={mutationLoading}
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
