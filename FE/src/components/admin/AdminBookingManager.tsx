@@ -8,6 +8,7 @@ import { Booking } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../Toast';
 import { getZaloLink } from '../../constants';
+import { exportAdminBookingsCsv } from '../../lib/api';
 
 interface AdminBookingManagerProps {
   bookings: Booking[];
@@ -54,51 +55,20 @@ export default function AdminBookingManager({
     );
   };
 
-  // 2. Export CSV Helper with UTF-8 BOM
-  const handleExportCSV = () => {
-    if (bookings.length === 0) {
-      showToast('error', language === 'vi' ? 'Không có dữ liệu để xuất!' : 'No data to export!');
-      return;
+  // 2. Export CSV from backend with current status filter
+  const handleExportCSV = async () => {
+    try {
+      await exportAdminBookingsCsv({
+        status: activeStatusTab === 'ALL'
+          ? undefined
+          : activeStatusTab === 'PENDING'
+            ? 'pending_hold'
+            : activeStatusTab.toLowerCase(),
+      });
+      showToast('success', language === 'vi' ? 'Đã xuất file CSV thành công!' : 'CSV exported successfully!');
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : (language === 'vi' ? 'Không thể xuất CSV.' : 'Could not export CSV.'));
     }
-
-    const headers = [
-      'Mã đặt phòng (Booking Code)',
-      'Họ và tên khách (Guest Name)',
-      'Số điện thoại (Phone)',
-      'Email',
-      'Tên biệt thự (Villa)',
-      'Ngày Check-in (Check-in)',
-      'Ngày Check-out (Check-out)',
-      'Trạng thái (Status)',
-      'Tổng tiền VND (Total Price)'
-    ];
-
-    const rows = bookings.map(b => [
-      b.code,
-      b.fullName,
-      b.phone,
-      b.email || 'N/A',
-      b.villaName,
-      b.checkIn,
-      b.checkOut,
-      b.status,
-      b.totalPrice
-    ]);
-
-    const csvContent =
-      '\uFEFF' + // UTF-8 BOM to prevent Vietnamese glitches in Excel
-      [headers.join(','), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `HenryTravel_bookings_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('success', language === 'vi' ? 'Đã xuất file CSV thành công!' : 'CSV exported successfully!');
   };
 
   // 3. Printing Receipt Invoice Helper

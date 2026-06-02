@@ -480,6 +480,35 @@ export async function getAdminBookings(params: {
   return adminApiRequest<AdminBookingResponse>(`/admin/bookings${buildQuery(params)}`);
 }
 
+export async function exportAdminBookingsCsv(params: {
+  villaId?: string;
+  status?: string;
+  phone?: string;
+  code?: string;
+  from?: string;
+  to?: string;
+} = {}): Promise<void> {
+  const token = getAdminToken();
+  const response = await fetch(`${API_BASE_URL}/admin/bookings/export${buildQuery(params)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) adminLogout();
+    throw new Error('Không thể xuất CSV booking. Vui lòng thử lại.');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `HenryTravel_bookings_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function getAdminFeedbacks(params: {
   villaId?: string;
   rating?: number;

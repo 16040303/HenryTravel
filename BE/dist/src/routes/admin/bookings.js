@@ -48,6 +48,74 @@ router.get('/', async (req, res, next) => {
         next(e);
     }
 });
+const CSV_DELIMITER = ';';
+const escapeCsvValue = (value) => {
+    if (value === null || value === undefined)
+        return '';
+    const text = value instanceof Date ? value.toISOString() : String(value);
+    if (!/[;"\r\n]/.test(text))
+        return text;
+    return `"${text.replace(/"/g, '""')}"`;
+};
+router.get('/export', async (req, res, next) => {
+    try {
+        const where = {};
+        if (typeof req.query.villaId === 'string')
+            where.villaId = req.query.villaId;
+        if (typeof req.query.status === 'string' && statuses.includes(req.query.status))
+            where.status = req.query.status;
+        if (typeof req.query.phone === 'string')
+            where.guestPhone = { contains: req.query.phone };
+        if (typeof req.query.code === 'string')
+            where.bookingCode = { contains: req.query.code, mode: 'insensitive' };
+        const from = (0, validators_1.parseDate)(req.query.from);
+        const to = (0, validators_1.parseDate)(req.query.to);
+        if (from || to)
+            where.checkIn = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+        const bookings = await prisma_1.prisma.booking.findMany({
+            where,
+            include: { villa: { select: { name: true, location: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        const headers = [
+            'booking_code',
+            'villa_name',
+            'villa_location',
+            'guest_name',
+            'guest_phone',
+            'guest_email',
+            'check_in',
+            'check_out',
+            'guests_count',
+            'rooms_count',
+            'status',
+            'created_at',
+            'hold_expire_at',
+        ];
+        const rows = bookings.map((booking) => [
+            booking.bookingCode,
+            booking.villa.name,
+            booking.villa.location,
+            booking.guestName,
+            booking.guestPhone,
+            booking.guestEmail,
+            booking.checkIn,
+            booking.checkOut,
+            booking.guestsCount,
+            booking.roomsCount,
+            booking.status,
+            booking.createdAt,
+            booking.holdExpireAt,
+        ].map(escapeCsvValue).join(CSV_DELIMITER));
+        const csv = `\uFEFF${headers.join(CSV_DELIMITER)}\n${rows.join('\n')}`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="henrytravel-bookings-${new Date().toISOString().slice(0, 10)}.csv"`);
+        res.send(csv);
+    }
+    catch (e) {
+        next(e);
+    }
+});
 async function updateStatus(req, status, note, action) {
     const id = paramId(req);
     const booking = await prisma_1.prisma.booking.findUnique({ where: { id }, include: { villa: true } });
