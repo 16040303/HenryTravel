@@ -41,7 +41,7 @@ router.get('/', async (req, res, next) => {
             where.checkIn = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
         const [total, bookings] = await Promise.all([
             prisma_1.prisma.booking.count({ where }),
-            prisma_1.prisma.booking.findMany({ where, include: { villa: { select: { id: true, name: true, location: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+            prisma_1.prisma.booking.findMany({ where, include: { villa: { select: { id: true, name: true, location: true, price: true, priceType: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
         ]);
         res.json({ bookings: bookings.map(sanitize), total, page, totalPages: Math.ceil(total / limit) });
     }

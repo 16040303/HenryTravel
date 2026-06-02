@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { CheckCircle2, AlertCircle, Info, X, Copy } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, X, XCircle } from 'lucide-react';
 
 // ---- Types ----
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -24,57 +24,100 @@ export function useToast() {
   return ctx;
 }
 
+const toastMeta: Record<ToastType, {
+  title: string;
+  icon: React.ReactNode;
+  toneClass: string;
+  iconClass: string;
+  progressClass: string;
+}> = {
+  success: {
+    title: 'Thành công',
+    icon: <CheckCircle2 className="h-5 w-5" />,
+    toneClass: 'border-emerald-100 bg-emerald-50/80 text-emerald-700',
+    iconClass: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    progressClass: 'bg-emerald-500',
+  },
+  error: {
+    title: 'Không thể thực hiện',
+    icon: <XCircle className="h-5 w-5" />,
+    toneClass: 'border-rose-100 bg-rose-50/80 text-rose-700',
+    iconClass: 'bg-rose-100 text-rose-700 ring-rose-200',
+    progressClass: 'bg-rose-500',
+  },
+  warning: {
+    title: 'Cần kiểm tra',
+    icon: <AlertTriangle className="h-5 w-5" />,
+    toneClass: 'border-amber-100 bg-amber-50/80 text-amber-700',
+    iconClass: 'bg-amber-100 text-amber-700 ring-amber-200',
+    progressClass: 'bg-amber-500',
+  },
+  info: {
+    title: 'Thông tin',
+    icon: <Info className="h-5 w-5" />,
+    toneClass: 'border-blue-100 bg-blue-50/80 text-[#005899]',
+    iconClass: 'bg-blue-100 text-[#0071c2] ring-blue-200',
+    progressClass: 'bg-[#0071c2]',
+  },
+};
+
 // ---- Individual Toast Item ----
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const [isExiting, setIsExiting] = useState(false);
+  const meta = toastMeta[toast.type];
+  const duration = toast.duration || 4200;
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsExiting(true);
       setTimeout(() => onRemove(toast.id), 250);
-    }, toast.duration || 3500);
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, [toast.id, toast.duration, onRemove]);
+  }, [toast.id, duration, onRemove]);
 
   const handleClose = () => {
     setIsExiting(true);
     setTimeout(() => onRemove(toast.id), 250);
   };
 
-  const iconMap: Record<ToastType, React.ReactNode> = {
-    success: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
-    error: <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />,
-    warning: <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />,
-    info: <Info className="w-5 h-5 text-[#0071c2] shrink-0" />,
-  };
-
-  const borderMap: Record<ToastType, string> = {
-    success: 'border-l-emerald-500',
-    error: 'border-l-red-500',
-    warning: 'border-l-amber-500',
-    info: 'border-l-[#0071c2]',
-  };
-
   return (
     <div
       role="alert"
       className={`
-        flex items-center gap-3 bg-white rounded-xl shadow-xl border border-neutral-100
-        border-l-4 ${borderMap[toast.type]}
-        px-4 py-3 min-w-[320px] max-w-[480px]
+        relative flex w-[calc(100vw-24px)] max-w-[440px] items-start gap-3 overflow-hidden rounded-2xl
+        border bg-white/95 p-4 pr-3 shadow-2xl shadow-neutral-900/12 backdrop-blur-xl
+        ${meta.toneClass}
         ${isExiting ? 'animate-toastOut' : 'animate-toastIn'}
       `}
     >
-      {iconMap[toast.type]}
-      <p className="text-xs font-semibold text-neutral-700 flex-1 leading-relaxed">{toast.message}</p>
+      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${meta.iconClass}`}>
+        {meta.icon}
+      </div>
+
+      <div className="min-w-0 flex-1 text-left">
+        <p className="text-[12px] font-black uppercase tracking-[0.14em] text-neutral-800">
+          {meta.title}
+        </p>
+        <p className="mt-1 text-sm font-semibold leading-relaxed text-neutral-650">
+          {toast.message}
+        </p>
+      </div>
+
       <button
         onClick={handleClose}
-        className="text-neutral-400 hover:text-neutral-700 p-1 rounded-lg hover:bg-neutral-100 transition-colors shrink-0 cursor-pointer"
-        aria-label="Dismiss notification"
+        className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-white/70 hover:text-neutral-800 cursor-pointer"
+        aria-label="Đóng thông báo"
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="h-4 w-4" />
       </button>
+
+      <div className="absolute bottom-0 left-0 h-1 w-full bg-neutral-100/70">
+        <div
+          className={`h-full ${meta.progressClass}`}
+          style={{ animation: `toastProgress ${duration}ms linear forwards` }}
+        />
+      </div>
     </div>
   );
 }
@@ -85,7 +128,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((type: ToastType, message: string, duration?: number) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    setToasts((prev) => [...prev, { id, type, message, duration }]);
+    setToasts((prev) => [...prev, { id, type, message, duration }].slice(-4));
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -96,9 +139,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {/* Toast Container — fixed top center */}
+      {/* Toast Container */}
       <div
-        className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2.5 pointer-events-none"
+        className="fixed top-20 left-1/2 z-[200] flex -translate-x-1/2 flex-col gap-3 pointer-events-none sm:right-6 sm:left-auto sm:translate-x-0"
         aria-live="polite"
       >
         {toasts.map((t) => (

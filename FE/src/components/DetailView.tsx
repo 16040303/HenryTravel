@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   ArrowLeft, Star, MapPin, Calendar, Share2, Compass, Waves, Wifi,
   ParkingCircle, Utensils, Flame, Mountain, PawPrint, Users, MessageSquare,
-  Clock, ShieldAlert, BadgeInfo, CheckCircle2, Copy
+  Clock, ShieldAlert, BadgeInfo, CheckCircle2, Copy, XCircle
 } from 'lucide-react';
-import { VillaDetail, Feedback, BookingResult } from '../types';
-import { getVillaById, createBooking, getVillaFeedbacks, submitFeedback, getPublicSettings } from '../lib/api';
+import { VillaDetail, Feedback, BookingResult, Booking } from '../types';
+import { getVillaById, createBooking, getVillaFeedbacks, submitFeedback, getPublicSettings, checkBooking } from '../lib/api';
 import { getZaloLink, ZALO_PHONE_FALLBACK, FACILITIES } from '../constants';
 import { useBookingCountdown } from '../hooks/useBookingCountdown';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -76,6 +76,34 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   // Countdown timer hook powered by hold timer
   const currentHoldTime = bookingResult ? bookingResult.holdExpireAt : null;
   const timer = useBookingCountdown(currentHoldTime);
+  const pollingIntervalRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+  const autoCloseTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const lastAutoClosedStatusRef = useRef<Booking['status'] | null>(null);
+
+  const normalizeBookingStatus = (status?: string | null): Booking['status'] => {
+    switch (status) {
+      case 'pending_hold':
+      case 'PENDING':
+        return 'PENDING';
+      case 'confirmed':
+      case 'CONFIRMED':
+        return 'CONFIRMED';
+      case 'cancelled':
+      case 'CANCELLED':
+        return 'CANCELLED';
+      case 'completed':
+      case 'COMPLETED':
+        return 'COMPLETED';
+      default:
+        return 'PENDING';
+    }
+  };
+
+  const bookingStatus = normalizeBookingStatus(bookingResult?.booking?.status);
+  const isBookingPending = bookingStatus === 'PENDING';
+  const isBookingConfirmed = bookingStatus === 'CONFIRMED';
+  const isBookingCancelled = bookingStatus === 'CANCELLED';
+  const isBookingCompleted = bookingStatus === 'COMPLETED';
 
   useEffect(() => {
     async function loadVilla() {
@@ -116,6 +144,77 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (pollingIntervalRef.current) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    const bookingCode = bookingResult?.bookingCode;
+    const guestPhone = bookingResult?.booking?.phone || bookingPhone;
+
+    if (!showBookingModal || !bookingCode || !guestPhone || !isBookingPending) return;
+
+    pollingIntervalRef.current = window.setInterval(() => {
+      checkBooking(bookingCode, guestPhone)
+        .then((result) => {
+          if (!result.found || !result.booking) return;
+          setBookingResult((current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              booking: {
+                ...current.booking,
+                ...result.booking,
+                status: normalizeBookingStatus(result.booking.status),
+                zaloLinks: result.booking.zaloLinks || current.booking?.zaloLinks || current.zaloLinks,
+              },
+              holdExpireAt: result.booking.holdExpireAt || current.holdExpireAt,
+              zaloLinks: result.booking.zaloLinks || current.zaloLinks,
+              holdMinutes: current.holdMinutes,
+            };
+          });
+        })
+        .catch(() => {
+          // Polling is best-effort; keep UI stable and avoid toast spam.
+        });
+    }, 5000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        window.clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [showBookingModal, bookingResult?.bookingCode, bookingResult?.booking?.phone, bookingPhone, isBookingPending]);
+
+  useEffect(() => {
+    if (!showBookingModal || !bookingResult) return;
+    if (bookingStatus !== 'CONFIRMED' && bookingStatus !== 'CANCELLED') return;
+    if (lastAutoClosedStatusRef.current === bookingStatus) return;
+
+    lastAutoClosedStatusRef.current = bookingStatus;
+    if (autoCloseTimeoutRef.current) {
+      window.clearTimeout(autoCloseTimeoutRef.current);
+    }
+    autoCloseTimeoutRef.current = window.setTimeout(() => {
+      setShowBookingModal(false);
+      autoCloseTimeoutRef.current = null;
+    }, bookingStatus === 'CONFIRMED' ? 3000 : 4000);
+
+    return () => {
+      if (autoCloseTimeoutRef.current) {
+        window.clearTimeout(autoCloseTimeoutRef.current);
+        autoCloseTimeoutRef.current = null;
+      }
+    };
+  }, [showBookingModal, bookingStatus, bookingResult]);
+
+  useEffect(() => () => {
+    if (pollingIntervalRef.current) window.clearInterval(pollingIntervalRef.current);
+    if (autoCloseTimeoutRef.current) window.clearTimeout(autoCloseTimeoutRef.current);
   }, []);
 
   // Recalculate days and prices whenever check dates are updated
@@ -270,7 +369,21 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       }
     } catch (err) {
       console.error(err);
-      showToast('error', 'Có lỗi hệ thống trong lúc kết nối máy chủ!');
+      const error = err as Error & { code?: string };
+      const errorCode = error.code;
+      const errorMessage = error.message || '';
+
+      if (errorCode === 'DATE_OVERLAP' || errorMessage.toLowerCase().includes('booking trong khoảng ngày')) {
+        showToast('warning', 'Ngày bạn chọn đã có khách giữ chỗ hoặc đặt phòng. Vui lòng chọn ngày khác.');
+      } else if (errorCode === 'VILLA_UNAVAILABLE') {
+        showToast('warning', 'Villa hiện không khả dụng. Vui lòng chọn villa khác hoặc liên hệ tư vấn viên.');
+      } else if (errorCode === 'VALIDATION_ERROR' && errorMessage) {
+        showToast('warning', errorMessage);
+      } else if (errorMessage && !errorMessage.includes('Không thể kết nối máy chủ')) {
+        showToast('error', errorMessage);
+      } else {
+        showToast('error', 'Chưa kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.');
+      }
     } finally {
       setBookingLoading(false);
     }
@@ -322,6 +435,34 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       showToast('success', `Đã sao chép mã đặt phòng: ${bookingResult.bookingCode}`);
     }
   };
+
+  const closeBookingModal = () => {
+    if (pollingIntervalRef.current) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (autoCloseTimeoutRef.current) {
+      window.clearTimeout(autoCloseTimeoutRef.current);
+      autoCloseTimeoutRef.current = null;
+    }
+    setShowBookingModal(false);
+  };
+
+  const bookingModalTitle = isBookingConfirmed
+    ? 'Đặt phòng của bạn đã được xác nhận.'
+    : isBookingCancelled
+      ? 'Yêu cầu giữ chỗ đã được hủy.'
+      : isBookingCompleted
+        ? 'Đặt phòng đã hoàn tất.'
+        : 'Đã gửi yêu cầu giữ chỗ';
+
+  const bookingModalDescription = isBookingConfirmed
+    ? 'Cảm ơn bạn. HenryTravel đã xác nhận đặt phòng này. Vui lòng lưu mã booking để tra cứu khi cần.'
+    : isBookingCancelled
+      ? 'Yêu cầu giữ chỗ đã được hủy. Bạn có thể chọn ngày khác hoặc liên hệ tư vấn viên để được hỗ trợ.'
+      : isBookingCompleted
+        ? 'Booking này đã được hệ thống ghi nhận hoàn tất.'
+        : 'Phòng đang được giữ tạm. Bạn vui lòng nhắn Zalo để tư vấn viên xác nhận lại thông tin.';
 
   const handleShareVilla = async () => {
     const shareUrl = window.location.href;
@@ -893,38 +1034,53 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
           <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-scaleIn border border-neutral-100">
 
             {/* Header Success Accent */}
-            <div className="bg-[#003b66] text-white p-6 text-center flex flex-col items-center">
-              <div className="w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-3 shadow">
-                <CheckCircle2 className="w-8 h-8 font-black" />
+            <div className={`${isBookingCancelled ? 'bg-rose-700' : isBookingConfirmed || isBookingCompleted ? 'bg-emerald-700' : 'bg-[#003b66]'} text-white p-6 text-center flex flex-col items-center`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white mb-3 shadow ${isBookingCancelled ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                {isBookingCancelled ? <XCircle className="w-8 h-8 font-black" /> : <CheckCircle2 className="w-8 h-8 font-black" />}
               </div>
 
-              <h3 className="text-xl font-display font-black tracking-tight text-white leading-tight">Đã gửi yêu cầu giữ chỗ</h3>
-              <p className="text-xs text-[#a1c9ff] font-bold mt-1 tracking-wider">Mã booking: {bookingResult.bookingCode}</p>
+              <h3 className="text-xl font-display font-black tracking-tight text-white leading-tight">{bookingModalTitle}</h3>
+              <p className="text-xs text-white/80 font-bold mt-1 tracking-wider">Mã booking: {bookingResult.bookingCode}</p>
             </div>
-
-            {/* Hold Ticker Counter Box (15 minutes countdown hold holdExpireAt) */}
             <div className="p-6 flex flex-col items-center text-center gap-5">
+              {isBookingPending ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl py-4 px-6 w-full max-w-sm flex flex-col items-center gap-1 shadow-sm">
+                  <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 animate-pulse">
+                    <Clock className="w-3.5 h-3.5 text-[#fe6a34]" />
+                    Thời gian tạm khóa giữ phòng
+                  </span>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl py-4 px-6 w-full max-w-sm flex flex-col items-center gap-1 shadow-sm">
-                <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 animate-pulse">
-                  <Clock className="w-3.5 h-3.5 text-[#fe6a34]" />
-                  Thời gian tạm khóa giữ phòng
-                </span>
+                  {timer.isExpired ? (
+                    <span className="text-xl font-black text-rose-500">Đã hết bảo lưu! Vui lòng đặt lại</span>
+                  ) : (
+                    <div className="flex items-center gap-2 font-mono text-3xl font-black text-[#fe6a34]">
+                      <span>{timer.minutes.toString().padStart(2, '0')}</span>
+                      <span className="animate-pulse">:</span>
+                      <span>{timer.seconds.toString().padStart(2, '0')}</span>
+                    </div>
+                  )}
 
-                {timer.isExpired ? (
-                  <span className="text-xl font-black text-rose-500">Đã hết bảo lưu! Vui lòng đặt lại</span>
-                ) : (
-                  <div className="flex items-center gap-2 font-mono text-3xl font-black text-[#fe6a34]">
-                    <span>{timer.minutes.toString().padStart(2, '0')}</span>
-                    <span className="animate-pulse">:</span>
-                    <span>{timer.seconds.toString().padStart(2, '0')}</span>
-                  </div>
-                )}
+                  {bookingResult.booking?.remainingMinutes !== undefined && (
+                    <p className="text-[10px] text-amber-700 font-bold mt-1">
+                      Còn khoảng {bookingResult.booking.remainingMinutes} phút giữ chỗ theo hệ thống.
+                    </p>
+                  )}
 
-                <p className="text-[10px] text-neutral-500 font-semibold leading-normal mt-2">
-                  * Phòng được giữ tạm trong <strong>15 phút</strong>. Bạn vui lòng nhắn Zalo để tư vấn viên xác nhận lại thông tin.
-                </p>
-              </div>
+                  <p className="text-[10px] text-neutral-500 font-semibold leading-normal mt-2">
+                    * Phòng được giữ tạm trong <strong>15 phút</strong>. Bạn vui lòng nhắn Zalo để tư vấn viên xác nhận lại thông tin.
+                  </p>
+                </div>
+              ) : (
+                <div className={`rounded-2xl py-4 px-6 w-full max-w-sm flex flex-col items-center gap-2 shadow-sm border ${isBookingCancelled ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+                  {isBookingCancelled ? <XCircle className="w-7 h-7" /> : <CheckCircle2 className="w-7 h-7" />}
+                  <p className="text-sm font-black leading-normal">{bookingModalDescription}</p>
+                  {(isBookingConfirmed || isBookingCancelled) && (
+                    <p className="text-[10px] font-semibold opacity-80">
+                      Popup sẽ tự đóng sau vài giây. Mã booking: {bookingResult.bookingCode}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Booking Info review rows */}
               <div className="w-full text-left bg-neutral-50 p-4 rounded-xl border border-neutral-100/60 text-xs font-semibold text-neutral-600 flex flex-col gap-2">
@@ -946,38 +1102,44 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 </div>
               </div>
 
-              <div className="w-full rounded-2xl border border-[#a1c9ff]/40 bg-[#edf3ff]/60 p-4 text-left">
-                <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#005899]">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Nội dung gửi cho tư vấn viên</span>
+              {isBookingPending && (
+                <div className="w-full rounded-2xl border border-[#a1c9ff]/40 bg-[#edf3ff]/60 p-4 text-left">
+                  <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#005899]">
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Nội dung gửi cho tư vấn viên</span>
+                  </div>
+                  <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-white/80 p-3 text-[11px] font-semibold leading-relaxed text-neutral-700 border border-white">
+                    {zaloSupportMessage}
+                  </pre>
+                  <p className="mt-2 text-[10px] font-semibold leading-normal text-neutral-500">
+                    Zalo không luôn tự điền nội dung khi mở từ web/QR. Hãy sao chép tin nhắn rồi dán vào khung chat Zalo.
+                  </p>
                 </div>
-                <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-white/80 p-3 text-[11px] font-semibold leading-relaxed text-neutral-700 border border-white">
-                  {zaloSupportMessage}
-                </pre>
-                <p className="mt-2 text-[10px] font-semibold leading-normal text-neutral-500">
-                  Zalo không luôn tự điền nội dung khi mở từ web/QR. Hãy sao chép tin nhắn rồi dán vào khung chat Zalo.
-                </p>
-              </div>
+              )}
 
               {/* Action Buttons trigger */}
               <div className="flex flex-col sm:flex-row gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={copyZaloMessage}
-                  className="flex-1 bg-[#fe6a34] hover:bg-[#ab3500] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#fe6a34]/30"
-                >
-                  <Copy className="w-4 h-4" />
-                  <span>Sao chép tin nhắn</span>
-                </button>
+                {isBookingPending && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={copyZaloMessage}
+                      className="flex-1 bg-[#fe6a34] hover:bg-[#ab3500] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#fe6a34]/30"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>Sao chép tin nhắn</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={openZaloSupport}
-                  className="flex-1 bg-[#0071c2] hover:bg-[#005899] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#0071c2]/20"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Mở Zalo</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={openZaloSupport}
+                      className="flex-1 bg-[#0071c2] hover:bg-[#005899] text-white font-black py-3 rounded-xl text-xs tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#0071c2]/20"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Mở Zalo</span>
+                    </button>
+                  </>
+                )}
 
                 {/* Neutral backup button */}
                 <button
@@ -1000,7 +1162,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowBookingModal(false)}
+                  onClick={closeBookingModal}
                   className="text-neutral-500 hover:text-neutral-800 font-bold"
                 >
                   Đóng

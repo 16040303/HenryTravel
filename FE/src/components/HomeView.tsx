@@ -86,8 +86,8 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
     if (!checkIn || !checkOut || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
       showToast('warning', language === 'vi'
-        ? 'Ng?y tr? ph?ng ph?i sau ng?y nh?n ph?ng.'
-        : (language === 'ko' ? '???? ??? ??? ???? ???.' : 'Check-out must be after check-in.')
+        ? 'Ngày trả phòng phải sau ngày nhận phòng.'
+        : (language === 'ko' ? '체크아웃은 체크인 이후여야 합니다.' : 'Check-out must be after check-in.')
       );
       return;
     }

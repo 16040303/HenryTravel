@@ -171,6 +171,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
+@keyframes toastProgress {
+  from {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
