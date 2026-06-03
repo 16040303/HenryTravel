@@ -31,7 +31,7 @@ function getJwtSecret(): string {
 
 export function generateToken(userId: string, role: string): string {
   const options: SignOptions = {
-    expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as SignOptions['expiresIn'],
+    expiresIn: (process.env.JWT_EXPIRES_IN || '1h') as SignOptions['expiresIn'],
   };
   return jwt.sign({ userId, role }, getJwtSecret(), options);
 }

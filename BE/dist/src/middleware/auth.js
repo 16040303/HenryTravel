@@ -18,7 +18,7 @@ function getJwtSecret() {
 }
 function generateToken(userId, role) {
     const options = {
-        expiresIn: (process.env.JWT_EXPIRES_IN || '8h'),
+        expiresIn: (process.env.JWT_EXPIRES_IN || '1h'),
     };
     return jsonwebtoken_1.default.sign({ userId, role }, getJwtSecret(), options);
 }

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import routes from './routes';
 import { startBookingJobs, stopBookingJobs } from './jobs/releaseHold';
 import { errorHandler } from './middleware/errorHandler';
@@ -16,6 +17,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

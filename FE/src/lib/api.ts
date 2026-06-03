@@ -400,13 +400,32 @@ export function getStoredAdminUser(): AdminUser | null {
 }
 
 export function adminLogout(): void {
+  void fetch(`${API_BASE_URL}/admin/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => undefined);
   clearAdminToken();
   localStorage.removeItem(ADMIN_USER_KEY);
   localStorage.removeItem('HenryTravel_admin_authenticated');
   sessionStorage.removeItem('HenryTravel_admin_authenticated');
 }
 
-export async function adminApiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function refreshAdminSession(): Promise<string | null> {
+  const response = await fetch(`${API_BASE_URL}/admin/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await response.json() as AdminLoginResponse : null;
+  if (!response.ok || !data?.token) return null;
+
+  setAdminToken(data.token);
+  localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(data.user));
+  return data.token;
+}
+
+export async function adminApiRequest<T>(path: string, options: RequestInit = {}, allowRefresh = true): Promise<T> {
   const token = getAdminToken();
   const headers = new Headers(options.headers);
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -420,6 +439,7 @@ export async function adminApiRequest<T>(path: string, options: RequestInit = {}
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: 'include',
     headers,
   });
 
@@ -427,6 +447,13 @@ export async function adminApiRequest<T>(path: string, options: RequestInit = {}
   const data = contentType.includes('application/json') ? await response.json() : null;
 
   if (!response.ok) {
+    if (response.status === 401 && allowRefresh) {
+      const refreshedToken = await refreshAdminSession();
+      if (refreshedToken) {
+        return adminApiRequest<T>(path, options, false);
+      }
+    }
+
     const body = (data || {}) as ApiErrorBody;
     if (response.status === 401 || response.status === 403) {
       adminLogout();
@@ -446,6 +473,7 @@ export async function adminApiRequest<T>(path: string, options: RequestInit = {}
 export async function adminLogin(email: string, password: string): Promise<AdminLoginResponse> {
   const response = await apiRequest<AdminLoginResponse>('/admin/auth/login', {
     method: 'POST',
+    credentials: 'include',
     body: JSON.stringify({ email: email.trim(), password }),
   });
   setAdminToken(response.token);
