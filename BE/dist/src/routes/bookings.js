@@ -5,6 +5,7 @@ const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const rateLimit_1 = require("../middleware/rateLimit");
 const booking_1 = require("../services/booking");
+const settings_1 = require("../services/settings");
 const zalo_1 = require("../services/zalo");
 const notifications_1 = require("../services/notifications");
 const errors_1 = require("../utils/errors");
@@ -26,6 +27,10 @@ function toBookingResponse(booking) {
         guestPhone: booking.guestPhone,
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
+        guestsCount: booking.guestsCount,
+        adultCount: booking.adultCount,
+        childrenCount: booking.childrenCount,
+        infantCount: booking.infantCount,
     };
 }
 function toBookingCheckResponse(booking) {
@@ -39,6 +44,9 @@ function toBookingCheckResponse(booking) {
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         guestsCount: booking.guestsCount,
+        adultCount: booking.adultCount,
+        childrenCount: booking.childrenCount,
+        infantCount: booking.infantCount,
         roomsCount: booking.roomsCount,
         specialRequest: booking.specialRequest,
         status: booking.status,
@@ -60,7 +68,10 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             : undefined;
         const checkIn = (0, validators_1.parseDate)(req.body.checkIn);
         const checkOut = (0, validators_1.parseDate)(req.body.checkOut);
-        const guestsCount = Number(req.body.guestsCount);
+        const adultCount = (0, validators_1.parsePositiveInt)(req.body.adultCount ?? req.body.guestsCount, 1, 100);
+        const childrenCount = (0, validators_1.parsePositiveInt)(req.body.childrenCount, 0, 100);
+        const infantCount = (0, validators_1.parsePositiveInt)(req.body.infantCount, 0, 100);
+        const guestsCount = adultCount + childrenCount + infantCount;
         const roomsCount = (0, validators_1.parsePositiveInt)(req.body.roomsCount, 1, 100);
         const specialRequest = typeof req.body.specialRequest === 'string' && req.body.specialRequest.trim()
             ? req.body.specialRequest.trim()
@@ -68,8 +79,8 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
         if (!checkIn || !checkOut || !(0, validators_1.isValidDateRange)(checkIn, checkOut)) {
             throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Ngày nhận/trả phòng không hợp lệ.');
         }
-        if (!Number.isInteger(guestsCount) || guestsCount <= 0) {
-            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Số khách phải lớn hơn 0.');
+        if (guestsCount <= 0) {
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Tổng số khách phải lớn hơn 0.');
         }
         const villa = await prisma_1.prisma.villa.findUnique({ where: { id: villaId } });
         if (!villa) {
@@ -86,7 +97,9 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             throw new errors_1.AppError(409, 'DATE_OVERLAP', 'Villa đã có booking trong khoảng ngày này.');
         }
         const guestToken = (0, crypto_1.randomUUID)();
-        const holdExpireAt = (0, booking_1.calculateHoldExpireAt)(villa);
+        const globalHoldMinutes = await (0, settings_1.getBookingHoldMinutes)();
+        const holdMinutes = globalHoldMinutes ?? 15;
+        const holdExpireAt = new Date(Date.now() + holdMinutes * 60 * 1000);
         const booking = await (0, booking_1.createBookingWithRetry)({
             villaId: villa.id,
             guestName,
@@ -96,6 +109,9 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             checkIn,
             checkOut,
             guestsCount,
+            adultCount,
+            childrenCount,
+            infantCount,
             roomsCount,
             specialRequest,
             holdExpireAt,
@@ -106,6 +122,9 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             checkIn,
             checkOut,
             guestsCount,
+            adultCount,
+            childrenCount,
+            infantCount,
             guestName,
             bookingCode: booking.bookingCode,
         });
@@ -137,7 +156,7 @@ router.post('/', rateLimit_1.bookingRateLimit, async (req, res, next) => {
             booking: toBookingResponse(booking),
             guestToken,
             zaloLinks,
-            holdMinutes: villa.holdMinutes || 15,
+            holdMinutes,
         });
     }
     catch (error) {
@@ -182,6 +201,9 @@ router.get('/check', async (req, res, next) => {
                 checkIn: responseBooking.checkIn,
                 checkOut: responseBooking.checkOut,
                 guestsCount: responseBooking.guestsCount,
+                adultCount: responseBooking.adultCount,
+                childrenCount: responseBooking.childrenCount,
+                infantCount: responseBooking.infantCount,
                 guestName: responseBooking.guestName || undefined,
                 bookingCode: responseBooking.bookingCode,
             });

@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
-import { generateToken } from '../../middleware/auth';
+import { adminAuthMiddleware, generateToken } from '../../middleware/auth';
 import { logAdminAction } from '../../services/adminLog';
 import {
   createAdminRefreshToken,
@@ -97,6 +97,65 @@ router.post('/refresh', async (req, res, next) => {
     });
   } catch (error) {
     clearRefreshCookie(res);
+    next(error);
+  }
+});
+
+router.put('/change-password', adminAuthMiddleware, async (req, res, next) => {
+  try {
+    const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
+    const confirmPassword = typeof req.body.confirmPassword === 'string' ? req.body.confirmPassword : '';
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Vui lòng nhập đầy đủ thông tin mật khẩu.');
+    }
+    if (newPassword.length < 8) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Mật khẩu mới phải có ít nhất 8 ký tự.');
+    }
+    if (newPassword !== confirmPassword) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Mật khẩu xác nhận không khớp.');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user?.id || '' } });
+    if (!user || user.role !== 'admin' || !user.password) {
+      throw new AppError(401, 'UNAUTHORIZED', 'Phiên đăng nhập không hợp lệ.');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new AppError(400, 'INVALID_CURRENT_PASSWORD', 'Mật khẩu hiện tại không đúng.');
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Mật khẩu mới không được trùng mật khẩu hiện tại.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: passwordHash },
+    });
+
+    const rawToken = typeof req.cookies?.[ADMIN_REFRESH_COOKIE] === 'string'
+      ? req.cookies[ADMIN_REFRESH_COOKIE]
+      : '';
+    if (rawToken) {
+      await revokeAdminRefreshToken(rawToken);
+    }
+    clearRefreshCookie(res);
+
+    await logAdminAction({
+      adminId: user.id,
+      action: 'ADMIN_CHANGE_PASSWORD',
+      targetType: 'user',
+      targetId: user.id,
+      req,
+    });
+
+    res.json({ ok: true, message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' });
+  } catch (error) {
     next(error);
   }
 });

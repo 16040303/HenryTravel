@@ -1,4 +1,6 @@
 import {
+  AdminBlockedDatePayload,
+  AdminBlockedDateResponse,
   AdminBookingHistoryResponse,
   AdminBookingResponse,
   AdminFeedbackResponse,
@@ -15,9 +17,11 @@ import {
   Feedback,
   FilterParams,
   SearchParams,
+  AccommodationTypeValue,
   Villa,
   VillaAvailabilityDay,
   VillaDetail,
+  VillaMedia,
   ZaloLinks,
 } from '../types';
 
@@ -31,22 +35,37 @@ interface ApiErrorBody {
 export interface PublicSettings {
   zaloPhone: string;
   zaloUrl: string;
+  whatsappUrl: string;
+  wechatId: string;
+  kakaoTalkId: string;
+  tikTokUrl: string;
+  facebookPersonalUrl: string;
+  facebookFanpageUrl: string;
+  naverBlogUrl: string;
+  instagramWorkUrl: string;
+  commonPolicy: string;
 }
 
 interface BackendVilla {
   id: string;
   name: string;
+  nameEn?: string | null;
   location?: string;
+  locationEn?: string | null;
   description?: string | null;
+  descriptionEn?: string | null;
+  descriptionKo?: string | null;
   price?: string | number;
+  priceMax?: string | number | null;
   priceType?: string;
   maxGuests?: number;
-  images?: string[] | null;
+  mediaCover?: VillaMedia | null;
+  media?: VillaMedia[];
   facilities?: string[] | null;
   status?: string;
   avgRating?: number;
   feedbackCount?: number;
-  holdMinutes?: number;
+  accommodationType?: AccommodationTypeValue;
 }
 
 interface BackendBooking {
@@ -59,6 +78,9 @@ interface BackendBooking {
   checkIn: string;
   checkOut: string;
   guestsCount?: number;
+  adultCount?: number;
+  childrenCount?: number;
+  infantCount?: number;
   roomsCount?: number;
   status: string;
   holdExpireAt?: string | null;
@@ -145,29 +167,49 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   return data as T;
 }
 
+const PUBLIC_SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+let publicSettingsCache: { value: PublicSettings; cachedAt: number } | null = null;
+
 export async function getPublicSettings(): Promise<PublicSettings> {
-  return apiRequest<PublicSettings>('/settings/public');
+  const now = Date.now();
+  if (publicSettingsCache && now - publicSettingsCache.cachedAt < PUBLIC_SETTINGS_CACHE_TTL_MS) {
+    return publicSettingsCache.value;
+  }
+
+  try {
+    const settings = await apiRequest<PublicSettings>('/settings/public');
+    publicSettingsCache = { value: settings, cachedAt: now };
+    return settings;
+  } catch (error) {
+    if (publicSettingsCache) {
+      return publicSettingsCache.value;
+    }
+    throw error;
+  }
 }
 
 export function mapBackendVillaToFrontendVilla(villa: BackendVilla): VillaDetail {
-  const images = Array.isArray(villa.images) && villa.images.length > 0
-    ? villa.images
-    : ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1200&auto=format&fit=crop'];
+  const media = Array.isArray(villa.media) ? villa.media : [];
+  const coverUrl = villa.mediaCover?.thumbnailUrl || villa.mediaCover?.url || media[0]?.thumbnailUrl || media[0]?.url || '';
   const facilities = Array.isArray(villa.facilities) ? villa.facilities : [];
 
   return {
     id: villa.id,
     name: villa.name,
+    nameEn: villa.nameEn,
     location: villa.location,
-    image: images[0],
-    images,
+    locationEn: villa.locationEn,
+    image: coverUrl,
     status: villa.status === 'available' ? 'Available' : villa.status === 'maintenance' ? 'Maintenance' : 'Hết phòng',
     rating: villa.avgRating || 0,
     reviewsCount: villa.feedbackCount || 0,
     price: Number(villa.price) || 0,
-    type: 'Villa',
+    priceMax: villa.priceMax === null || villa.priceMax === undefined ? null : Number(villa.priceMax) || null,
+    type: villa.accommodationType === 'hotel_resort' ? 'Khách sạn - resort' : 'Villa',
     facilities,
     description: villa.description || 'Villa cao cấp đang được cập nhật mô tả chi tiết.',
+    descriptionEn: villa.descriptionEn,
+    descriptionKo: villa.descriptionKo,
     isActive: villa.status !== 'hidden',
     avgRating: villa.avgRating || 0,
     feedbackCount: villa.feedbackCount || 0,
@@ -177,10 +219,12 @@ export function mapBackendVillaToFrontendVilla(villa: BackendVilla): VillaDetail
     address: villa.location,
     policies: {
       time: ['Nhận phòng sau 14:00', 'Trả phòng trước 12:00'],
-      other: [`Giữ chỗ theo thời gian cấu hình của villa${villa.holdMinutes ? ` (${villa.holdMinutes} phút)` : ''}`, 'Vui lòng liên hệ Zalo để xác nhận thanh toán'],
+      other: ['Thời gian giữ chỗ được áp dụng cho tất cả booking mới.', 'Vui lòng liên hệ Zalo để xác nhận thanh toán'],
     },
     bookedDates: [],
     pendingDates: [],
+    blockedDates: [],
+    media,
   };
 }
 
@@ -203,6 +247,9 @@ export function mapBackendBookingToFrontendBooking(booking: BackendBooking, vill
     checkIn,
     checkOut,
     guests: booking.guestsCount || 1,
+    adultCount: booking.adultCount,
+    childrenCount: booking.childrenCount,
+    infantCount: booking.infantCount,
     rooms: booking.roomsCount || 1,
     totalPrice: price * nights,
     status: normalizeStatus(booking.status),
@@ -227,7 +274,7 @@ export function mapBackendFeedbackToFrontendFeedback(feedback: BackendFeedback):
 }
 
 export async function getVillas(
-  filters?: Partial<SearchParams & FilterParams & { isFeatured?: boolean; page?: number; limit?: number }>
+  filters?: Partial<SearchParams & FilterParams & { isFeatured?: boolean; page?: number; limit?: number; lang?: string }>
 ): Promise<Villa[]> {
   const query = buildQuery({
     location: filters?.location,
@@ -237,6 +284,8 @@ export async function getVillas(
     minPrice: filters?.priceMin,
     maxPrice: filters?.priceMax,
     facilities: filters?.facilities,
+    accommodationType: filters?.type === 'villa' || filters?.type === 'hotel_resort' ? filters.type : undefined,
+    lang: filters?.lang,
     page: filters?.page,
     limit: filters?.limit || 50,
   });
@@ -244,13 +293,14 @@ export async function getVillas(
   return response.villas.map(mapBackendVillaToFrontendVilla);
 }
 
-export async function getVillaById(id: string): Promise<VillaDetail | undefined> {
-  const villa = await apiRequest<BackendVilla>(`/villas/${encodeURIComponent(id)}`);
+export async function getVillaById(id: string, lang?: string): Promise<VillaDetail | undefined> {
+  const villa = await apiRequest<BackendVilla>(`/villas/${encodeURIComponent(id)}${buildQuery({ lang })}`);
   const mapped = mapBackendVillaToFrontendVilla(villa);
   try {
     const availability = await getVillaAvailability(id, new Date().toISOString().slice(0, 7));
     mapped.bookedDates = availability.filter((item) => item.status === 'booked').map((item) => item.date);
     mapped.pendingDates = availability.filter((item) => item.status === 'pending').map((item) => item.date);
+    mapped.blockedDates = availability.filter((item) => item.status === 'blocked').map((item) => item.date);
   } catch (error) {
     console.warn('Could not load villa availability', error);
   }
@@ -265,6 +315,9 @@ export async function createBooking(data: {
   checkIn: string;
   checkOut: string;
   guests: number;
+  adultCount?: number;
+  childrenCount?: number;
+  infantCount?: number;
   rooms: number;
   totalPrice: number;
   specialRequest?: string;
@@ -284,6 +337,9 @@ export async function createBooking(data: {
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       guestsCount: data.guests,
+      adultCount: data.adultCount ?? data.guests,
+      childrenCount: data.childrenCount ?? 0,
+      infantCount: data.infantCount ?? 0,
       roomsCount: data.rooms,
       specialRequest: data.specialRequest,
     }),
@@ -481,6 +537,17 @@ export async function adminLogin(email: string, password: string): Promise<Admin
   return response;
 }
 
+export async function changeAdminPassword(data: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<{ ok: boolean; message: string }> {
+  return adminApiRequest<{ ok: boolean; message: string }>('/admin/auth/change-password', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function getAdminStats(): Promise<AdminStats> {
   return adminApiRequest<AdminStats>('/admin/stats');
 }
@@ -571,6 +638,29 @@ export function mapAdminFeedbackToFrontendFeedback(feedback: AdminFeedbackRespon
   return mapBackendFeedbackToFrontendFeedback(feedback);
 }
 
+export async function getAdminBlockedDates(params: {
+  villaId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminBlockedDateResponse> {
+  return adminApiRequest<AdminBlockedDateResponse>(`/admin/blocked-dates${buildQuery(params)}`);
+}
+
+export async function createAdminBlockedDate(data: AdminBlockedDatePayload): Promise<AdminBlockedDateResponse['blockedDates'][number]> {
+  return adminApiRequest<AdminBlockedDateResponse['blockedDates'][number]>('/admin/blocked-dates', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAdminBlockedDate(id: string): Promise<void> {
+  await adminApiRequest<void>(`/admin/blocked-dates/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function createAdminVilla(data: AdminVillaMutationPayload): Promise<AdminVillaResponse['villas'][number]> {
   return adminApiRequest<AdminVillaResponse['villas'][number]>('/admin/villas', {
     method: 'POST',
@@ -585,23 +675,57 @@ export async function updateAdminVilla(id: string, data: AdminVillaMutationPaylo
   });
 }
 
-export interface UploadedImage {
+export interface UploadedMedia {
+  type: 'image' | 'video';
   url: string;
   secureUrl: string;
   publicId: string;
-  width: number;
-  height: number;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
   format: string;
   bytes: number;
 }
 
-export async function uploadAdminImages(files: File[]): Promise<{ urls: string[]; files: UploadedImage[] }> {
+export async function uploadAdminMedia(files: File[]): Promise<{ files: UploadedMedia[] }> {
   const formData = new FormData();
-  files.forEach((file) => formData.append('images', file));
+  files.forEach((file) => formData.append('files', file));
 
-  return adminApiRequest<{ urls: string[]; files: UploadedImage[] }>('/admin/upload', {
+  return adminApiRequest<{ files: UploadedMedia[] }>('/admin/media/upload', {
     method: 'POST',
     body: formData,
+  });
+}
+
+export async function getAdminVillaMedia(villaId: string): Promise<{ media: VillaMedia[] }> {
+  return adminApiRequest<{ media: VillaMedia[] }>(`/admin/villas/${encodeURIComponent(villaId)}/media`);
+}
+
+export async function addAdminVillaMedia(villaId: string, files: UploadedMedia[]): Promise<{ media: VillaMedia[] }> {
+  return adminApiRequest<{ media: VillaMedia[] }>(`/admin/villas/${encodeURIComponent(villaId)}/media`, {
+    method: 'POST',
+    body: JSON.stringify({ files }),
+  });
+}
+
+export async function reorderAdminVillaMedia(villaId: string, items: Array<{ id: string; sortOrder: number }>): Promise<{ success: boolean }> {
+  return adminApiRequest<{ success: boolean }>(`/admin/villas/${encodeURIComponent(villaId)}/media/reorder`, {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function updateAdminVillaMedia(villaId: string, mediaId: string, data: { isCover: boolean }): Promise<VillaMedia> {
+  return adminApiRequest<VillaMedia>(`/admin/villas/${encodeURIComponent(villaId)}/media/${encodeURIComponent(mediaId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAdminVillaMedia(villaId: string, mediaId: string): Promise<void> {
+  await adminApiRequest<void>(`/admin/villas/${encodeURIComponent(villaId)}/media/${encodeURIComponent(mediaId)}`, {
+    method: 'DELETE',
   });
 }
 
@@ -643,13 +767,25 @@ export async function toggleAdminFeedback(id: string): Promise<{ id: string; ver
 export interface AdminSettingsResponse {
   zaloPhone: string;
   zaloUrl: string;
+  whatsappUrl: string;
+  wechatId: string;
+  kakaoTalkId: string;
+  tikTokUrl: string;
+  facebookPersonalUrl: string;
+  facebookFanpageUrl: string;
+  naverBlogUrl: string;
+  instagramWorkUrl: string;
+  commonPolicy: string;
+  bookingHoldTimeMode: 'preset' | 'custom';
+  holdMinutes: number;
+  customHoldMinutes: number;
 }
 
 export async function getAdminSettings(): Promise<AdminSettingsResponse> {
   return adminApiRequest<AdminSettingsResponse>('/admin/settings');
 }
 
-export async function updateAdminSettings(data: { zaloUrl?: string; zaloPhone?: string }): Promise<AdminSettingsResponse> {
+export async function updateAdminSettings(data: Partial<AdminSettingsResponse>): Promise<AdminSettingsResponse> {
   return adminApiRequest<AdminSettingsResponse>('/admin/settings', {
     method: 'PUT',
     body: JSON.stringify(data),

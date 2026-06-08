@@ -1,391 +1,215 @@
-import React, { useState } from 'react';
-import { 
-  Calendar, ChevronLeft, ChevronRight, Info, Check, 
-  HelpCircle, ShieldAlert, Sparkles, Lock, Unlock, X 
-} from 'lucide-react';
-import { EntityId, VillaDetail } from '../../types';
+import React, { useEffect, useState } from 'react';
+import { Calendar, Lock, Trash2 } from 'lucide-react';
+import { AdminBlockedDate, EntityId, VillaDetail } from '../../types';
+import { createAdminBlockedDate, deleteAdminBlockedDate, getAdminBlockedDates } from '../../lib/api';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../Toast';
+import CustomDatePicker from '../common/CustomDatePicker';
 
 interface AdminAvailabilityManagerProps {
   villas: VillaDetail[];
   onUpdateVillaAvailability: (villaId: EntityId, bookedDates: string[], pendingDates: string[]) => void;
 }
 
-export default function AdminAvailabilityManager({
-  villas,
-  onUpdateVillaAvailability
-}: AdminAvailabilityManagerProps) {
-  const { language } = useLanguage();
+export default function AdminAvailabilityManager({ villas }: AdminAvailabilityManagerProps) {
+  const { language, t } = useLanguage();
   const { showToast } = useToast();
+  const [activeVillaId, setActiveVillaId] = useState<EntityId>(() => villas.length > 0 ? villas[0].id : '');
+  const [blockedDates, setBlockedDates] = useState<AdminBlockedDate[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reason, setReason] = useState(t('admin.availability.defaultReason'));
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [activeVillaId, setActiveVillaId] = useState<EntityId>(() => {
-    return villas.length > 0 ? villas[0].id : 0;
-  });
+  const activeVilla = villas.find((villa) => String(villa.id) === String(activeVillaId));
 
-  const activeVilla = villas.find(v => String(v.id) === String(activeVillaId));
-
-  // Multi-day date selection states
-  const [rangeStart, setRangeStart] = useState<string | null>(null);
-  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
-
-  // Calendar Year/Month navigation state
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth(); // 0-indexed
-
-  // Format Helper
-  const formatDateString = (y: number, m: number, d: number): string => {
-    const mm = String(m + 1).padStart(2, '0');
-    const dd = String(d).padStart(2, '0');
-    return `${y}-${mm}-${dd}`;
+  const loadBlockedDates = async () => {
+    if (!activeVillaId) return;
+    setLoading(true);
+    try {
+      const response = await getAdminBlockedDates({ villaId: String(activeVillaId), limit: 100 });
+      setBlockedDates(response.blockedDates);
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : t('admin.availability.loadError'));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-  };
+  useEffect(() => {
+    loadBlockedDates();
+  }, [activeVillaId]);
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-  };
+  const handleCreateBlockedDate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeVillaId || !startDate || !endDate || !reason.trim()) {
+      showToast('warning', t('admin.availability.required'));
+      return;
+    }
+    const normalizedEndDate = (() => {
+      if (endDate !== startDate) return endDate;
+      const nextDay = new Date(`${startDate}T00:00:00.000Z`);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      return nextDay.toISOString().slice(0, 10);
+    })();
 
-  // Day calculations
-  const getDaysInMonth = (y: number, m: number): number => {
-    return new Date(y, m + 1, 0).getDate();
-  };
+    if (new Date(normalizedEndDate) <= new Date(startDate)) {
+      showToast('warning', t('admin.availability.invalidRange'));
+      return;
+    }
 
-  const getFirstDayOfMonth = (y: number, m: number): number => {
-    return new Date(y, m, 1).getDay();
-  };
-
-  const daysInCurrentMonth = getDaysInMonth(year, month);
-  const firstDayIndex = getFirstDayOfMonth(year, month);
-
-  const dayCells = [];
-  for (let i = 0; i < firstDayIndex; i++) {
-    dayCells.push(null);
-  }
-  for (let d = 1; d <= daysInCurrentMonth; d++) {
-    dayCells.push(d);
-  }
-
-  // Toggles checked multi-day range check
-  const handleDayClick = (dayNum: number) => {
-    const clickedDateStr = formatDateString(year, month, dayNum);
-
-    // If both rangeStart and rangeEnd are selected, or none are selected: reset start
-    if ((rangeStart && rangeEnd) || !rangeStart) {
-      setRangeStart(clickedDateStr);
-      setRangeEnd(null);
-    } else {
-      // If rangeStart is selected but rangeEnd is empty
-      if (new Date(clickedDateStr) >= new Date(rangeStart)) {
-        setRangeEnd(clickedDateStr);
+    setSaving(true);
+    try {
+      await createAdminBlockedDate({
+        villaId: String(activeVillaId),
+        startDate,
+        endDate: normalizedEndDate,
+        reason: reason.trim(),
+        note: note.trim() || undefined,
+      });
+      showToast('success', t('admin.availability.created'));
+      setStartDate('');
+      setEndDate('');
+      setNote('');
+      await loadBlockedDates();
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code;
+      if (code === 'DATE_OVERLAP' || code === 'BLOCKED_DATE_OVERLAP') {
+        showToast('error', t('admin.availability.overlap'));
       } else {
-        // Reset start if clicked date is earlier than start
-        setRangeStart(clickedDateStr);
-        setRangeEnd(null);
+        showToast('error', error instanceof Error ? error.message : t('admin.availability.createError'));
       }
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Clear selections helper
-  const handleClearSelection = () => {
-    setRangeStart(null);
-    setRangeEnd(null);
-  };
-
-  // Get all date strings between start and end (inclusive)
-  const getDatesInRange = (startStr: string, endStr: string): string[] => {
-    const dates: string[] = [];
-    const start = new Date(startStr);
-    const end = new Date(endStr);
-    
-    // Copy date
-    let current = new Date(start);
-    while (current <= end) {
-      const y = current.getFullYear();
-      const m = current.getMonth();
-      const d = current.getDate();
-      dates.push(formatDateString(y, m, d));
-      current.setDate(current.getDate() + 1);
+  const handleDeleteBlockedDate = async (id: string) => {
+    if (!window.confirm(t('admin.availability.deleteConfirm'))) return;
+    setSaving(true);
+    try {
+      await deleteAdminBlockedDate(id);
+      showToast('success', t('admin.availability.deleted'));
+      await loadBlockedDates();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : t('admin.availability.deleteError'));
+    } finally {
+      setSaving(false);
     }
-    return dates;
-  };
-
-  // Block the entire selected range
-  const handleBlockSelectedRange = () => {
-    if (!activeVilla || !rangeStart || !rangeEnd) return;
-
-    const datesToBlock = getDatesInRange(rangeStart, rangeEnd);
-    let updatedBooked = [...activeVilla.bookedDates];
-    let updatedPending = [...activeVilla.pendingDates];
-
-    datesToBlock.forEach(d => {
-      if (!updatedBooked.includes(d)) {
-        updatedBooked.push(d);
-      }
-      // Remove from pending if holds existed
-      updatedPending = updatedPending.filter(x => x !== d);
-    });
-
-    onUpdateVillaAvailability(activeVilla.id, updatedBooked, updatedPending);
-    showToast('warning', language === 'vi' 
-      ? `Đã khóa giữ hàng loạt dải ngày từ ${rangeStart} đến ${rangeEnd}` 
-      : `Blocked dates range from ${rangeStart} to ${rangeEnd}`
-    );
-    handleClearSelection();
-  };
-
-  // Unblock/Release range dates
-  const handleUnblockSelectedRange = () => {
-    if (!activeVilla || !rangeStart || !rangeEnd) return;
-
-    const datesToUnlock = getDatesInRange(rangeStart, rangeEnd);
-    let updatedBooked = [...activeVilla.bookedDates].filter(d => !datesToUnlock.includes(d));
-    let updatedPending = [...activeVilla.pendingDates].filter(d => !datesToUnlock.includes(d));
-
-    onUpdateVillaAvailability(activeVilla.id, updatedBooked, updatedPending);
-    showToast('success', language === 'vi'
-      ? `Đã giải phóng mở khoá hàng loạt dải ngày từ ${rangeStart} đến ${rangeEnd}`
-      : `Unlocked dates range from ${rangeStart} to ${rangeEnd}`
-    );
-    handleClearSelection();
-  };
-
-  const monthNames = {
-    vi: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
-    en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-    ko: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
-  };
-
-  const getMonthName = (m: number): string => {
-    return monthNames[language as keyof typeof monthNames]?.[m] || monthNames.vi[m];
   };
 
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">
-      {/* Header property selectors */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
         <div>
           <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-1.5">
             <Calendar className="w-4 h-4 text-[#0071c2]" />
-            <span>{language === 'vi' ? 'Quản lý lịch trống & Đóng/Mở phòng' : 'Availability Calendar & Room Blocks'}</span>
+            <span>{t('admin.availability.title')}</span>
           </h3>
           <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-            {language === 'vi' ? 'Chọn biệt thự để đóng lịch khóa phòng thủ công hoặc kiểm tra overbooking' : 'Select a villa to manually lock or inspect dates availability'}
+            {t('admin.availability.desc')}
           </p>
         </div>
-
-        {/* Villa Select Dropdown */}
         <select
           value={activeVillaId}
-          onChange={(e) => {
-            setActiveVillaId(e.target.value);
-            handleClearSelection();
-          }}
+          onChange={(event) => setActiveVillaId(event.target.value)}
           className="bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-xs"
         >
-          {villas.map(v => (
-            <option key={v.id} value={v.id}>{v.name}</option>
+          {villas.map((villa) => (
+            <option key={villa.id} value={villa.id}>{villa.name}</option>
           ))}
         </select>
       </div>
 
       {activeVilla ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Calendar Grid Card */}
-          <div className="lg:col-span-8 bg-white rounded-3xl border border-neutral-100 shadow-sm p-4 sm:p-6 flex flex-col gap-5 min-w-0 overflow-hidden">
-            {/* Multi-day Selection control Panel */}
-            <div className="bg-indigo-50/50 border border-indigo-150 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-neutral-750">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[9px] uppercase font-bold text-neutral-450 tracking-wider">Đang chọn dải ngày:</span>
-                <div className="flex items-center gap-1 bg-white border border-neutral-200 py-1 px-3.5 rounded-xl font-mono text-[10px]">
-                  <span>{rangeStart || 'YYYY-MM-DD'}</span>
-                  <span className="text-neutral-400">➔</span>
-                  <span>{rangeEnd || 'YYYY-MM-DD'}</span>
-                </div>
-                {(rangeStart || rangeEnd) && (
-                  <button 
-                    onClick={handleClearSelection}
-                    className="p-1 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-neutral-800 cursor-pointer"
-                    title="Bỏ chọn"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              
-              {rangeStart && rangeEnd && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleBlockSelectedRange}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-1.5 px-3 rounded-xl flex items-center gap-1 cursor-pointer"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Khóa ngày</span>
-                  </button>
-                  <button
-                    onClick={handleUnblockSelectedRange}
-                    className="bg-[#edf3ff] hover:bg-[#0071c2] text-[#0071c2] hover:text-white border border-[#a1c9ff] py-1.5 px-3 rounded-xl flex items-center gap-1 cursor-pointer transition-all"
-                  >
-                    <Unlock className="w-3.5 h-3.5" />
-                    <span>Mở khóa</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Nav month */}
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <h4 className="font-bold text-sm text-neutral-800 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#0071c2]" />
-                <span>{getMonthName(month)} {year}</span>
-              </h4>
-              
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={prevMonth}
-                  className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-500 cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={nextMonth}
-                  className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-500 cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="w-full overflow-x-auto scrollbar-safe overscroll-contain">
-              <div className="min-w-[520px] sm:min-w-0 flex flex-col gap-2">
-            {/* Weekdays */}
-            <div className="grid grid-cols-7 gap-2 text-center text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-              {(language === 'vi' 
-                ? ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] 
-                : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-              ).map((w, index) => (
-                <span key={w} className={index === 0 || index === 6 ? 'text-red-400' : ''}>{w}</span>
-              ))}
-            </div>
-
-            {/* Days block grids */}
-            <div className="grid grid-cols-7 gap-2 text-center font-bold text-xs font-mono">
-              {dayCells.map((day, idx) => {
-                if (day === null) {
-                  return <div key={`empty-${idx}`} />;
-                }
-
-                const dateStr = formatDateString(year, month, day);
-                const booked = activeVilla.bookedDates.includes(dateStr);
-                const pending = activeVilla.pendingDates.includes(dateStr);
-
-                // Multi-day select highlighting evaluations
-                const isSelectedStart = rangeStart === dateStr;
-                const isSelectedEnd = rangeEnd === dateStr;
-                const isWithinRange = rangeStart && rangeEnd && 
-                                      new Date(dateStr) >= new Date(rangeStart) && 
-                                      new Date(dateStr) <= new Date(rangeEnd);
-
-                let cellClass = 'bg-white hover:bg-neutral-100 text-neutral-700 hover:rounded-lg cursor-pointer border border-neutral-100';
-                let tooltipText = 'Available';
-
-                if (booked) {
-                  cellClass = 'bg-rose-50 border border-rose-200 text-rose-600 rounded-lg cursor-pointer hover:bg-rose-100';
-                  tooltipText = 'Locked / Booked';
-                } else if (pending) {
-                  cellClass = 'bg-amber-50 border border-amber-200 text-amber-600 rounded-lg cursor-pointer hover:bg-amber-100';
-                  tooltipText = 'Pending Hold';
-                }
-
-                // Range Selection Highlighting overrides
-                if (isSelectedStart || isSelectedEnd) {
-                  cellClass = 'bg-[#0071c2] text-white border-[#0071c2] rounded-lg cursor-pointer z-10 scale-102';
-                } else if (isWithinRange) {
-                  cellClass = 'bg-blue-50/70 border border-blue-200/80 text-blue-700 cursor-pointer';
-                }
-
-                return (
-                  <button
-                    key={`day-${day}`}
-                    type="button"
-                    onClick={() => handleDayClick(day)}
-                    className={`py-3.5 transition-all flex flex-col items-center justify-center relative ${cellClass}`}
-                    title={tooltipText}
-                  >
-                    <span>{day}</span>
-                    {booked && !isWithinRange && !isSelectedStart && !isSelectedEnd && (
-                      <span className="absolute bottom-1 text-[7px] text-rose-500 font-sans tracking-wide leading-none">BLOCK</span>
-                    )}
-                    {pending && !isWithinRange && !isSelectedStart && !isSelectedEnd && (
-                      <span className="absolute bottom-1 text-[7px] text-amber-500 font-sans tracking-wide leading-none">HOLD</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            </div>
-            </div>
-
-            {/* Legend guide info */}
-            <div className="border-t border-neutral-100 pt-4 mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
-              <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 bg-white border border-neutral-200 rounded-md" />
-                <span className="text-neutral-500">Mở phòng (Available)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 bg-rose-50 border border-rose-200 rounded-md" />
-                <span className="text-rose-600">Đã khóa / Đặt phòng</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 bg-amber-50 border border-amber-200 rounded-md" />
-                <span className="text-amber-600">Chờ duyệt (Pending)</span>
-              </div>
-              <div className="flex items-center gap-2 font-semibold">
-                <span className="text-[#0071c2]">💡 Chọn ngày nhận/trả</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Info Sidebar Card */}
-          <div className="lg:col-span-4 bg-white rounded-3xl border border-neutral-100 shadow-sm p-6 flex flex-col gap-4">
-            <h4 className="font-bold text-xs uppercase text-neutral-400 tracking-wider">Thông số phòng nghỉ</h4>
-            <div className="flex gap-3 items-center bg-neutral-50 p-3 rounded-xl border">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <form onSubmit={handleCreateBlockedDate} className="lg:col-span-5 bg-white rounded-3xl border border-neutral-100 shadow-sm p-5 flex flex-col gap-4">
+            <div className="flex items-center gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
               <img src={activeVilla.image} alt={activeVilla.name} className="w-16 h-12 object-cover rounded-lg shrink-0" />
-              <div className="min-w-0 flex-1">
-                <h5 className="font-bold text-xs text-neutral-800 truncate leading-snug">{activeVilla.name}</h5>
-                <span className="text-[10px] text-neutral-400 block mt-0.5">{activeVilla.location} · {activeVilla.type}</span>
+              <div className="min-w-0">
+                <h4 className="font-bold text-xs text-neutral-800 truncate">{activeVilla.name}</h4>
+                <p className="text-[10px] text-neutral-400 font-semibold">{activeVilla.location}</p>
               </div>
             </div>
 
-            {/* Availability details overview metrics */}
-            <div className="flex flex-col gap-2.5 text-xs border-t border-neutral-100 pt-4 mt-2">
-              <div className="flex justify-between font-semibold">
-                <span className="text-neutral-400">Số đêm đã bị khóa:</span>
-                <span className="text-rose-600 font-black">{activeVilla.bookedDates.length} đêm</span>
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span className="text-neutral-400">Số đêm đang chờ cọc:</span>
-                <span className="text-amber-600 font-black">{activeVilla.pendingDates.length} đêm</span>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1 text-[10px] font-bold text-neutral-500 uppercase">
+                {t('admin.availability.startDate')}
+                <CustomDatePicker
+                  value={startDate}
+                  onChange={setStartDate}
+                  language={language}
+                  buttonClassName="border border-neutral-200 rounded-xl px-3 py-2 text-left text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-50"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] font-bold text-neutral-500 uppercase">
+                {t('admin.availability.endDate')}
+                <CustomDatePicker
+                  value={endDate}
+                  onChange={setEndDate}
+                  language={language}
+                  buttonClassName="border border-neutral-200 rounded-xl px-3 py-2 text-left text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-50"
+                />
+              </label>
             </div>
 
-            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl text-[11px] leading-relaxed text-indigo-950 font-semibold mt-3">
-              <ShieldAlert className="w-5 h-5 text-indigo-500 mb-2 shrink-0" />
-              <p className="font-bold">Chặn khoảng ngày (Airbnb Style):</p>
-              <p className="mt-1 font-medium font-sans">
-                Chọn Ngày Check-In (click lần 1) và Ngày Check-Out (click lần 2) trực tiếp trên lịch. Sử dụng thanh công cụ để Đóng dải ngày hoặc Mở dải ngày hàng loạt để thuận tiện điều phối phòng.
-              </p>
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-neutral-500 uppercase">
+              {t('admin.availability.reason')}
+              <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={120} className="border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-700" placeholder={t('admin.availability.reasonPlaceholder')} />
+            </label>
+
+            <label className="flex flex-col gap-1 text-[10px] font-bold text-neutral-500 uppercase">
+              {t('admin.availability.note')}
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={4} className="border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-700 resize-none" placeholder={t('admin.availability.notePlaceholder')} />
+            </label>
+
+            <button disabled={saving} className="bg-rose-600 hover:bg-rose-700 disabled:bg-neutral-400 text-white py-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer">
+              <Lock className="w-4 h-4" />
+              {saving ? t('admin.availability.saving') : t('admin.availability.blockRange')}
+            </button>
+          </form>
+
+          <div className="lg:col-span-7 flex min-h-[360px] flex-col gap-4 rounded-3xl border border-neutral-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-neutral-800">{t('admin.availability.listTitle')}</h4>
+              <span className="text-[10px] font-black text-neutral-400 uppercase">{t('admin.availability.ranges', { count: blockedDates.length })}</span>
             </div>
+
+            {loading ? (
+              <div className="text-xs font-bold text-neutral-400 bg-neutral-50 rounded-xl p-4">{t('admin.availability.loading')}</div>
+            ) : blockedDates.length === 0 ? (
+              <div className="text-xs font-bold text-neutral-400 bg-neutral-50 rounded-xl p-4">{t('admin.availability.empty')}</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {blockedDates.map((blockedDate) => (
+                  <div key={blockedDate.id} className="border border-neutral-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-xs font-black text-neutral-800">
+                        {blockedDate.startDate.slice(0, 10)} → {blockedDate.endDate.slice(0, 10)}
+                      </p>
+                      <p className="text-xs font-bold text-rose-600 mt-1">{blockedDate.reason}</p>
+                      {blockedDate.note && <p className="text-[11px] text-neutral-500 mt-1">{blockedDate.note}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBlockedDate(blockedDate.id)}
+                      disabled={saving}
+                      className="text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-100 rounded-xl px-3 py-2 text-xs font-bold flex items-center gap-1 cursor-pointer self-start sm:self-center"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {t('admin.availability.delete')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ) : (
         <div className="text-center p-8 bg-white border border-neutral-100 rounded-3xl">
-          Chưa có villa nào đăng ký trong kho phòng
+          {t('admin.availability.noVilla')}
         </div>
       )}
     </div>

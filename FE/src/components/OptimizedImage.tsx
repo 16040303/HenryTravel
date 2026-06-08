@@ -6,6 +6,7 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   className?: string;
   isHero?: boolean; // If true, eager loads; otherwise lazy loads
   aspectRatioClassName?: string; // e.g., 'aspect-[4/3]'
+  fetchPriority?: 'high' | 'low' | 'auto';
 }
 
 /**
@@ -24,6 +25,19 @@ export default function OptimizedImage({
   aspectRatioClassName = 'aspect-[4/3]',
   ...rest
 }: OptimizedImageProps) {
+  if (!src) {
+    return (
+      <div
+        className={`overflow-hidden relative bg-neutral-100 ${aspectRatioClassName} ${className}`}
+        role="img"
+        aria-label={alt}
+      >
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+          No image
+        </div>
+      </div>
+    );
+  }
   
   // Helper to dynamically transform cloud-served URLs into responsive, webp formats
   const getOptimizedUrl = (originalSrc: string, width: number): string => {
@@ -34,45 +48,6 @@ export default function OptimizedImage({
       const baseUrl = originalSrc.split('=')[0];
       // =w{width}-rw serves highly compressed WebP format at target width
       return `${baseUrl}=w${width}-rw`; 
-    }
-    
-    // Picsum Photos CDN Optimization
-    if (originalSrc.includes('picsum.photos')) {
-      try {
-        const url = new URL(originalSrc);
-        const segments = url.pathname.split('/');
-        
-        // Find dimensions and replace with optimized size + webp
-        let foundWidthIndex = -1;
-        let foundHeightIndex = -1;
-        
-        for (let i = 0; i < segments.length; i++) {
-          if (/^\d+$/.test(segments[i])) {
-            if (foundWidthIndex === -1) {
-              foundWidthIndex = i;
-            } else {
-              foundHeightIndex = i;
-              break;
-            }
-          }
-        }
-        
-        if (foundWidthIndex !== -1 && foundHeightIndex !== -1) {
-          segments[foundWidthIndex] = String(width);
-          // Standard 4:3 aspect ratio
-          segments[foundHeightIndex] = String(Math.round(width * 0.75));
-          url.pathname = segments.join('/');
-        }
-        
-        // Ensure webp format is loaded
-        if (!url.pathname.endsWith('.webp')) {
-          url.pathname += '.webp';
-        }
-        
-        return url.toString();
-      } catch (e) {
-        return originalSrc;
-      }
     }
     
     return originalSrc;
@@ -96,6 +71,7 @@ export default function OptimizedImage({
         alt={alt}
         loading={isHero ? 'eager' : 'lazy'}
         decoding={isHero ? 'sync' : 'async'}
+        fetchPriority={isHero ? 'high' : 'auto'}
         referrerPolicy="no-referrer"
         className={`w-full h-full object-cover transition-all duration-500 hover:scale-[1.03]`}
         {...rest}

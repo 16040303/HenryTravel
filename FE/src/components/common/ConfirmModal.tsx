@@ -23,7 +23,7 @@ export default function ConfirmModal({
   cancelText,
   type = 'warning'
 }: ConfirmModalProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close on ESC key press and lock background scroll only while open.
@@ -36,10 +36,11 @@ export default function ConfirmModal({
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
       document.body.classList.add('modal-open');
-      // Accessibility: focus modal or confirm button initially
-      setTimeout(() => {
-        modalRef.current?.focus();
-      }, 50);
+      // Accessibility: focus modal after scroll reset to avoid browser forcing old scroll position.
+      requestAnimationFrame(() => {
+        modalRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+        modalRef.current?.focus({ preventScroll: true });
+      });
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -63,23 +64,24 @@ export default function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-[300] overflow-y-auto overscroll-contain p-4 bg-neutral-900/60 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-[300] overflow-y-auto overscroll-contain bg-neutral-900/60 backdrop-blur-sm animate-fadeIn"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
       onClick={onClose}
     >
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn my-auto mx-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="min-h-full flex items-start justify-center p-4">
+        <div
+          ref={modalRef}
+          tabIndex={-1}
+          className="w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Close Button top-right */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-1.5 rounded-lg transition-colors cursor-pointer"
-          aria-label="Close modal"
+          aria-label={t('common.close')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -109,15 +111,16 @@ export default function ConfirmModal({
             onClick={onClose}
             className="bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold text-xs px-4.5 py-2.5 rounded-xl transition-all cursor-pointer"
           >
-            {cancelText || (language === 'vi' ? 'Hủy bỏ' : (language === 'ko' ? '취소' : 'Cancel'))}
+            {cancelText || t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className={`text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 ${buttonConfirmColorMap[type]}`}
           >
-            {confirmText || (language === 'vi' ? 'Đồng ý' : (language === 'ko' ? '확인' : 'Confirm'))}
+            {confirmText || t('common.confirm')}
           </button>
+        </div>
         </div>
       </div>
     </div>

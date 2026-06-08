@@ -22,6 +22,7 @@ async function buildZaloLinks(params) {
         `Ngày nhận phòng: ${formatDate(params.checkIn)}`,
         `Ngày trả phòng: ${formatDate(params.checkOut)}`,
         `Số khách: ${params.guestsCount}`,
+        `Cơ cấu khách: ${params.adultCount ?? params.guestsCount} người lớn, ${params.childrenCount ?? 0} trẻ em 6-11 tuổi, ${params.infantCount ?? 0} trẻ em dưới 6 tuổi`,
         'Nhờ admin kiểm tra và xác nhận giúp tôi.',
     ].filter(Boolean).join('\n');
     const encodedMessage = encodeURIComponent(message);

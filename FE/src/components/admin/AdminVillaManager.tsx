@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Building2, Trash2, Edit, PlusCircle, Search, MapPin, 
   Users, CheckCircle2, AlertCircle, X, Copy, Eye, 
   ToggleLeft, ToggleRight, CheckSquare, Square 
 } from 'lucide-react';
-import { EntityId, VillaDetail } from '../../types';
-import { LOCATIONS, FACILITIES } from '../../constants';
+import { AccommodationTypeLabel, EntityId, VillaDetail, VillaMedia } from '../../types';
+import { AMENITY_CATEGORY_LABELS, AMENITIES, getAmenityDisplay, getAmenityLabel, normalizeAmenityKey, normalizeAmenityKeys } from '../../data/amenities';
+import { VIETNAM_PROVINCES_2025 } from '../../constants/vietnamProvinces';
 import { useLanguage } from '../../contexts/LanguageContext';
-import ImageUploader from './ImageUploader';
+import MediaUploader from './MediaUploader';
 
 interface AdminVillaManagerProps {
   villas: VillaDetail[];
-  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates'>) => Promise<void>;
+  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'blockedDates'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
   onDuplicateVilla: (id: EntityId) => void | Promise<void>;
@@ -34,9 +36,11 @@ export default function AdminVillaManager({
   onCloseAddModalDirectly,
   mutationLoading = false
 }: AdminVillaManagerProps) {
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
+  const [amenitySearchQuery, setAmenitySearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('All');
+  const [typeFilter, setTypeFilter] = useState<'All' | AccommodationTypeLabel>('All');
   
   // Custom Active/Inactive filter state
   const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
@@ -45,25 +49,32 @@ export default function AdminVillaManager({
   const [showAddModal, setShowAddModal] = useState(showAddModalDirectly);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingVilla, setEditingVilla] = useState<VillaDetail | null>(null);
+  const modalOverlayRef = useRef<HTMLDivElement>(null);
+  const modalPanelRef = useRef<HTMLDivElement>(null);
 
   // Bulk selections state
   const [selectedVillaIds, setSelectedVillaIds] = useState<EntityId[]>([]);
 
   // Add/Edit Form State
   const [villaName, setVillaName] = useState('');
-  const [villaLocation, setVillaLocation] = useState('Đà Lạt');
-  const [villaPrice, setVillaPrice] = useState(2500000);
-  const [villaType, setVillaType] = useState<'Villa' | 'Homestay' | 'Căn hộ'>('Villa');
+  const [villaLocation, setVillaLocation] = useState('');
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [villaPrice, setVillaPrice] = useState<number | ''>('');
+  const [villaPriceMax, setVillaPriceMax] = useState<number | ''>('');
+  const [villaType, setVillaType] = useState<AccommodationTypeLabel>('Villa');
   const [villaDescription, setVillaDescription] = useState('');
+  const [villaNameEn, setVillaNameEn] = useState('');
+  const [villaLocationEn, setVillaLocationEn] = useState('');
+  const [villaDescriptionEn, setVillaDescriptionEn] = useState('');
+  const [villaDescriptionKo, setVillaDescriptionKo] = useState('');
   const [villaAddress, setVillaAddress] = useState('');
   const [villaGuests, setVillaGuests] = useState(8);
   const [villaBedrooms, setVillaBedrooms] = useState(4);
   const [villaBathrooms, setVillaBathrooms] = useState(4);
   const [villaFacilities, setVillaFacilities] = useState<string[]>(['wifi', 'kitchen']);
-  const [villaImageUrl, setVillaImageUrl] = useState('');
-  const [villaImages, setVillaImages] = useState<string[]>([]);
   const [villaStatus, setVillaStatus] = useState<'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('Available');
   const [villaIsActive, setVillaIsActive] = useState(true);
+  const [pendingMediaPreview, setPendingMediaPreview] = useState<VillaMedia[]>([]);
 
   useEffect(() => {
     const isModalOpen = showAddModal || showEditModal;
@@ -74,41 +85,65 @@ export default function AdminVillaManager({
     };
   }, [showAddModal, showEditModal]);
 
+  const resetVillaModalScroll = () => {
+    requestAnimationFrame(() => {
+      modalOverlayRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      modalPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  };
+
+  useEffect(() => {
+    const isModalOpen = showAddModal || showEditModal;
+    if (!isModalOpen) return;
+
+    resetVillaModalScroll();
+  }, [showAddModal, showEditModal, editingVilla?.id]);
+
   // Load details to editor
   const handleOpenEdit = (v: VillaDetail) => {
     setEditingVilla(v);
     setVillaName(v.name);
     setVillaLocation(v.location);
     setVillaPrice(v.price);
+    setVillaPriceMax(v.priceMax ?? '');
     setVillaType(v.type);
     setVillaDescription(v.description);
+    setVillaNameEn(v.nameEn || '');
+    setVillaLocationEn(v.locationEn || '');
+    setVillaDescriptionEn(v.descriptionEn || '');
+    setVillaDescriptionKo(v.descriptionKo || '');
     setVillaAddress(v.address);
     setVillaGuests(v.guestsCount);
     setVillaBedrooms(v.bedroomsCount);
     setVillaBathrooms(v.bathroomsCount);
-    setVillaFacilities(v.facilities);
-    setVillaImages(Array.isArray(v.images) && v.images.length > 0 ? v.images : v.image ? [v.image] : []);
-    setVillaImageUrl(v.image || '');
+    setVillaFacilities(normalizeAmenityKeys(v.facilities));
     setVillaStatus(v.status);
     setVillaIsActive(v.isActive !== false);
+    resetVillaModalScroll();
     setShowEditModal(true);
   };
 
   const handleOpenAdd = () => {
     setVillaName('');
-    setVillaLocation('Đà Lạt');
-    setVillaPrice(2500000);
+    setVillaLocation('');
+    setVillaPrice('');
+    setVillaPriceMax('');
     setVillaType('Villa');
     setVillaDescription('');
+    setVillaNameEn('');
+    setVillaLocationEn('');
+    setVillaDescriptionEn('');
+    setVillaDescriptionKo('');
     setVillaAddress('');
     setVillaGuests(8);
     setVillaBedrooms(4);
     setVillaBathrooms(4);
-    setVillaFacilities(['wifi', 'kitchen']);
-    setVillaImages([]);
-    setVillaImageUrl('');
+    setVillaFacilities(['wifi_high_speed', 'kitchen']);
+    setAmenitySearchQuery('');
     setVillaStatus('Available');
     setVillaIsActive(true);
+    setPendingMediaPreview([]);
+    resetVillaModalScroll();
     setShowAddModal(true);
   };
 
@@ -121,19 +156,28 @@ export default function AdminVillaManager({
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (villaPriceMax !== '' && villaPrice !== '' && Number(villaPriceMax) < Number(villaPrice)) {
+      alert(t('admin.validationVillaPriceRange'));
+      return;
+    }
     await onAddVilla({
       name: villaName,
       location: villaLocation,
-      price: villaPrice,
+      price: Number(villaPrice),
+      priceMax: villaPriceMax === '' ? null : Number(villaPriceMax),
       type: villaType,
       description: villaDescription,
+      nameEn: villaNameEn,
+      locationEn: villaLocationEn,
+      descriptionEn: villaDescriptionEn,
+      descriptionKo: villaDescriptionKo,
       address: villaAddress,
       guestsCount: villaGuests,
       bedroomsCount: villaBedrooms,
       bathroomsCount: villaBathrooms,
       facilities: villaFacilities,
-      image: villaImages[0] || villaImageUrl,
-      images: villaImages,
+      image: pendingMediaPreview.find((item) => item.isCover)?.thumbnailUrl || pendingMediaPreview[0]?.thumbnailUrl || pendingMediaPreview[0]?.url || '',
+      media: pendingMediaPreview,
       status: villaStatus,
       isActive: villaIsActive,
       policies: {
@@ -147,20 +191,29 @@ export default function AdminVillaManager({
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVilla) return;
+    if (villaPriceMax !== '' && villaPrice !== '' && Number(villaPriceMax) < Number(villaPrice)) {
+      alert(t('admin.validationVillaPriceRange'));
+      return;
+    }
     await onUpdateVilla({
       ...editingVilla,
       name: villaName,
       location: villaLocation,
-      price: villaPrice,
+      price: Number(villaPrice),
+      priceMax: villaPriceMax === '' ? null : Number(villaPriceMax),
       type: villaType,
       description: villaDescription,
+      nameEn: villaNameEn,
+      locationEn: villaLocationEn,
+      descriptionEn: villaDescriptionEn,
+      descriptionKo: villaDescriptionKo,
       address: villaAddress,
       guestsCount: villaGuests,
       bedroomsCount: villaBedrooms,
       bathroomsCount: villaBathrooms,
       facilities: villaFacilities,
-      image: villaImages[0] || villaImageUrl,
-      images: villaImages,
+      image: editingVilla.image,
+      media: editingVilla.media,
       status: villaStatus,
       isActive: villaIsActive
     });
@@ -169,9 +222,11 @@ export default function AdminVillaManager({
   };
 
   const handleFacilityToggle = (id: string) => {
-    setVillaFacilities(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const normalizedId = normalizeAmenityKey(id);
+    setVillaFacilities(prev => {
+      const normalized = normalizeAmenityKeys(prev);
+      return normalized.includes(normalizedId) ? normalized.filter(x => x !== normalizedId) : [...normalized, normalizedId];
+    });
   };
 
   // Toggle active individual
@@ -179,7 +234,8 @@ export default function AdminVillaManager({
     const nextActive = !(v.isActive !== false);
     onUpdateVilla({
       ...v,
-      isActive: nextActive
+      isActive: nextActive,
+      status: nextActive ? 'Available' : v.status
     });
   };
 
@@ -196,7 +252,10 @@ export default function AdminVillaManager({
       activeFilter === 'Active' ? activeVal === true :
       activeVal === false;
 
-    return matchesSearch && matchesStatus && matchesActive;
+
+    const matchesType = typeFilter === 'All' || v.type === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesActive && matchesType;
   });
 
   // Checkbox handlers
@@ -219,6 +278,10 @@ export default function AdminVillaManager({
     setSelectedVillaIds([]);
   };
 
+  const locationSuggestions = VIETNAM_PROVINCES_2025.filter((province) =>
+    province.toLowerCase().includes(villaLocation.trim().toLowerCase())
+  ).slice(0, 8);
+
   const handleBulkDelete = () => {
     onBulkDeleteVillas(selectedVillaIds);
     setSelectedVillaIds([]);
@@ -235,7 +298,7 @@ export default function AdminVillaManager({
           </span>
           <input
             type="text"
-            placeholder={language === 'vi' ? 'Tìm kiếm villa theo tên, khu vực...' : 'Search by name, location...'}
+            placeholder={t('admin.villa.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2 pl-10 pr-4 text-xs font-semibold outline-none focus:bg-white focus:border-[#0071c2]"
@@ -250,11 +313,22 @@ export default function AdminVillaManager({
             onChange={(e) => setStatusFilter(e.target.value as any)}
             className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
           >
-            <option value="All">{language === 'vi' ? 'Tất cả trạng thái phòng' : 'All Statuses'}</option>
-            <option value="Available">{language === 'vi' ? 'Trống (Available)' : 'Available'}</option>
-            <option value="Hết phòng">{language === 'vi' ? 'Hết phòng (Full)' : 'Booked'}</option>
-            <option value="Sắp có">{language === 'vi' ? 'Sắp mở bán' : 'Upcoming'}</option>
-            <option value="Maintenance">{language === 'vi' ? 'Đang bảo trì' : 'Maintenance'}</option>
+            <option value="All">{t('admin.villa.allStatuses')}</option>
+            <option value="Available">{t('admin.villa.available')}</option>
+            <option value="Hết phòng">{t('admin.villa.booked')}</option>
+            <option value="Sắp có">{t('admin.villa.upcoming')}</option>
+            <option value="Maintenance">{t('admin.villa.maintenance')}</option>
+          </select>
+
+          {/* Accommodation Type Filter */}
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as 'All' | AccommodationTypeLabel)}
+            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
+          >
+            <option value="All">{t('admin.villa.allTypes')}</option>
+            <option value="Villa">Villa</option>
+            <option value="Khách sạn - resort">{t('nav.hotelResort')}</option>
           </select>
 
           {/* Active / Inactive operational filter */}
@@ -263,9 +337,9 @@ export default function AdminVillaManager({
             onChange={(e) => setActiveFilter(e.target.value as any)}
             className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
           >
-            <option value="All">{language === 'vi' ? 'Mọi hoạt động' : 'All Active/Inactive'}</option>
-            <option value="Active">{language === 'vi' ? 'Đang hiển thị (Active)' : 'Active Only'}</option>
-            <option value="Inactive">{language === 'vi' ? 'Đã ẩn (Inactive)' : 'Inactive Only'}</option>
+            <option value="All">{t('admin.villa.allActivity')}</option>
+            <option value="Active">{t('admin.villa.activeOnly')}</option>
+            <option value="Inactive">{t('admin.villa.inactiveOnly')}</option>
           </select>
 
           <button
@@ -273,7 +347,7 @@ export default function AdminVillaManager({
             className="bg-[#0071c2] hover:bg-[#005899] text-white font-black text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow shadow-[#0071c2]/10"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>{language === 'vi' ? 'Thêm mới' : 'Add Villa'}</span>
+            <span>{t('admin.villa.add')}</span>
           </button>
         </div>
       </div>
@@ -284,9 +358,7 @@ export default function AdminVillaManager({
           <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
             <CheckCircle2 className="w-5 h-5 text-[#0071c2]" />
             <span>
-              {language === 'vi' 
-                ? `Đã chọn ${selectedVillaIds.length} biệt thự` 
-                : `Selected ${selectedVillaIds.length} accommodations`}
+              {t('admin.villa.selected', { count: selectedVillaIds.length })}
             </span>
           </div>
           <div className="flex items-center gap-2.5">
@@ -294,19 +366,19 @@ export default function AdminVillaManager({
               onClick={() => handleBulkStatusChange(true)}
               className="bg-white hover:bg-neutral-50 text-emerald-600 border border-emerald-200 font-bold text-xs py-2 px-4 rounded-xl cursor-pointer transition-colors"
             >
-              {language === 'vi' ? 'Hiện hàng loạt (Active)' : 'Batch Set Active'}
+              {t('admin.villa.batchActive')}
             </button>
             <button
               onClick={() => handleBulkStatusChange(false)}
               className="bg-white hover:bg-neutral-50 text-neutral-500 border border-neutral-200 font-bold text-xs py-2 px-4 rounded-xl cursor-pointer transition-colors"
             >
-              {language === 'vi' ? 'Ẩn hàng loạt (Inactive)' : 'Batch Set Inactive'}
+              {t('admin.villa.batchInactive')}
             </button>
             <button
               onClick={handleBulkDelete}
               className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs py-2 px-4 rounded-xl cursor-pointer transition-colors shadow shadow-rose-600/10"
             >
-              {language === 'vi' ? 'Xóa hàng loạt' : 'Batch Delete'}
+              {t('admin.villa.batchDelete')}
             </button>
           </div>
         </div>
@@ -325,20 +397,24 @@ export default function AdminVillaManager({
               <Square className="w-4 h-4 text-neutral-350" />
             )}
             <span>
-              {selectedVillaIds.length === filteredVillas.length 
-                ? (language === 'vi' ? 'Bỏ chọn tất cả' : 'Deselect all') 
-                : (language === 'vi' ? 'Chọn tất cả hiển thị' : 'Select all listed')}
+              {selectedVillaIds.length === filteredVillas.length ? t('admin.villa.deselectAll') : t('admin.villa.selectAll')}
             </span>
           </button>
           <span className="text-[10px] text-neutral-400 font-semibold font-mono">
-            {language === 'vi' ? `Hiển thị ${filteredVillas.length} căn` : `Showing ${filteredVillas.length} properties`}
+            {t('admin.villa.showing', { count: filteredVillas.length })}
           </span>
         </div>
       )}
 
       {/* Grid listing */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-        {filteredVillas.map((v) => {
+      <div className="grid min-h-[420px] grid-cols-1 content-start gap-5 sm:grid-cols-2 md:grid-cols-3">
+        {filteredVillas.length === 0 ? (
+          <div className="col-span-full flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 bg-white/70 px-6 py-10 text-center">
+            <Building2 className="mb-3 h-9 w-9 text-neutral-300" />
+            <p className="text-sm font-black text-neutral-700">{t('admin.villa.noRooms')}</p>
+            <p className="mt-1 text-xs font-semibold text-neutral-400">{t('admin.villa.noRoomsDesc')}</p>
+          </div>
+        ) : filteredVillas.map((v) => {
           const isChecked = selectedVillaIds.some(id => String(id) === String(v.id));
           const isActive = v.isActive !== false;
           
@@ -379,7 +455,15 @@ export default function AdminVillaManager({
                 {/* Active/Inactive badge Overlay top-right */}
                 <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
                   <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border backdrop-blur-md ${badgeClass}`}>
-                    {v.status}
+                    {v.status === 'Available'
+                      ? t('admin.villa.available')
+                      : v.status === 'Hết phòng'
+                        ? t('admin.villa.booked')
+                        : v.status === 'Maintenance'
+                          ? t('admin.villa.maintenance')
+                          : v.status === 'Sắp có'
+                            ? t('admin.villa.upcoming')
+                            : v.status}
                   </span>
                   
                   <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border backdrop-blur-md ${
@@ -387,7 +471,7 @@ export default function AdminVillaManager({
                       ? 'bg-emerald-500/90 text-white border-emerald-400' 
                       : 'bg-neutral-500/90 text-white border-neutral-400'
                   }`}>
-                    {isActive ? 'Active' : 'Inactive'}
+                    {isActive ? t('admin.villa.activeOption') : t('admin.villa.inactiveOption')}
                   </span>
                 </div>
 
@@ -408,7 +492,7 @@ export default function AdminVillaManager({
                     <button
                       onClick={() => handleToggleActiveIndividual(v)}
                       className="text-neutral-400 hover:text-neutral-700 transition-colors flex items-center gap-1 cursor-pointer"
-                      title={isActive ? 'Deactivate' : 'Activate'}
+                      title={isActive ? t('admin.villa.deactivate') : t('admin.villa.activate')}
                     >
                       {isActive ? (
                         <ToggleRight className="w-6 h-6 text-emerald-500 fill-emerald-500/10" />
@@ -425,22 +509,22 @@ export default function AdminVillaManager({
                 </div>
 
                 <div className="flex items-baseline gap-1 mt-1 font-mono text-sm font-black text-[#fe6a34] border-t border-neutral-50 pt-3">
-                  <span>{v.price.toLocaleString('vi-VN')}₫</span>
-                  <span className="text-[10px] text-neutral-400 font-normal"> / {language === 'vi' ? 'đêm' : 'night'}</span>
+                  <span>{v.price.toLocaleString('vi-VN')} VND{v.priceMax && v.priceMax > v.price ? ` - ${v.priceMax.toLocaleString('vi-VN')} VND` : ''}</span>
+                  <span className="text-[10px] text-neutral-400 font-normal"> / {t('admin.villa.night')}</span>
                 </div>
 
                 {/* Grid details */}
                 <div className="grid grid-cols-3 gap-2 bg-neutral-50 p-2 rounded-xl text-center text-[10px] font-semibold text-neutral-500 mt-1">
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Khách' : 'Guests'}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{v.guestsCount} max</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.guests')}</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{v.guestsCount} {t('admin.villa.maxShort')}</span>
                   </div>
                   <div className="flex flex-col border-x border-neutral-200">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Giường' : 'Beds'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.beds')}</span>
                     <span className="text-neutral-700 font-bold mt-0.5">{v.bedroomsCount} P</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Tắm' : 'Baths'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.baths')}</span>
                     <span className="text-neutral-700 font-bold mt-0.5">{v.bathroomsCount} WC</span>
                   </div>
                 </div>
@@ -455,7 +539,7 @@ export default function AdminVillaManager({
                     className="flex-1 bg-[#edf3ff] hover:bg-[#0071c2] text-[#0071c2] hover:text-white border border-[#a1c9ff] font-bold text-xs py-2 rounded-lg text-center cursor-pointer transition-all flex items-center justify-center gap-1 shrink-0"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Preview</span>
+                    <span>{t('admin.villa.preview')}</span>
                   </a>
 
                   {/* Clone duplication button */}
@@ -463,7 +547,7 @@ export default function AdminVillaManager({
                     onClick={() => onDuplicateVilla(v.id)}
                     disabled={mutationLoading}
                     className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-indigo-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    title={language === 'vi' ? 'Sao chép / Nhân bản' : 'Clone Property'}
+                    title={t('admin.villa.clone')}
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
@@ -471,7 +555,7 @@ export default function AdminVillaManager({
                   <button
                     onClick={() => handleOpenEdit(v)}
                     className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-blue-600 rounded-lg text-neutral-400 transition-colors cursor-pointer"
-                    title={language === 'vi' ? 'Sửa thông tin' : 'Edit'}
+                    title={t('admin.villa.edit')}
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
@@ -480,7 +564,7 @@ export default function AdminVillaManager({
                     onClick={() => onDeleteVilla(v.id, v.name)}
                     disabled={mutationLoading}
                     className="p-2 border border-neutral-200 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    title={language === 'vi' ? 'Xoá' : 'Delete'}
+                    title={t('admin.villa.delete')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -492,21 +576,17 @@ export default function AdminVillaManager({
       </div>
 
       {/* Add / Edit Villa Modal Dialog */}
-      {(showAddModal || showEditModal) && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto overscroll-contain max-h-[90vh] shadow-2xl animate-scaleIn border my-auto mx-auto">
-            
+      {(showAddModal || showEditModal) && createPortal(
+        <div ref={modalOverlayRef} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
+          <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
+            <div ref={modalPanelRef} className="relative bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto overscroll-contain max-h-[90vh] shadow-2xl animate-scaleIn border">
             <div className="flex justify-between items-center mb-6 pb-2 border-b border-neutral-100">
               <div>
                 <h3 className="text-lg font-display font-black text-neutral-800">
-                  {showAddModal 
-                    ? (language === 'vi' ? 'Thêm biệt thự lưu trú mới' : 'Add New Accommodation')
-                    : (language === 'vi' ? 'Cập nhật thông tin biệt thự' : 'Modify Accommodation')}
+                  {showAddModal ? t('admin.villa.addTitle') : t('admin.villa.editTitle')}
                 </h3>
                 <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-                  {language === 'vi'
-                    ? 'Chỉ lưu các field backend hỗ trợ. Loại dịch vụ, địa chỉ, phòng ngủ/phòng tắm hiện là UI-only.'
-                    : 'Only backend-supported fields are saved. Type, address, bedrooms/bathrooms are UI-only for now.'}
+                  {t('admin.villa.modalDesc')}
                 </p>
               </div>
               <button 
@@ -518,22 +598,28 @@ export default function AdminVillaManager({
             </div>
 
             <form onSubmit={showAddModal ? handleAddSubmit : handleEditSubmit} className="flex flex-col gap-5 text-xs font-semibold text-neutral-600">
-              <ImageUploader
-                value={villaImages}
-                onChange={(urls) => {
-                  setVillaImages(urls);
-                  setVillaImageUrl(urls[0] || '');
-                }}
-                disabled={mutationLoading}
-              />
+              {showAddModal ? (
+                <MediaUploader
+                  value={pendingMediaPreview}
+                  onChange={setPendingMediaPreview}
+                  disabled={mutationLoading}
+                />
+              ) : editingVilla ? (
+                <MediaUploader
+                  villaId={String(editingVilla.id)}
+                  value={editingVilla.media}
+                  onChange={(media) => setEditingVilla({ ...editingVilla, media, image: media.find((item) => item.isCover)?.thumbnailUrl || media[0]?.thumbnailUrl || media[0]?.url || editingVilla.image })}
+                  disabled={mutationLoading}
+                />
+              ) : null}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Tên Villa / Homestay *' : 'Name *'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.name')}</span>
                   <input
                     type="text"
                     required
-                    placeholder="Ví dụ: Pine Hill Retreat Villa"
+                    placeholder={t('admin.villa.namePlaceholder')}
                     value={villaName}
                     onChange={(e) => setVillaName(e.target.value)}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] focus:bg-white text-xs font-bold text-neutral-800"
@@ -541,63 +627,97 @@ export default function AdminVillaManager({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Khu vực địa điểm *' : 'Location *'}</span>
-                  <select
-                    value={villaLocation}
-                    onChange={(e) => setVillaLocation(e.target.value)}
-                    className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
-                  >
-                    {LOCATIONS.map(loc => (
-                      <option key={loc} value={loc}>{loc}</option>
-                    ))}
-                  </select>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.location')}</span>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={villaLocation}
+                      onFocus={() => setShowLocationSuggestions(true)}
+                      onChange={(e) => {
+                        setVillaLocation(e.target.value);
+                        setShowLocationSuggestions(true);
+                      }}
+                      placeholder={t('admin.villa.locationPlaceholder')}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800"
+                    />
+                    {showLocationSuggestions && locationSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-[80] mt-1 max-h-56 overflow-y-auto rounded-xl border border-neutral-100 bg-white p-1 shadow-xl shadow-neutral-900/10">
+                        {locationSuggestions.map((province) => (
+                          <button
+                            key={province}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setVillaLocation(province);
+                              setShowLocationSuggestions(false);
+                            }}
+                            className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-neutral-700 hover:bg-[#edf3ff] hover:text-[#005899]"
+                          >
+                            {province}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Giá thuê 1 đêm *' : 'Price / night *'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.priceMin')}</span>
                   <input
                     type="number"
                     required
                     min={0}
                     value={villaPrice}
-                    onChange={(e) => setVillaPrice(Number(e.target.value))}
+                    onChange={(e) => setVillaPrice(e.target.value === '' ? '' : Number(e.target.value))}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] focus:bg-white font-mono text-xs text-neutral-800"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Loại dịch vụ' : 'Dwelling Type'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.priceMax')}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder={t('admin.villa.priceMaxPlaceholder')}
+                    value={villaPriceMax}
+                    onChange={(e) => setVillaPriceMax(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] focus:bg-white font-mono text-xs text-neutral-800"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.type')}</span>
                   <select
                     value={villaType}
-                    onChange={(e) => setVillaType(e.target.value as 'Villa' | 'Homestay' | 'Căn hộ')}
+                    onChange={(e) => setVillaType(e.target.value as AccommodationTypeLabel)}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
                   >
-                    <option value="Villa">Villa (Biệt thự)</option>
-                    <option value="Homestay">Homestay (Nhà dân)</option>
-                    <option value="Căn hộ">Căn hộ dịch vụ</option>
+                    <option value="Villa">Villa</option>
+                    <option value="Khách sạn - resort">{t('nav.hotelResort')}</option>
                   </select>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Trạng thái hoạt động' : 'Status'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.status')}</span>
                   <select
                     value={villaStatus}
                     onChange={(e) => setVillaStatus(e.target.value as 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance')}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
                   >
-                    <option value="Available">Available</option>
-                    <option value="Hết phòng">Hết phòng</option>
-                    <option value="Sắp có">Sắp có</option>
-                    <option value="Maintenance">Maintenance</option>
+                    <option value="Available">{t('admin.villa.available')}</option>
+                    <option value="Hết phòng">{t('admin.villa.booked')}</option>
+                    <option value="Sắp có">{t('admin.villa.upcoming')}</option>
+                    <option value="Maintenance">{t('admin.villa.maintenance')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Sức chứa khách max' : 'Guests Count'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.maxGuests')}</span>
                   <input
                     type="number"
                     min={1}
@@ -607,7 +727,7 @@ export default function AdminVillaManager({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Phòng ngủ' : 'Bedrooms'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.bedrooms')}</span>
                   <input
                     type="number"
                     min={0}
@@ -617,7 +737,7 @@ export default function AdminVillaManager({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Phòng vệ sinh' : 'Bathrooms'}</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.bathrooms')}</span>
                   <input
                     type="number"
                     min={0}
@@ -627,24 +747,24 @@ export default function AdminVillaManager({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">Hiển thị website</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.websiteVisibility')}</span>
                   <select
                     value={villaIsActive ? 'Active' : 'Inactive'}
                     onChange={(e) => setVillaIsActive(e.target.value === 'Active')}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
                   >
-                    <option value="Active">Active (Hiển thị)</option>
-                    <option value="Inactive">Inactive (Tạm ẩn)</option>
+                    <option value="Active">{t('admin.villa.activeOption')}</option>
+                    <option value="Inactive">{t('admin.villa.inactiveOption')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Địa chỉ chính xác *' : 'Precise Address *'}</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.address')}</span>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Phường 3, Thành Phố Đà Lạt"
+                  placeholder={t('admin.villa.addressPlaceholder')}
                   value={villaAddress}
                   onChange={(e) => setVillaAddress(e.target.value)}
                   className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-xs"
@@ -652,35 +772,117 @@ export default function AdminVillaManager({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Mô tả dịch vụ chi tiết *' : 'Description *'}</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.description')}</span>
                 <textarea
                   required
                   rows={3}
-                  placeholder="Giới thiệu điểm độc đáo, cảnh quan sân vườn..."
+                  placeholder={t('admin.villa.descriptionPlaceholder')}
                   value={villaDescription}
                   onChange={(e) => setVillaDescription(e.target.value)}
                   className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 outline-none resize-none text-xs leading-relaxed"
                 />
               </div>
 
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 flex flex-col gap-4">
+                <div>
+                  <h4 className="text-xs font-black text-[#005899] uppercase">{t('admin.villa.multilingualTitle')}</h4>
+                  <p className="text-[10px] text-neutral-500 font-semibold mt-1">{t('admin.villa.multilingualDesc')}</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Name EN</span>
+                    <input
+                      type="text"
+                      value={villaNameEn}
+                      onChange={(e) => setVillaNameEn(e.target.value)}
+                      className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Location EN</span>
+                    <input
+                      type="text"
+                      value={villaLocationEn}
+                      onChange={(e) => setVillaLocationEn(e.target.value)}
+                      className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">Description EN</span>
+                  <textarea
+                    rows={3}
+                    value={villaDescriptionEn}
+                    onChange={(e) => setVillaDescriptionEn(e.target.value)}
+                    className="bg-white border border-neutral-200 rounded-xl p-3 outline-none resize-none text-xs leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.descriptionKo')}</span>
+                  <textarea
+                    rows={3}
+                    value={villaDescriptionKo}
+                    onChange={(e) => setVillaDescriptionKo(e.target.value)}
+                    className="bg-white border border-neutral-200 rounded-xl p-3 outline-none resize-none text-xs leading-relaxed"
+                  />
+                </div>
+              </div>
+
               {/* Facilities Checklist */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-neutral-400 uppercase">{language === 'vi' ? 'Các tiện ích hiện hữu' : 'Amenities Checklist'}</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
-                  {FACILITIES.map(item => {
-                    const isChecked = villaFacilities.includes(item.id);
-                    return (
-                      <label key={item.id} className="flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleFacilityToggle(item.id)}
-                          className="w-4 h-4 text-[#0071c2] rounded border-neutral-350 focus:ring-[#0071c2]"
-                        />
-                        <span>{item.label}</span>
-                      </label>
-                    );
-                  })}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.amenities')}</span>
+                  <input
+                    type="text"
+                    value={amenitySearchQuery}
+                    onChange={(e) => setAmenitySearchQuery(e.target.value)}
+                    placeholder="Tìm tiện ích..."
+                    className="w-full sm:w-60 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold outline-none focus:border-[#0071c2] focus:bg-white"
+                  />
+                </div>
+                <div className="max-h-[360px] overflow-y-auto rounded-2xl border border-neutral-100 bg-neutral-50 p-4">
+                  {Object.entries(
+                    AMENITIES
+                      .filter((item) => {
+                        const query = amenitySearchQuery.trim().toLowerCase();
+                        if (!query) return true;
+                        return [item.key, item.labelVi, item.labelEn, item.labelKo, item.labelZh]
+                          .some((value) => value.toLowerCase().includes(query));
+                      })
+                      .reduce<Record<string, typeof AMENITIES>>((acc, item) => {
+                        acc[item.category] = [...(acc[item.category] || []), item];
+                        return acc;
+                      }, {})
+                  ).map(([category, items]) => (
+                    <div key={category} className="mb-5 last:mb-0">
+                      <div className="mb-2 flex items-center justify-between border-b border-neutral-200/70 pb-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wide text-neutral-500">
+                          {AMENITY_CATEGORY_LABELS[category as keyof typeof AMENITY_CATEGORY_LABELS]?.[language] || category}
+                        </span>
+                        <span className="text-[10px] font-bold text-neutral-400">{items.length}</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {items.map(item => {
+                          const normalizedFacilities = normalizeAmenityKeys(villaFacilities);
+                          const isChecked = normalizedFacilities.includes(item.key);
+                          return (
+                            <label key={item.key} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold cursor-pointer transition-all ${isChecked ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-white bg-white text-neutral-700 hover:border-neutral-200'}`}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleFacilityToggle(item.key)}
+                                className="w-4 h-4 text-[#0071c2] rounded border-neutral-350 focus:ring-[#0071c2]"
+                              />
+                              <span>{getAmenityLabel(getAmenityDisplay(item.key), language)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -691,24 +893,23 @@ export default function AdminVillaManager({
                   onClick={showAddModal ? handleCloseAdd : () => setShowEditModal(false)}
                   className="px-4.5 py-2.5 font-bold text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 rounded-xl cursor-pointer"
                 >
-                  {language === 'vi' ? 'Hủy bỏ' : 'Cancel'}
+                  {t('admin.villa.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={mutationLoading}
                   className="bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 px-6 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {mutationLoading
-                    ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...')
-                    : showAddModal 
-                      ? (language === 'vi' ? 'Đăng ký ngay' : 'Register Villa') 
-                      : (language === 'vi' ? 'Lưu thay đổi' : 'Save Changes')}
+                  {mutationLoading ? t('admin.villa.processing') : showAddModal ? t('admin.villa.register') : t('admin.villa.save')}
                 </button>
               </div>
             </form>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
 }
+

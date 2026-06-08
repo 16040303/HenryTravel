@@ -1,18 +1,37 @@
 export type EntityId = string | number;
+export type AccommodationTypeValue = 'villa' | 'hotel_resort';
+export type AccommodationTypeLabel = 'Villa' | 'Khách sạn - resort';
+export type MediaType = 'image' | 'video';
+
+export interface VillaMedia {
+  id: string;
+  type: MediaType;
+  url: string;
+  thumbnailUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  sortOrder: number;
+  isCover: boolean;
+}
 
 export interface Villa {
   id: EntityId;
   name: string;
+  nameEn?: string | null;
   location: string;
+  locationEn?: string | null;
   image: string;
-  images: string[];
   status: 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance';
   rating: number;
   reviewsCount: number;
   price: number;
-  type: 'Villa' | 'Homestay' | 'Căn hộ';
+  priceMax?: number | null;
+  type: AccommodationTypeLabel;
   facilities: string[];
   description: string;
+  descriptionEn?: string | null;
+  descriptionKo?: string | null;
   isActive?: boolean;
   avgRating?: number;
   feedbackCount?: number;
@@ -30,6 +49,8 @@ export interface VillaDetail extends Villa {
   };
   bookedDates: string[]; // ISO Date strings, e.g., '2024-12-20'
   pendingDates: string[]; // ISO Date strings, e.g., '2024-12-25'
+  blockedDates: string[]; // ISO Date strings blocked manually by admin
+  media: VillaMedia[];
 }
 
 export interface Booking {
@@ -43,6 +64,9 @@ export interface Booking {
   checkIn: string; // ISO date format
   checkOut: string; // ISO date format
   guests: number;
+  adultCount?: number;
+  childrenCount?: number;
+  infantCount?: number;
   rooms: number;
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
@@ -93,7 +117,7 @@ export interface SearchParams {
 export interface FilterParams {
   priceMin: number;
   priceMax: number;
-  type?: 'Villa' | 'Homestay' | 'Căn hộ' | 'All';
+  type?: AccommodationTypeValue | 'All';
   facilities: string[];
 }
 
@@ -113,7 +137,8 @@ export interface ZaloLinks {
 
 export interface VillaAvailabilityDay {
   date: string;
-  status: 'available' | 'pending' | 'booked';
+  status: 'available' | 'pending' | 'booked' | 'blocked';
+  reason?: string;
 }
 
 export interface AdminUser {
@@ -151,6 +176,9 @@ export interface AdminStats {
     checkIn: string;
     checkOut: string;
     guestsCount?: number;
+    adultCount?: number;
+    childrenCount?: number;
+    infantCount?: number;
     roomsCount?: number;
     status: string;
     holdExpireAt?: string | null;
@@ -174,18 +202,23 @@ export interface AdminVillaResponse {
   villas: Array<{
     id: string;
     name: string;
+    nameEn?: string | null;
     location: string;
+    locationEn?: string | null;
     description?: string | null;
+    descriptionEn?: string | null;
+    descriptionKo?: string | null;
     status?: string;
     price: string | number;
+    priceMax?: string | number | null;
     priceType?: string;
     facilities?: string[] | null;
-    images?: string[] | null;
+    mediaCover?: VillaMedia | null;
     maxGuests: number;
-    holdMinutes?: number;
     avgRating?: number;
     bookingCount?: number;
     feedbackCount?: number;
+    accommodationType?: AccommodationTypeValue;
     createdAt?: string;
   }>;
   total: number;
@@ -225,19 +258,51 @@ export interface AdminLogResponse {
   totalPages: number;
 }
 
+export interface AdminBlockedDate {
+  id: string;
+  villaId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  note?: string | null;
+  createdBy: string;
+  createdAt: string;
+  villa?: { id: string; name: string; location: string };
+  admin?: { id: string; name: string; email: string };
+}
+
+export interface AdminBlockedDateResponse {
+  blockedDates: AdminBlockedDate[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminBlockedDatePayload {
+  villaId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  note?: string;
+}
+
 export interface AdminVillaMutationPayload {
   name?: string;
+  nameEn?: string | null;
   location?: string;
+  locationEn?: string | null;
   description?: string;
+  descriptionEn?: string | null;
+  descriptionKo?: string | null;
   price?: number;
+  priceMax?: number | null;
   priceType?: 'fixed' | 'contact';
   status?: 'available' | 'maintenance' | 'hidden';
   maxGuests?: number;
-  images?: string[];
   facilities?: string[];
-  holdMinutes?: number;
   depositRequired?: boolean;
   depositAmount?: number | null;
+  accommodationType?: AccommodationTypeValue;
 }
 
 export interface AdminBookingHistoryResponse {

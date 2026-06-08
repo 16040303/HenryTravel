@@ -6,6 +6,9 @@ export interface ZaloLinkParams {
   checkIn: Date;
   checkOut: Date;
   guestsCount: number;
+  adultCount?: number;
+  childrenCount?: number;
+  infantCount?: number;
   guestName?: string;
   bookingCode: string;
 }
@@ -40,6 +43,7 @@ export async function buildZaloLinks(params: ZaloLinkParams): Promise<ZaloLinks>
     `Ngày nhận phòng: ${formatDate(params.checkIn)}`,
     `Ngày trả phòng: ${formatDate(params.checkOut)}`,
     `Số khách: ${params.guestsCount}`,
+    `Cơ cấu khách: ${params.adultCount ?? params.guestsCount} người lớn, ${params.childrenCount ?? 0} trẻ em 6-11 tuổi, ${params.infantCount ?? 0} trẻ em dưới 6 tuổi`,
     'Nhờ admin kiểm tra và xác nhận giúp tôi.',
   ].filter(Boolean).join('\n');
   const encodedMessage = encodeURIComponent(message);

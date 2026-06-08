@@ -9,6 +9,7 @@ const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const routes_1 = __importDefault(require("./routes"));
 const releaseHold_1 = require("./jobs/releaseHold");
+const cloudinaryCleanup_1 = require("./jobs/cloudinaryCleanup");
 const errorHandler_1 = require("./middleware/errorHandler");
 const prisma_1 = require("./lib/prisma");
 const app = (0, express_1.default)();
@@ -26,11 +27,13 @@ app.use(errorHandler_1.errorHandler);
 const server = app.listen(port, () => {
     console.log(`HenryTravel API is running on http://localhost:${port}`);
     (0, releaseHold_1.startBookingJobs)();
+    (0, cloudinaryCleanup_1.startCloudinaryCleanupJob)();
 });
 async function shutdown(signal) {
     console.log(`${signal} received. Shutting down HenryTravel API...`);
     server.close(async () => {
         (0, releaseHold_1.stopBookingJobs)();
+        (0, cloudinaryCleanup_1.stopCloudinaryCleanupJob)();
         await (0, prisma_1.disconnectPrisma)();
         process.exit(0);
     });

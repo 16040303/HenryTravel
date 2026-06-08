@@ -32,9 +32,7 @@ export interface VillaWithStats {
   price: Prisma.Decimal;
   priceType: PriceType;
   facilities: Prisma.JsonValue;
-  images: Prisma.JsonValue;
   viewsCount: number;
-  holdMinutes: number;
   depositRequired: boolean;
   depositAmount: Prisma.Decimal | null;
   maxGuests: number;

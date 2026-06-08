@@ -1,0 +1,92 @@
+﻿C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminAvailabilityManager.tsx:21:const [reason, setReason] = useState('Bảo trì');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:93:isCompleted ? 'COMPLETED (HOÀN TẤT)' :
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:94:b.status === 'CONFIRMED' ? 'CONFIRMED (ĐÃ CỌC)' :
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:95:b.status === 'PENDING' ? 'PENDING (ĐỢI CỌC)' : 'CANCELLED (ĐÃ HỦY)';
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:127:<div class="title">Hóa đơn thanh toán giữ chỗ</div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:128:<div class="receipt-code">MÃ ĐƠN: ${b.code}</div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:133:<h4>Thông tin khách hàng</h4>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:134:<div class="row"><span class="label">Khách hàng:</span><span class="value">${b.fullName}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:135:<div class="row"><span class="label">Số điện thoại:</span><span class="value">${b.phone}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:136:<div class="row"><span class="label">Email:</span><span class="value">${b.email || 'Chưa cung cấp'}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:137:<div class="row"><span class="label">Trạng thái:</span>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:146:<h4>Thông tin kỳ nghỉ</h4>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:147:<div class="row"><span class="label">Biệt thự:</span><span class="value">${b.villaName}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:148:<div class="row"><span class="label">Nhận phòng:</span><span class="value">${b.checkIn}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:149:<div class="row"><span class="label">Trả phòng:</span><span class="value">${b.checkOut}</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:150:<div class="row"><span class="label">Lượng khách:</span><span class="value">${b.guests} người</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:151:<div class="row"><span class="label">Cơ cấu:</span><span class="value">${b.adultCount ?? b.guests} người lớn, ${b.childrenCount ?? 0} trẻ 6-11, ${b.infantCount ?? 0} trẻ dưới 6</span></div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:156:<div style="font-weight: 800; color: #005899; font-size: 13px; text-transform: uppercase;">Tổng thanh toán tiền cọc</div>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:161:Cảm ơn quý khách đã tin tưởng và lựa chọn đặt phòng tại HenryTravel homestay.<br>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:162:Hệ thống đặt phòng tự động HenryTravel<br>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:163:Vui lòng liên hệ qua thông tin hỗ trợ hiển thị trên website.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:604:{selectedBooking.adultCount ?? selectedBooking.guests} người lớn · {selectedBooking.childrenCount ?? 0} trẻ 6-11 · {selectedBooking.infantCount ?? 0} trẻ dưới 6
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminBookingManager.tsx:648:const msg = `Xin chào ${selectedBooking.fullName}, tôi cần liên hệ hỗ trợ về đơn hàng HenryTravel mã ${selectedBooking.code}.`;
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminDashboard.tsx:479:const villaName = villas.find(v => v.id === f.villaId)?.name || 'Nơi lưu trú';
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminFeedbackManager.tsx:87:const villaName = villas.find(v => String(v.id) === String(f.villaId))?.name || `Mã villa: ${f.villaId}`;
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminLayout.tsx:96:{ id: 'info', label: 'Thông tin', icon: <Info className="w-4.5 h-4.5" /> },
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:152:showToast('error', 'Vui lòng nhập đầy đủ thông tin mật khẩu.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:156:showToast('error', 'Mật khẩu mới phải có ít nhất 8 ký tự.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:160:showToast('error', 'Mật khẩu xác nhận không khớp.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:167:showToast('success', result.message || 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:173:const message = error instanceof Error ? error.message : 'Không thể đổi mật khẩu. Vui lòng thử lại.';
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:191:<span>{section === 'info' ? 'Thông tin liên hệ & mạng xã hội' : t('admin.settings.title')}</span>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:195:? 'Cập nhật các kênh liên hệ và đường link mạng xã hội hiển thị ở footer.'
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:287:Số điện thoại Zalo hỗ trợ
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:295:placeholder="Ví dụ: 0896042307"
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:298:* Nhập số điện thoại Zalo. Hệ thống tự tạo link https://zalo.me/so-dien-thoai.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:305:Số điện thoại WhatsApp hỗ trợ
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:312:placeholder="Ví dụ: 84898466594"
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:315:* Nhập số điện thoại WhatsApp. Hệ thống tự tạo link https://wa.me/so-dien-thoai.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:333:Link mạng xã hội hiển thị ở footer
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:340:<span className="text-[9px] font-black uppercase text-neutral-400">Facebook cá nhân</span>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:341:<input type="url" value={facebookPersonalUrl} onChange={(e) => setFacebookPersonalUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link Facebook cá nhân" />
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:344:<span className="text-[9px] font-black uppercase text-neutral-400">Instagram công việc</span>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:345:<input type="url" value={instagramWorkUrl} onChange={(e) => setInstagramWorkUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link Instagram hiển thị cho khách" />
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:349:<input type="url" value={tikTokUrl} onChange={(e) => setTikTokUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link kênh TikTok" />
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:365:Quy định chung hiển thị cho khách
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:372:placeholder="Mỗi dòng là một quy định chung..."
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:375:* Quy định riêng của từng căn sẽ được admin tư vấn qua Zalo sau khi khách đặt phòng.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:418:<span>Đặt lại mật khẩu</span>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:434:Đặt lại mật khẩu
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:437:Sau khi đổi thành công, hệ thống sẽ đăng xuất để Anh Yêu đăng nhập lại.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:442:<label className="text-[10px] font-bold text-neutral-400 uppercase">Mật khẩu hiện tại</label>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:453:<label className="text-[10px] font-bold text-neutral-400 uppercase">Mật khẩu mới</label>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:465:<label className="text-[10px] font-bold text-neutral-400 uppercase">Nhập lại mật khẩu mới</label>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:486:Hủy
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminSettings.tsx:493:{isChangingPassword ? 'Đang đổi...' : 'Xác nhận đổi mật khẩu'}
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:41:const [statusFilter, setStatusFilter] = useState<'All' | 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('All');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:59:const [villaLocation, setVillaLocation] = useState('Đà Nẵng');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:73:const [villaStatus, setVillaStatus] = useState<'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('Available');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:124:setVillaLocation('Đà Lạt');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:172:time: ['Nhận phòng: Từ 14:00', 'Trả phòng: Trước 12:00'],
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:173:other: ['Cần liên hệ đặt cọc trước.', 'Giữ vệ sinh chung.']
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:299:<option value="Hết phòng">{t('admin.villa.booked')}</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:300:<option value="Sắp có">{t('admin.villa.upcoming')}</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:310:<option value="All">Tất cả loại hình</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:312:<option value="Khách sạn - resort">Khách sạn - resort</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:395:<p className="text-sm font-black text-neutral-700">Không có phòng phù hợp</p>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:396:<p className="mt-1 text-xs font-semibold text-neutral-400">Thử đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm.</p>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:404:v.status === 'Hết phòng' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:576:Lưu chỗ ở trước để thêm hình ảnh/video.
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:593:placeholder="Ví dụ: Pine Hill Retreat Villa"
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:612:placeholder="Nhập tỉnh/thành..."
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:658:<option value="Khách sạn - resort">Khách sạn - resort</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:666:onChange={(e) => setVillaStatus(e.target.value as 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance')}
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:670:<option value="Hết phòng">Hết phòng</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:671:<option value="Sắp có">Sắp có</option>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:726:placeholder="Ví dụ: Phường 3, Thành Phố Đà Lạt"
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:738:placeholder="Giới thiệu điểm độc đáo, cảnh quan sân vườn..."
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:747:<h4 className="text-xs font-black text-[#005899] uppercase">Nội dung đa ngôn ngữ</h4>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\AdminVillaManager.tsx:748:<p className="text-[10px] text-neutral-500 font-semibold mt-1">Bỏ trống sẽ fallback theo nội dung tiếng Việt.</p>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:39:setError('Chỉ được tải lên tối đa 10 file/lần.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:43:setError('Chỉ hỗ trợ JPG, PNG, WEBP, MP4, WEBM hoặc MOV.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:47:setError('Mỗi ảnh không được vượt quá 5MB.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:51:setError('Mỗi video không được vượt quá 100MB.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:55:setError('Mỗi chỗ ở chỉ được tối đa 3 video.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:65:setError(uploadError instanceof Error ? uploadError.message : 'Không thể tải media lên.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:77:setError(updateError instanceof Error ? updateError.message : 'Không thể đặt ảnh đại diện.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:89:setError(deleteError instanceof Error ? deleteError.message : 'Không thể xóa media.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:109:setError(moveError instanceof Error ? moveError.message : 'Không thể sắp xếp media.');
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:129:<p className="text-[10px] font-black uppercase text-neutral-500">Hình ảnh & video</p>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:130:<p className="text-[10px] font-semibold text-neutral-400">Ảnh 5MB, video 100MB, tối đa 10 file/lần và 3 video/chỗ ở.</p>
+C:\xampp\htdocs\henrytravel\FE\src\components\admin\MediaUploader.tsx:139:Tải media

@@ -18,7 +18,7 @@ export function useBookingCountdown(holdExpireAt: string | null) {
         return { minutes: 0, seconds: 0, isExpired: true };
       }
 
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const minutes = Math.floor(difference / (1000 * 60));
       const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
       return { minutes, seconds, isExpired: false };

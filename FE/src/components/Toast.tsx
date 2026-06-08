@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { CheckCircle2, AlertTriangle, Info, X, XCircle } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // ---- Types ----
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -25,36 +26,36 @@ export function useToast() {
 }
 
 const toastMeta: Record<ToastType, {
-  title: string;
+  titleKey: string;
   icon: React.ReactNode;
   toneClass: string;
   iconClass: string;
   progressClass: string;
 }> = {
   success: {
-    title: 'Thành công',
-    icon: <CheckCircle2 className="h-5 w-5" />,
+    titleKey: 'toast.success',
+    icon: <CheckCircle2 className="h-4 w-4" />,
     toneClass: 'border-emerald-100 bg-emerald-50/80 text-emerald-700',
     iconClass: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
     progressClass: 'bg-emerald-500',
   },
   error: {
-    title: 'Không thể thực hiện',
-    icon: <XCircle className="h-5 w-5" />,
+    titleKey: 'toast.error',
+    icon: <XCircle className="h-4 w-4" />,
     toneClass: 'border-rose-100 bg-rose-50/80 text-rose-700',
     iconClass: 'bg-rose-100 text-rose-700 ring-rose-200',
     progressClass: 'bg-rose-500',
   },
   warning: {
-    title: 'Cần kiểm tra',
-    icon: <AlertTriangle className="h-5 w-5" />,
+    titleKey: 'toast.warning',
+    icon: <AlertTriangle className="h-4 w-4" />,
     toneClass: 'border-amber-100 bg-amber-50/80 text-amber-700',
     iconClass: 'bg-amber-100 text-amber-700 ring-amber-200',
     progressClass: 'bg-amber-500',
   },
   info: {
-    title: 'Thông tin',
-    icon: <Info className="h-5 w-5" />,
+    titleKey: 'toast.info',
+    icon: <Info className="h-4 w-4" />,
     toneClass: 'border-blue-100 bg-blue-50/80 text-[#005899]',
     iconClass: 'bg-blue-100 text-[#0071c2] ring-blue-200',
     progressClass: 'bg-[#0071c2]',
@@ -65,6 +66,7 @@ const toastMeta: Record<ToastType, {
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const [isExiting, setIsExiting] = useState(false);
   const meta = toastMeta[toast.type];
+  const { t } = useLanguage();
   const duration = toast.duration || 4200;
 
   useEffect(() => {
@@ -85,34 +87,34 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     <div
       role="alert"
       className={`
-        relative flex w-[calc(100vw-24px)] max-w-[440px] items-start gap-3 overflow-hidden rounded-2xl
-        border bg-white/95 p-4 pr-3 shadow-2xl shadow-neutral-900/12 backdrop-blur-xl
+        relative flex w-[calc(100vw-24px)] max-w-[360px] items-start gap-2.5 overflow-hidden rounded-xl
+        border bg-white/95 p-3 pr-2.5 shadow-xl shadow-neutral-900/10 backdrop-blur-xl
         ${meta.toneClass}
         ${isExiting ? 'animate-toastOut' : 'animate-toastIn'}
       `}
     >
-      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${meta.iconClass}`}>
+      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ${meta.iconClass}`}>
         {meta.icon}
       </div>
 
       <div className="min-w-0 flex-1 text-left">
-        <p className="text-[12px] font-black uppercase tracking-[0.14em] text-neutral-800">
-          {meta.title}
+        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-neutral-800">
+          {t(meta.titleKey)}
         </p>
-        <p className="mt-1 text-sm font-semibold leading-relaxed text-neutral-650">
+        <p className="mt-0.5 text-xs font-semibold leading-relaxed text-neutral-650">
           {toast.message}
         </p>
       </div>
 
       <button
         onClick={handleClose}
-        className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-white/70 hover:text-neutral-800 cursor-pointer"
-        aria-label="Đóng thông báo"
+        className="shrink-0 rounded-lg p-1 text-neutral-400 transition-colors hover:bg-white/70 hover:text-neutral-800 cursor-pointer"
+        aria-label={t('toast.close')}
       >
-        <X className="h-4 w-4" />
+        <X className="h-3.5 w-3.5" />
       </button>
 
-      <div className="absolute bottom-0 left-0 h-1 w-full bg-neutral-100/70">
+      <div className="absolute bottom-0 left-0 h-0.5 w-full bg-neutral-100/70">
         <div
           className={`h-full ${meta.progressClass}`}
           style={{ animation: `toastProgress ${duration}ms linear forwards` }}
@@ -141,7 +143,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
       {/* Toast Container */}
       <div
-        className="fixed top-20 left-1/2 z-[200] flex -translate-x-1/2 flex-col gap-3 pointer-events-none sm:right-6 sm:left-auto sm:translate-x-0"
+        className="fixed top-6 left-1/2 z-[9998] flex -translate-x-1/2 flex-col gap-2 pointer-events-none"
         aria-live="polite"
       >
         {toasts.map((t) => (

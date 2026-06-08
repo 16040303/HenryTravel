@@ -6,6 +6,7 @@ import { useToast } from '../Toast';
 interface BookingCalendarProps {
   bookedDates: string[]; // e.g. ["2026-06-25", "2026-06-26"]
   pendingDates: string[]; // e.g. ["2026-06-28"]
+  blockedDates?: string[]; // manually blocked dates
   checkIn: string; // "YYYY-MM-DD"
   checkOut: string; // "YYYY-MM-DD"
   onDateChange: (checkIn: string, checkOut: string) => void;
@@ -14,6 +15,7 @@ interface BookingCalendarProps {
 export default function BookingCalendar({
   bookedDates = [],
   pendingDates = [],
+  blockedDates = [],
   checkIn,
   checkOut,
   onDateChange
@@ -90,6 +92,10 @@ export default function BookingCalendar({
     return pendingDates.includes(dateStr);
   };
 
+  const isBlocked = (dateStr: string): boolean => {
+    return blockedDates.includes(dateStr);
+  };
+
   const isSelectedCheckIn = (dateStr: string): boolean => {
     return checkIn === dateStr;
   };
@@ -108,19 +114,13 @@ export default function BookingCalendar({
 
     // 1. Prevent selecting past dates
     if (isPastDate(clickedDateStr)) {
-      showToast('warning', language === 'vi' 
-        ? 'Không thể chọn ngày trong quá khứ!' 
-        : (language === 'ko' ? '지난 날짜는 선택할 수 없습니다!' : 'Cannot select a past date!')
-      );
+      showToast('warning', t('calendar.pastError'));
       return;
     }
 
-    // 2. Prevent selecting booked dates
-    if (isBooked(clickedDateStr)) {
-      showToast('error', language === 'vi' 
-        ? 'Ngày này đã có khách đặt!' 
-        : (language === 'ko' ? '해당 날짜는 이미 예약되었습니다!' : 'This date is already booked!')
-      );
+    // 2. Prevent selecting unavailable dates
+    if (isBooked(clickedDateStr) || isBlocked(clickedDateStr)) {
+      showToast('error', t('calendar.unavailableError'));
       return;
     }
 
@@ -140,22 +140,19 @@ export default function BookingCalendar({
         // Clicked date is after Check-In, let's validate range overlap
         let current = new Date(checkIn);
         const end = new Date(clickedDateStr);
-        let hasBookedOverlap = false;
+        let hasUnavailableOverlap = false;
 
-        while (current <= end) {
+        while (current < end) {
           const checkStr = formatDateString(current.getFullYear(), current.getMonth(), current.getDate());
-          if (isBooked(checkStr)) {
-            hasBookedOverlap = true;
+          if (isBooked(checkStr) || isBlocked(checkStr)) {
+            hasUnavailableOverlap = true;
             break;
           }
           current.setDate(current.getDate() + 1);
         }
 
-        if (hasBookedOverlap) {
-          showToast('error', language === 'vi'
-            ? 'Phạm vi ngày đã chọn có chứa ngày đã được đặt trước! Vui lòng chọn khoảng trống khác.'
-            : (language === 'ko' ? '선택하신 날짜 범위 내에 이미 예약된 일정이 포함되어 있습니다! 다른 일정을 선택하세요.' : 'The selected range contains days that are already booked! Please select another empty range.')
-          );
+        if (hasUnavailableOverlap) {
+          showToast('error', t('calendar.rangeUnavailableError'));
           return;
         }
 
@@ -172,10 +169,7 @@ export default function BookingCalendar({
         }
 
         if (hasPendingOverlap) {
-          showToast('warning', language === 'vi'
-            ? 'Khoảng ngày bạn chọn có chứa ngày đang chờ đối soát (Pending Hold). Đơn đặt vẫn có thể được tạo nhưng có nguy cơ bị hủy nếu người giữ trước nộp tiền thành công.'
-            : (language === 'ko' ? '선택하신 범위 내에 임시 확보 대기 중(Pending Hold)인 날짜가 있습니다. 임시 확보는 가능하나, 선점자가 결제를 완료할 경우 취소될 수 있습니다.' : 'The selected range includes days awaiting transfer (Pending Hold). Your hold can be placed but might be released if the prior guest secures payment.')
-          );
+          showToast('warning', t('calendar.pendingWarning'));
         }
 
         onDateChange(checkIn, clickedDateStr);
@@ -207,7 +201,7 @@ export default function BookingCalendar({
             onClick={prevMonth}
             className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer text-neutral-500 disabled:opacity-30 disabled:cursor-not-allowed"
             disabled={year <= new Date().getFullYear() && month <= new Date().getMonth()}
-            aria-label="Previous month"
+            aria-label={t('common.previousMonth')}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -215,7 +209,7 @@ export default function BookingCalendar({
             type="button"
             onClick={nextMonth}
             className="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer text-neutral-500"
-            aria-label="Next month"
+            aria-label={t('common.nextMonth')}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -245,6 +239,7 @@ export default function BookingCalendar({
           const past = isPastDate(dateStr);
           const booked = isBooked(dateStr);
           const pending = isPending(dateStr);
+          const blocked = isBlocked(dateStr);
           const checkInSelected = isSelectedCheckIn(dateStr);
           const checkOutSelected = isSelectedCheckOut(dateStr);
           const inRangeSelected = isSelectedRange(dateStr);
@@ -256,12 +251,14 @@ export default function BookingCalendar({
             dayClass = 'text-neutral-300 cursor-not-allowed opacity-40';
           } else if (booked) {
             dayClass = 'bg-rose-50 border border-rose-100 text-rose-500 line-through rounded-lg cursor-not-allowed';
+          } else if (blocked) {
+            dayClass = 'bg-slate-100 border border-slate-200 text-slate-500 line-through rounded-lg cursor-not-allowed';
           } else if (pending) {
             dayClass = 'bg-amber-50 border border-amber-200 text-amber-600 rounded-lg cursor-pointer hover:bg-amber-100';
           }
 
           // Active range overrides
-          if (!past && !booked) {
+          if (!past && !booked && !blocked) {
             if (checkInSelected) {
               dayClass = 'bg-[#0071c2] text-white font-extrabold rounded-l-lg rounded-r-none ring-2 ring-offset-1 ring-[#0071c2] scale-[1.05] z-10';
             } else if (checkOutSelected) {
@@ -275,13 +272,17 @@ export default function BookingCalendar({
             <button
               key={`day-${day}`}
               type="button"
-              disabled={past || booked}
+              disabled={past || booked || blocked}
               onClick={() => handleDayClick(day)}
               className={`py-2 transition-all flex items-center justify-center cursor-pointer ${dayClass}`}
               title={
                 booked 
-                  ? t('status.CANCELLED') 
-                  : (pending ? t('status.PENDING') : (checkInSelected ? t('home.checkIn') : ''))
+                  ? t('calendar.booked') 
+                  : blocked
+                    ? t('calendar.blocked')
+                    : past
+                      ? t('calendar.past')
+                      : (pending ? t('calendar.pending') : (checkInSelected ? t('home.checkIn') : t('calendar.available')))
               }
             >
               {day}
@@ -296,19 +297,19 @@ export default function BookingCalendar({
       <div className="border-t border-neutral-100 pt-3 mt-1 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 bg-white border border-neutral-200 rounded" />
-          <span>{language === 'vi' ? 'Trống' : (language === 'ko' ? '공실' : 'Available')}</span>
+          <span>{t('calendar.available')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 bg-[#0071c2] rounded" />
-          <span>{language === 'vi' ? 'Đang Chọn' : (language === 'ko' ? '선택 일자' : 'Selected')}</span>
+          <span>{t('calendar.selected')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 bg-amber-50 border border-amber-200 rounded" />
-          <span>{language === 'vi' ? 'Chờ Duyệt' : (language === 'ko' ? '대기 중' : 'Pending')}</span>
+          <span>{t('calendar.pending')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 bg-rose-50 border border-rose-100 rounded line-through" />
-          <span>{language === 'vi' ? 'Đã Đặt' : (language === 'ko' ? '예약 완료' : 'Booked')}</span>
+          <span>{t('calendar.booked')}</span>
         </div>
       </div>
     </div>

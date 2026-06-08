@@ -51,7 +51,7 @@ router.post('/', (req, res, next) => {
       const uploadedFiles = await Promise.all(
         files.map(async (file) => {
           try {
-            return await uploadBufferToCloudinary(file.buffer, { folder: 'henrytravel/villas' });
+            return await uploadBufferToCloudinary(file.buffer, { folder: 'henrytravel/villas/images', resourceType: 'image' });
           } catch (uploadError) {
             if (uploadError instanceof AppError) throw uploadError;
             throw new AppError(500, 'UPLOAD_FAILED', 'Không thể tải ảnh lên. Vui lòng thử lại.');

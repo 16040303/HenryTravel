@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Building2, CalendarCheck, Landmark, AlertCircle, Sparkles, 
   ArrowUpRight, PlusCircle, CalendarDays, ClipboardList, 
-  MessageSquare, Sliders, LogOut, ShieldCheck, User 
+  MessageSquare, Sliders, LogOut, ShieldCheck, User, Info
 } from 'lucide-react';
 import { AdminStats, AdminUser, EntityId, VillaDetail, Booking, Feedback } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -17,7 +17,7 @@ interface AdminLayoutProps {
   villas: VillaDetail[];
   bookings: Booking[];
   feedbacks: Feedback[];
-  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates'>) => Promise<void>;
+  onAddVilla: (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'blockedDates'>) => Promise<void>;
   onDeleteVilla: (id: EntityId, name: string) => void;
   onUpdateVilla: (v: VillaDetail) => void | Promise<void>;
   onDuplicateVilla: (id: EntityId) => void | Promise<void>;
@@ -33,8 +33,8 @@ interface AdminLayoutProps {
   adminUser?: AdminUser;
   mutationLoading?: boolean;
   isRefreshing?: boolean;
-  activeTab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings';
-  onTabChange: (tab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings') => void;
+  activeTab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'info' | 'settings';
+  onTabChange: (tab: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'info' | 'settings') => void;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -62,7 +62,7 @@ export default function AdminLayout({
   onTabChange,
   scrollRef
 }: AdminLayoutProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
 
   // Trigger add villa modal directly from dashboard quick action
   const [directOpenAddVilla, setDirectOpenAddVilla] = useState(false);
@@ -81,38 +81,39 @@ export default function AdminLayout({
   };
 
   interface MenuItem {
-    readonly id: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'settings';
+    readonly id: 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'info' | 'settings';
     readonly label: string;
     readonly icon: React.ReactNode;
     readonly badge?: number;
   }
 
   const menuItems: MenuItem[] = [
-    { id: 'dashboard', label: language === 'vi' ? 'Tổng quan' : 'Dashboard', icon: <Landmark className="w-4.5 h-4.5" /> },
-    { id: 'villas', label: language === 'vi' ? 'Quản lý Villa' : 'Villas Manager', icon: <Building2 className="w-4.5 h-4.5" /> },
-    { id: 'bookings', label: language === 'vi' ? 'Quản lý Đơn' : 'Bookings', icon: <ClipboardList className="w-4.5 h-4.5" />, badge: pendingBookingsCount > 0 ? pendingBookingsCount : undefined },
-    { id: 'feedback', label: language === 'vi' ? 'Đánh giá' : 'Feedbacks', icon: <MessageSquare className="w-4.5 h-4.5" /> },
-    { id: 'availability', label: language === 'vi' ? 'Lịch trống' : 'Availability', icon: <CalendarDays className="w-4.5 h-4.5" /> },
-    { id: 'settings', label: language === 'vi' ? 'Cấu hình' : 'Settings', icon: <Sliders className="w-4.5 h-4.5" /> }
+    { id: 'dashboard', label: t('admin.nav.dashboard'), icon: <Landmark className="w-4.5 h-4.5" /> },
+    { id: 'villas', label: t('admin.nav.villas'), icon: <Building2 className="w-4.5 h-4.5" /> },
+    { id: 'bookings', label: t('admin.nav.bookings'), icon: <ClipboardList className="w-4.5 h-4.5" />, badge: pendingBookingsCount > 0 ? pendingBookingsCount : undefined },
+    { id: 'feedback', label: t('admin.nav.feedback'), icon: <MessageSquare className="w-4.5 h-4.5" /> },
+    { id: 'availability', label: t('admin.nav.availability'), icon: <CalendarDays className="w-4.5 h-4.5" /> },
+    { id: 'info', label: t('admin.nav.info'), icon: <Info className="w-4.5 h-4.5" /> },
+    { id: 'settings', label: t('admin.nav.settings'), icon: <Sliders className="w-4.5 h-4.5" /> }
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col lg:flex-row gap-6 px-4 md:px-8 py-5 max-w-[1280px] mx-auto w-full overflow-hidden animate-fadeIn">
+    <div className="flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-4 overflow-hidden px-4 py-4 mx-auto md:px-8 lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
       {/* 1. Desktop Left Sidebar / Mobile Header Navigation Selector Tabs */}
-      <aside className="lg:w-72 shrink-0 bg-white border border-neutral-100 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col gap-5 self-start lg:self-stretch w-full max-h-full overflow-hidden">
+      <aside className="lg:w-72 shrink-0 bg-white border border-neutral-100 rounded-3xl p-3 sm:p-5 shadow-sm flex flex-col gap-4 lg:gap-5 self-start lg:self-stretch w-full max-h-full overflow-hidden">
         {/* Admin profile snippet desktop */}
         <div className="hidden lg:flex items-center gap-3 bg-neutral-50 p-3 rounded-2xl border border-neutral-100">
           <div className="w-10 h-10 rounded-full bg-[#0071c2]/10 text-[#0071c2] flex items-center justify-center font-bold">
             AD
           </div>
           <div className="flex flex-col leading-tight min-w-0">
-            <span className="text-xs font-black text-neutral-800 truncate">{adminUser?.name || 'Quản trị viên'}</span>
+            <span className="text-xs font-black text-neutral-800 truncate">{adminUser?.name || t('admin.profileFallback')}</span>
             <span className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">{adminUser?.email || 'admin@villa.com'}</span>
           </div>
         </div>
 
         {/* Sidebar Nav anchors */}
-        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto overscroll-contain p-1 lg:p-0 bg-neutral-50 lg:bg-transparent rounded-2xl border lg:border-0 border-neutral-100 gap-1 scrollbar-safe shrink-0 lg:min-h-0 w-full">
+        <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto overscroll-contain p-1 lg:p-0 bg-neutral-50 lg:bg-transparent rounded-2xl border lg:border-0 border-neutral-100 gap-1 scrollbar-safe shrink-0 lg:min-h-0 w-full pb-1">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -124,7 +125,7 @@ export default function AdminLayout({
                     setDirectOpenAddVilla(false);
                   }
                 }}
-                className={`flex items-center justify-center lg:justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap lg:w-full select-none ${
+                className={`flex min-h-11 items-center justify-center lg:justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap lg:w-full select-none ${
                   isActive
                     ? 'bg-[#0071c2] text-white shadow-sm shadow-[#0071c2]/20'
                     : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
@@ -151,7 +152,7 @@ export default function AdminLayout({
             <div className="h-full w-1/3 animate-pulse rounded-full bg-[#0071c2]" />
           </div>
         )}
-        <div ref={scrollRef} className="app-scroll scrollbar-safe h-full min-h-0 w-full pr-0 lg:pr-1 pb-8 pt-1">
+        <div ref={scrollRef} className="app-scroll scrollbar-safe h-full min-h-0 w-full pr-0 lg:pr-1 pb-8 pt-1 overflow-x-hidden">
         {activeTab === 'dashboard' && (
           <AdminDashboard
             villas={villas}
@@ -206,6 +207,13 @@ export default function AdminLayout({
           <AdminAvailabilityManager
             villas={villas}
             onUpdateVillaAvailability={onUpdateVillaAvailability}
+          />
+        )}
+
+        {activeTab === 'info' && (
+          <AdminSettings
+            onLogout={onLogout}
+            section="info"
           />
         )}
 

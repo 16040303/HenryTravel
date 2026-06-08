@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { 
   Building2, CalendarCheck, Landmark, AlertCircle,
   ArrowUpRight, ArrowDownRight, PlusCircle, CalendarDays,
   ClipboardList, MessageSquare, Star, ArrowRight, User
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getAdminSettings, type AdminSettingsResponse } from '../../lib/api';
 import { AdminStats, VillaDetail, Booking, Feedback } from '../../types';
 
 interface AdminDashboardProps {
@@ -24,7 +25,23 @@ export default function AdminDashboard({
   onOpenAddVilla,
   stats
 }: AdminDashboardProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
+  const [dashboardSettings, setDashboardSettings] = useState<AdminSettingsResponse | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getAdminSettings()
+      .then((settings) => {
+        if (mounted) setDashboardSettings(settings);
+      })
+      .catch(() => {
+        if (mounted) setDashboardSettings(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const villasCount = stats?.totalVillas ?? villas.length;
   const bookingsCount = stats ? stats.pendingBookings + stats.confirmedBookings + stats.cancelledBookings + stats.completedBookings : bookings.length;
@@ -35,29 +52,45 @@ export default function AdminDashboard({
     b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date()
   ).length;
 
-  // 1. Booking Analytics (Mock Months distribution)
-  const monthlyData = [
-    { name: 'Jan', count: 12 },
-    { name: 'Feb', count: 20 },
-    { name: 'Mar', count: 15 },
-    { name: 'Apr', count: 32 },
-    { name: 'May', count: 26 },
-    { name: 'Jun', count: 38 }
-  ];
+  // Booking analytics from current API data, grouped by the last 6 months.
+  const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+  const currentMonthStart = new Date();
+  currentMonthStart.setDate(1);
+  currentMonthStart.setHours(0, 0, 0, 0);
+  const monthlyData = Array.from({ length: 6 }, (_, index) => {
+    const monthDate = new Date(currentMonthStart);
+    monthDate.setMonth(currentMonthStart.getMonth() - (5 - index));
+    const month = monthDate.getMonth();
+    const year = monthDate.getFullYear();
+    return {
+      name: monthFormatter.format(monthDate),
+      count: bookings.filter((booking) => {
+        const createdAt = new Date(booking.createdAt);
+        return createdAt.getMonth() === month && createdAt.getFullYear() === year;
+      }).length,
+    };
+  });
 
-  const maxCount = Math.max(...monthlyData.map(d => d.count));
+  const maxCount = Math.max(1, ...monthlyData.map(d => d.count));
   const svgHeight = 160;
   const barWidth = 32;
   const gap = 20;
 
-  // 2. Revenue Analytics comparisons
-  const baseConfirmedRevenue = bookings
-    .filter(b => b.status === 'CONFIRMED')
+  const now = new Date();
+  const thisMonthRevenue = stats?.estimatedRevenue ?? bookings
+    .filter((booking) => {
+      const createdAt = new Date(booking.createdAt);
+      return booking.status === 'CONFIRMED' && createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+    })
     .reduce((sum, curr) => sum + curr.totalPrice, 0);
-
-  const thisMonthRevenue = stats?.estimatedRevenue ?? (baseConfirmedRevenue + 78000000);
-  const lastMonthRevenue = 68000000;
-  const revenuePercentChange = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthRevenue = bookings
+    .filter((booking) => {
+      const createdAt = new Date(booking.createdAt);
+      return booking.status === 'CONFIRMED' && createdAt.getMonth() === previousMonthDate.getMonth() && createdAt.getFullYear() === previousMonthDate.getFullYear();
+    })
+    .reduce((sum, curr) => sum + curr.totalPrice, 0);
+  const revenuePercentChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
   const isRevenueUp = revenuePercentChange >= 0;
 
   const topVillas = (stats?.topVillas && stats.topVillas.length > 0
@@ -66,7 +99,7 @@ export default function AdminDashboard({
         return {
           id: villa.id,
           name: villa.name,
-          image: matchedVilla?.image || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1200&auto=format&fit=crop',
+          image: matchedVilla?.image || '',
           bookingCount: villa.bookingCount,
           occupancy: Math.max(35, Math.min(95, villa.bookingCount * 15)),
         };
@@ -97,13 +130,11 @@ export default function AdminDashboard({
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
   const getHoldTimeDisplay = () => {
-    const mode = localStorage.getItem('bookingHoldTimeMode') || 'preset';
-    if (mode === 'custom') {
-      const mins = localStorage.getItem('bookingHoldTimeMinutes') || '45';
-      return `Tùy chỉnh: ${mins} phút`;
+    if (!dashboardSettings) return t('admin.settings.minutes', { minutes: 15 });
+    if (dashboardSettings.bookingHoldTimeMode === 'custom') {
+      return `${t('admin.settings.custom')}: ${t('admin.settings.minutes', { minutes: dashboardSettings.customHoldMinutes })}`;
     }
-    const mins = localStorage.getItem('admin_hold_minutes') || '15';
-    return `${mins} phút`;
+    return t('admin.settings.minutes', { minutes: dashboardSettings.holdMinutes });
   };
 
   return (
@@ -113,15 +144,13 @@ export default function AdminDashboard({
 
         <div className="relative z-10 flex flex-col gap-2 max-w-xl">
           <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase self-start">
-            {language === 'vi' ? 'Quản trị viên' : 'Manager'}
+            {t('admin.dashboard.role')}
           </div>
           <h2 className="text-xl sm:text-2xl font-display font-black leading-tight">
-            {language === 'vi' ? 'Chào Anh Yêu, hôm nay mình kiểm tra nhanh tình hình đặt phòng nhé.' : 'Good morning. Here is today\'s booking overview.'}
+            {t('admin.dashboard.greeting')}
           </h2>
           <p className="text-xs text-[#a1c9ff] font-semibold leading-relaxed font-sans">
-            {language === 'vi' 
-              ? `Thời gian giữ chỗ hiện tại: ${getHoldTimeDisplay()}. Dưới đây là thống kê đặt phòng, doanh thu và phản hồi mới.` 
-              : `Current hold time: ${getHoldTimeDisplay()}. Below are booking, revenue, and feedback summaries.`}
+            {t('admin.dashboard.holdSummary', { holdTime: getHoldTimeDisplay() })}
           </p>
         </div>
       </div>
@@ -132,9 +161,9 @@ export default function AdminDashboard({
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-neutral-100 flex items-center justify-between hover:shadow-md transition-shadow">
           <div className="flex flex-col">
             <span className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">
-              {language === 'vi' ? 'Tổng số biệt thự' : 'Total Villas'}
+              {t('admin.dashboard.totalVillas')}
             </span>
-            <span className="text-2xl font-black text-neutral-800 font-display mt-1.5">{villasCount} {language === 'vi' ? 'căn' : 'units'}</span>
+            <span className="text-2xl font-black text-neutral-800 font-display mt-1.5">{villasCount} {t('admin.dashboard.units')}</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#0071c2] flex items-center justify-center shrink-0">
             <Building2 className="w-5 h-5" />
@@ -145,9 +174,9 @@ export default function AdminDashboard({
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-neutral-100 flex items-center justify-between hover:shadow-md transition-shadow">
           <div className="flex flex-col">
             <span className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">
-              {language === 'vi' ? 'Tổng đơn đặt' : 'Total Bookings'}
+              {t('admin.dashboard.totalBookings')}
             </span>
-            <span className="text-2xl font-black text-neutral-800 font-display mt-1.5">{bookingsCount} {language === 'vi' ? 'lượt' : 'bookings'}</span>
+            <span className="text-2xl font-black text-neutral-800 font-display mt-1.5">{bookingsCount} {t('admin.dashboard.bookingUnit')}</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-orange-50 text-[#fe6a34] flex items-center justify-center shrink-0">
             <CalendarCheck className="w-5 h-5" />
@@ -158,9 +187,9 @@ export default function AdminDashboard({
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-neutral-100 flex items-center justify-between hover:shadow-md transition-shadow border-l-4 border-l-emerald-500">
           <div className="flex flex-col">
             <span className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">
-              {language === 'vi' ? 'Doanh thu tháng này' : 'Monthly Estimated'}
+              {t('admin.dashboard.monthlyRevenue')}
             </span>
-            <span className="text-xl font-black text-emerald-600 font-display mt-1.5">{thisMonthRevenue.toLocaleString('vi-VN')}₫</span>
+            <span className="text-xl font-black text-emerald-600 font-display mt-1.5">{thisMonthRevenue.toLocaleString('vi-VN')} VND</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <Landmark className="w-5 h-5" />
@@ -171,7 +200,7 @@ export default function AdminDashboard({
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-neutral-100 flex items-center justify-between hover:shadow-md transition-shadow border-l-4 border-l-purple-500">
           <div className="flex flex-col">
             <span className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">
-              {language === 'vi' ? 'Tỉ lệ lấp phòng trung bình' : 'Avg Occupancy'}
+              {t('admin.dashboard.avgOccupancy')}
             </span>
             <span className="text-2xl font-black text-purple-600 font-display mt-1.5">
               {villasCount > 0 ? Math.round(topVillas.reduce((sum, v) => sum + v.occupancy, 0) / topVillas.length) : 58}%
@@ -189,10 +218,10 @@ export default function AdminDashboard({
         <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-neutral-100 shadow-sm flex flex-col gap-4">
           <div>
             <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-              {language === 'vi' ? 'Xu hướng đặt phòng theo tháng' : 'Monthly Booking Analytics'}
+              {t('admin.dashboard.monthlyAnalytics')}
             </h3>
             <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-              {language === 'vi' ? 'Biểu đồ lượng đặt phòng trong 6 tháng qua' : 'Booking counts breakdown for the past 6 months'}
+              {t('admin.dashboard.monthlyAnalyticsDesc')}
             </p>
           </div>
 
@@ -278,17 +307,17 @@ export default function AdminDashboard({
         <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-neutral-100 shadow-sm flex flex-col justify-between gap-6">
           <div className="flex flex-col gap-1">
             <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-              {language === 'vi' ? 'Báo cáo doanh số' : 'Revenue Analytics'}
+              {t('admin.dashboard.revenueAnalytics')}
             </h3>
             <span className="text-[10px] text-neutral-400 font-semibold">
-              {language === 'vi' ? 'So sánh với tháng trước' : 'Calculated compared with previous month'}
+              {t('admin.dashboard.revenueDesc')}
             </span>
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-neutral-400 text-[10px] uppercase font-bold">{language === 'vi' ? 'Tháng này' : 'This Month'}</span>
+            <span className="text-neutral-400 text-[10px] uppercase font-bold">{t('admin.dashboard.thisMonth')}</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-neutral-800 font-display">{thisMonthRevenue.toLocaleString('vi-VN')}₫</span>
+              <span className="text-3xl font-black text-neutral-800 font-display">{thisMonthRevenue.toLocaleString('vi-VN')} VND</span>
               
               <span className={`px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-0.5 border ${
                 isRevenueUp ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
@@ -301,13 +330,13 @@ export default function AdminDashboard({
 
           <div className="border-t border-neutral-150 pt-4 flex flex-col gap-2.5 text-xs">
             <div className="flex justify-between font-semibold">
-              <span className="text-neutral-400">{language === 'vi' ? 'Tháng trước:' : 'Last Month:'}</span>
-              <span className="text-neutral-700 font-bold font-mono">{lastMonthRevenue.toLocaleString('vi-VN')}₫</span>
+              <span className="text-neutral-400">{t('admin.dashboard.lastMonth')}</span>
+              <span className="text-neutral-700 font-bold font-mono">{lastMonthRevenue.toLocaleString('vi-VN')} VND</span>
             </div>
             <div className="flex justify-between font-semibold">
-              <span className="text-neutral-400">{language === 'vi' ? 'Chênh lệch doanh số:' : 'Revenues Difference:'}</span>
+              <span className="text-neutral-400">{t('admin.dashboard.revenueDiff')}</span>
               <span className={`font-black font-mono ${isRevenueUp ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {isRevenueUp ? '+' : ''}{(thisMonthRevenue - lastMonthRevenue).toLocaleString('vi-VN')}₫
+                {isRevenueUp ? '+' : ''}{(thisMonthRevenue - lastMonthRevenue).toLocaleString('vi-VN')} VND
               </span>
             </div>
           </div>
@@ -315,9 +344,7 @@ export default function AdminDashboard({
           <div className="bg-indigo-50/50 border border-indigo-100 p-3.5 rounded-2xl text-[10px] leading-relaxed text-indigo-950 font-bold flex gap-2">
             <span className="text-sm">📈</span>
             <p>
-              {language === 'vi' 
-                ? 'Doanh thu được tính từ các đơn đã xác nhận trong hệ thống.'
-                : 'Revenue is calculated from confirmed bookings in the system.'}
+              {t('admin.dashboard.revenueNote')}
             </p>
           </div>
         </div>
@@ -332,8 +359,8 @@ export default function AdminDashboard({
           </div>
           <div className="flex-grow flex justify-between items-center leading-none">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{language === 'vi' ? 'Chờ duyệt' : 'Pending Holds'}</span>
-              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Đợi banking cọc' : 'Awaiting cọc'}</span>
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{t('admin.dashboard.pending')}</span>
+              <span className="text-[10px] text-neutral-400 font-semibold">{t('admin.dashboard.pendingDesc')}</span>
             </div>
             <span className="text-lg font-black text-amber-600 font-mono">{pendingCount}</span>
           </div>
@@ -346,8 +373,8 @@ export default function AdminDashboard({
           </div>
           <div className="flex-grow flex justify-between items-center leading-none">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{language === 'vi' ? 'Xác nhận' : 'Confirmed'}</span>
-              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Đã xác nhận' : 'Confirmed stays'}</span>
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{t('admin.dashboard.confirmed')}</span>
+              <span className="text-[10px] text-neutral-400 font-semibold">{t('admin.dashboard.confirmedDesc')}</span>
             </div>
             <span className="text-lg font-black text-emerald-600 font-mono">{confirmedCount}</span>
           </div>
@@ -360,8 +387,8 @@ export default function AdminDashboard({
           </div>
           <div className="flex-grow flex justify-between items-center leading-none">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{language === 'vi' ? 'Hoàn tất' : 'Completed'}</span>
-              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Khách đã checkout' : 'Checked out'}</span>
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{t('admin.dashboard.completed')}</span>
+              <span className="text-[10px] text-neutral-400 font-semibold">{t('admin.dashboard.completedDesc')}</span>
             </div>
             <span className="text-lg font-black text-[#0071c2] font-mono">{completedCount || 3}</span>
           </div>
@@ -374,8 +401,8 @@ export default function AdminDashboard({
           </div>
           <div className="flex-grow flex justify-between items-center leading-none">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{language === 'vi' ? 'Đã hủy' : 'Cancelled'}</span>
-              <span className="text-[10px] text-neutral-400 font-semibold">{language === 'vi' ? 'Đơn quá hạn 15p' : 'Hold timeouts'}</span>
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{t('admin.dashboard.cancelled')}</span>
+              <span className="text-[10px] text-neutral-400 font-semibold">{t('admin.dashboard.cancelledDesc')}</span>
             </div>
             <span className="text-lg font-black text-neutral-500 font-mono">{cancelledCount}</span>
           </div>
@@ -389,16 +416,16 @@ export default function AdminDashboard({
         <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-neutral-100 shadow-sm flex flex-col gap-5">
           <div>
             <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-              {language === 'vi' ? 'Top 5 biệt thự yêu thích nhất' : 'Popular Lodging (Top 5)'}
+              {t('admin.dashboard.topVillas')}
             </h3>
             <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-              {language === 'vi' ? 'Xếp hạng biệt thự được đặt nhiều nhất' : 'Ranked according to total completed bookings counts'}
+              {t('admin.dashboard.topVillasDesc')}
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex min-h-[220px] flex-col gap-4">
             {topVillas.length === 0 ? (
-              <span className="text-xs text-neutral-400 italic text-center p-4">Chưa có thông tin thống kê</span>
+              <span className="text-xs text-neutral-400 italic text-center p-4">{t('admin.dashboard.noStats')}</span>
             ) : (
               topVillas.map((v, index) => (
                 <div key={v.id} className="flex gap-3 items-center">
@@ -413,7 +440,7 @@ export default function AdminDashboard({
                   <div className="min-w-0 flex-1 flex flex-col gap-1 text-xs">
                     <div className="flex justify-between font-bold leading-none gap-2">
                       <h5 className="text-neutral-800 font-black truncate">{v.name}</h5>
-                      <span className="text-neutral-400 shrink-0 font-mono text-[10px]">{v.bookingCount} đơn</span>
+                      <span className="text-neutral-400 shrink-0 font-mono text-[10px]">{v.bookingCount} {t('admin.dashboard.orders')}</span>
                     </div>
 
                     {/* Progress Bar indicator */}
@@ -437,19 +464,19 @@ export default function AdminDashboard({
         <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-neutral-100 shadow-sm flex flex-col gap-5">
           <div>
             <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-              {language === 'vi' ? 'Nhận xét gần đây' : 'Recent Guest Reviews'}
+              {t('admin.dashboard.recentReviews')}
             </h3>
             <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-              {language === 'vi' ? 'Các đánh giá mới được gửi lên hệ thống' : 'Latest guest experiences submitted on site'}
+              {t('admin.dashboard.recentReviewsDesc')}
             </p>
           </div>
 
-          <div className="flex flex-col gap-3.5">
+          <div className="flex min-h-[220px] flex-col gap-3.5">
             {recentFeedbacks.length === 0 ? (
-              <span className="text-xs text-neutral-400 italic text-center p-4">Chưa có đánh giá nào từ khách hàng</span>
+              <span className="text-xs text-neutral-400 italic text-center p-4">{t('admin.dashboard.noReviews')}</span>
             ) : (
               recentFeedbacks.map((f) => {
-                const villaName = villas.find(v => v.id === f.villaId)?.name || 'Accommodation';
+                const villaName = villas.find(v => v.id === f.villaId)?.name || t('admin.dashboard.propertyFallback');
                 return (
                   <div key={f.id} className="flex flex-col gap-1 border-b border-neutral-50 last:border-0 pb-3 last:pb-0 text-xs">
                     <div className="flex justify-between items-center gap-2">
@@ -489,10 +516,10 @@ export default function AdminDashboard({
         <div className="flex justify-between items-center gap-4">
           <div>
             <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-              {language === 'vi' ? 'Tiến độ đặt phòng gần đây' : 'Recent Bookings Log'}
+              {t('admin.dashboard.recentBookings')}
             </h3>
             <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-              {language === 'vi' ? 'Bản tổng hợp 5 đơn lưu trú vừa khởi tạo' : 'Summary of the 5 latest reservations submitted'}
+              {t('admin.dashboard.recentBookingsDesc')}
             </p>
           </div>
           
@@ -500,26 +527,26 @@ export default function AdminDashboard({
             onClick={() => onNavigateToTab('bookings')}
             className="text-[#0071c2] hover:text-[#005899] text-xs font-black flex items-center gap-0.5 cursor-pointer group"
           >
-            <span>{language === 'vi' ? 'Xem tất cả' : 'View all queue'}</span>
+            <span>{t('admin.dashboard.viewAll')}</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
-        <div className="overflow-x-auto border border-neutral-100 rounded-2xl mt-1">
+        <div className="mt-1 min-h-[220px] overflow-x-auto rounded-2xl border border-neutral-100">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-neutral-100 font-black text-neutral-400 uppercase tracking-widest text-[8px] bg-neutral-50/50">
-                <th className="p-3.5">Khách hàng</th>
-                <th className="p-3.5">Mã đơn</th>
-                <th className="p-3.5">Biệt thự</th>
-                <th className="p-3.5">Khoảng ngày</th>
-                <th className="p-3.5 text-center">Trạng thái</th>
+                <th className="p-3.5">{t('admin.dashboard.customer')}</th>
+                <th className="p-3.5">{t('admin.dashboard.code')}</th>
+                <th className="p-3.5">{t('admin.dashboard.villa')}</th>
+                <th className="p-3.5">{t('admin.dashboard.dateRange')}</th>
+                <th className="p-3.5 text-center">{t('admin.dashboard.status')}</th>
               </tr>
             </thead>
             <tbody className="font-semibold text-neutral-700">
               {recentBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center text-neutral-400 italic">Chưa có lịch sử booking</td>
+                  <td colSpan={5} className="p-6 text-center text-neutral-400 italic">{t('admin.dashboard.noBookings')}</td>
                 </tr>
               ) : (
                 recentBookings.map(b => {
@@ -538,7 +565,7 @@ export default function AdminDashboard({
                       </td>
                       <td className="p-3.5 font-mono text-[#005899] font-bold">{b.code}</td>
                       <td className="p-3.5 font-bold text-neutral-800 max-w-[150px] truncate">{b.villaName}</td>
-                      <td className="p-3.5 font-mono text-neutral-500 font-bold">{b.checkIn} đến {b.checkOut}</td>
+                      <td className="p-3.5 font-mono text-neutral-500 font-bold">{b.checkIn} {t('admin.dashboard.to')} {b.checkOut}</td>
                       <td className="p-3.5 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${statusColor}`}>
                           {b.status}
@@ -557,10 +584,10 @@ export default function AdminDashboard({
       <div className="bg-white p-6 rounded-3xl border border-neutral-100 shadow-sm flex flex-col gap-4">
         <div>
           <h3 className="text-xs font-black uppercase text-neutral-400 tracking-wider">
-            {language === 'vi' ? 'Tiện ích lối tắt nhanh' : 'Operational Quick Actions'}
+            {t('admin.dashboard.quickActions')}
           </h3>
           <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-            {language === 'vi' ? 'Chuyển hướng nhanh đến các khu vực điều phối nghiệp vụ' : 'Navigate straight to operational panels in one click'}
+            {t('admin.dashboard.quickActionsDesc')}
           </p>
         </div>
 
@@ -574,8 +601,8 @@ export default function AdminDashboard({
               <PlusCircle className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-xs font-bold text-neutral-800 group-hover:text-[#005899] transition-colors">{language === 'vi' ? 'Thêm Villa mới' : 'Add Villa'}</span>
-              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Tạo mới cơ sở' : 'Create property'}</span>
+              <span className="text-xs font-bold text-neutral-800 group-hover:text-[#005899] transition-colors">{t('admin.dashboard.addVilla')}</span>
+              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{t('admin.dashboard.createProperty')}</span>
             </div>
           </button>
 
@@ -588,8 +615,8 @@ export default function AdminDashboard({
               <ClipboardList className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-xs font-bold text-neutral-800 group-hover:text-amber-800 transition-colors">{language === 'vi' ? 'Duyệt Booking' : 'Pending Bookings'}</span>
-              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Chờ xác nhận' : 'Awaiting review'}</span>
+              <span className="text-xs font-bold text-neutral-800 group-hover:text-amber-800 transition-colors">{t('admin.dashboard.reviewBooking')}</span>
+              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{t('admin.dashboard.awaitingReview')}</span>
             </div>
           </button>
 
@@ -602,8 +629,8 @@ export default function AdminDashboard({
               <CalendarDays className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-xs font-bold text-neutral-800 group-hover:text-purple-800 transition-colors">{language === 'vi' ? 'Lịch trống' : 'Availability Calendar'}</span>
-              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Đóng / khóa phòng' : 'Lock dates blocks'}</span>
+              <span className="text-xs font-bold text-neutral-800 group-hover:text-purple-800 transition-colors">{t('admin.dashboard.availability')}</span>
+              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{t('admin.dashboard.lockDates')}</span>
             </div>
           </button>
 
@@ -616,8 +643,8 @@ export default function AdminDashboard({
               <MessageSquare className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-xs font-bold text-neutral-800 group-hover:text-emerald-800 transition-colors">{language === 'vi' ? 'Duyệt phản hồi' : 'Guest Feedbacks'}</span>
-              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{language === 'vi' ? 'Ẩn / hiện nhận xét' : 'Toggle reviews active'}</span>
+              <span className="text-xs font-bold text-neutral-800 group-hover:text-emerald-800 transition-colors">{t('admin.dashboard.reviewFeedback')}</span>
+              <span className="text-[8px] text-neutral-400 font-semibold mt-1">{t('admin.dashboard.toggleReviews')}</span>
             </div>
           </button>
         </div>
@@ -625,3 +652,4 @@ export default function AdminDashboard({
     </div>
   );
 }
+

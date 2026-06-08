@@ -88,6 +88,57 @@ router.post('/refresh', async (req, res, next) => {
         next(error);
     }
 });
+router.put('/change-password', auth_1.adminAuthMiddleware, async (req, res, next) => {
+    try {
+        const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+        const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
+        const confirmPassword = typeof req.body.confirmPassword === 'string' ? req.body.confirmPassword : '';
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Vui lòng nhập đầy đủ thông tin mật khẩu.');
+        }
+        if (newPassword.length < 8) {
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Mật khẩu mới phải có ít nhất 8 ký tự.');
+        }
+        if (newPassword !== confirmPassword) {
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Mật khẩu xác nhận không khớp.');
+        }
+        const user = await prisma_1.prisma.user.findUnique({ where: { id: req.user?.id || '' } });
+        if (!user || user.role !== 'admin' || !user.password) {
+            throw new errors_1.AppError(401, 'UNAUTHORIZED', 'Phiên đăng nhập không hợp lệ.');
+        }
+        const isCurrentPasswordValid = await bcryptjs_1.default.compare(currentPassword, user.password);
+        if (!isCurrentPasswordValid) {
+            throw new errors_1.AppError(400, 'INVALID_CURRENT_PASSWORD', 'Mật khẩu hiện tại không đúng.');
+        }
+        const isSamePassword = await bcryptjs_1.default.compare(newPassword, user.password);
+        if (isSamePassword) {
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Mật khẩu mới không được trùng mật khẩu hiện tại.');
+        }
+        const passwordHash = await bcryptjs_1.default.hash(newPassword, 12);
+        await prisma_1.prisma.user.update({
+            where: { id: user.id },
+            data: { password: passwordHash },
+        });
+        const rawToken = typeof req.cookies?.[ADMIN_REFRESH_COOKIE] === 'string'
+            ? req.cookies[ADMIN_REFRESH_COOKIE]
+            : '';
+        if (rawToken) {
+            await (0, adminRefreshToken_1.revokeAdminRefreshToken)(rawToken);
+        }
+        clearRefreshCookie(res);
+        await (0, adminLog_1.logAdminAction)({
+            adminId: user.id,
+            action: 'ADMIN_CHANGE_PASSWORD',
+            targetType: 'user',
+            targetId: user.id,
+            req,
+        });
+        res.json({ ok: true, message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.post('/logout', async (req, res, next) => {
     try {
         const rawToken = typeof req.cookies?.[ADMIN_REFRESH_COOKIE] === 'string'

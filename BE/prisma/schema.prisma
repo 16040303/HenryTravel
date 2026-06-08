@@ -42,6 +42,11 @@ enum DepositStatus {
   refunded
 }
 
+enum MediaType {
+  image
+  video
+}
+
 model User {
   id          String    @id @default(uuid())
   name        String
@@ -53,9 +58,10 @@ model User {
   guestToken  String?   @map("guest_token")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  bookings           Booking[]
-  adminLogs          AdminLog[]
-  adminRefreshTokens AdminRefreshToken[]
+  bookings            Booking[]
+  adminLogs           AdminLog[]
+  adminRefreshTokens  AdminRefreshToken[]
+  createdBlockedDates VillaBlockedDate[]
 
   @@map("users")
 }
@@ -75,27 +81,85 @@ model AdminRefreshToken {
   @@map("admin_refresh_tokens")
 }
 
+model VillaBlockedDate {
+  id        String   @id @default(uuid())
+  villaId   String   @map("villa_id")
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  reason    String
+  note      String?
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  villa     Villa    @relation(fields: [villaId], references: [id])
+  admin     User     @relation(fields: [createdBy], references: [id])
+
+  @@index([villaId])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([villaId, startDate, endDate])
+  @@map("villa_blocked_dates")
+}
+
+enum AccommodationType {
+  villa
+  hotel_resort
+}
+
 model Villa {
-  id              String      @id @default(uuid())
-  name            String
-  location        String
-  description     String?
-  status          VillaStatus @default(available)
-  price           Decimal     @default(0)
-  priceType       PriceType   @default(fixed) @map("price_type")
-  facilities      Json        @default("[]")
-  images          Json        @default("[]")
-  viewsCount      Int         @default(0) @map("views_count")
-  holdMinutes     Int         @default(15) @map("hold_minutes")
-  depositRequired Boolean     @default(false) @map("deposit_required")
-  depositAmount   Decimal?    @map("deposit_amount")
-  maxGuests       Int         @default(10) @map("max_guests")
-  createdAt       DateTime    @default(now()) @map("created_at")
+  id                String            @id @default(uuid())
+  name              String
+  nameEn            String?           @map("name_en")
+  location          String
+  locationEn        String?           @map("location_en")
+  description       String?
+  descriptionEn     String?           @map("description_en")
+  descriptionKo     String?           @map("description_ko")
+  status            VillaStatus       @default(available)
+  accommodationType AccommodationType @default(villa) @map("accommodation_type")
+  price             Decimal           @default(0)
+  priceMax          Decimal?          @map("price_max")
+  priceType         PriceType         @default(fixed) @map("price_type")
+  facilities        Json              @default("[]")
+  viewsCount        Int               @default(0) @map("views_count")
+  depositRequired   Boolean           @default(false) @map("deposit_required")
+  depositAmount     Decimal?          @map("deposit_amount")
+  maxGuests         Int               @default(10) @map("max_guests")
+  createdAt         DateTime          @default(now()) @map("created_at")
 
   bookings        Booking[]
   feedbacks       Feedback[]
+  blockedDates    VillaBlockedDate[]
+  media           VillaMedia[]
 
+  @@index([accommodationType])
   @@map("villas")
+}
+
+model VillaMedia {
+  id           String    @id @default(uuid())
+  villaId      String    @map("villa_id")
+  type         MediaType
+  url          String
+  secureUrl    String?   @map("secure_url")
+  publicId     String?   @map("public_id")
+  thumbnailUrl String?   @map("thumbnail_url")
+  width        Int?
+  height       Int?
+  duration     Float?
+  format       String?
+  bytes        Int?
+  sortOrder    Int       @default(0) @map("sort_order")
+  isCover      Boolean   @default(false) @map("is_cover")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  villa        Villa     @relation(fields: [villaId], references: [id], onDelete: Cascade)
+
+  @@index([villaId])
+  @@index([villaId, sortOrder])
+  @@index([villaId, isCover])
+  @@map("villa_media")
 }
 
 model Booking {
@@ -110,6 +174,9 @@ model Booking {
   checkIn         DateTime      @map("check_in")
   checkOut        DateTime      @map("check_out")
   guestsCount     Int           @map("guests_count")
+  adultCount      Int           @default(1) @map("adult_count")
+  childrenCount   Int           @default(0) @map("children_count")
+  infantCount     Int           @default(0) @map("infant_count")
   roomsCount      Int           @default(1) @map("rooms_count")
   specialRequest  String?       @map("special_request")
   status          BookingStatus @default(pending_hold)
@@ -211,4 +278,25 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+model CloudinaryCleanupJob {
+  id          String    @id @default(uuid())
+  publicId     String    @map("public_id")
+  resourceType String    @default("image") @map("resource_type")
+  url          String
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  reason      String?
+  villaId     String?   @map("villa_id")
+  error       String?
+  scheduledAt DateTime  @default(now()) @map("scheduled_at")
+  processedAt DateTime? @map("processed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, scheduledAt])
+  @@index([publicId])
+  @@unique([publicId, url, status, resourceType])
+  @@map("cloudinary_cleanup_jobs")
 }

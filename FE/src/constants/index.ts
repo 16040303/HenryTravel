@@ -1,15 +1,13 @@
-export const LOCATIONS = ['Đà Lạt', 'Vũng Tàu', 'Phú Quốc', 'Hội An', 'Nha Trang', 'TP.HCM'];
+export const DEFAULT_LOCATIONS = ['Đà Nẵng', 'Huế', 'Hội An'];
 
-export const FACILITIES = [
-  { id: 'wifi', label: 'WiFi tốc độ cao', icon: 'Wifi' },
-  { id: 'pool', label: 'Hồ bơi vô cực', icon: 'Waves' },
-  { id: 'local_parking', label: 'Bãi đỗ xe', icon: 'ParkingCircle' },
-  { id: 'kitchen', label: 'Bếp đầy đủ', icon: 'Utensils' },
-  { id: 'outdoor_grill', label: 'Khu BBQ', icon: 'Flame' },
-  { id: 'landscape', label: 'View núi', icon: 'Mountain' },
-  { id: 'beach_access', label: 'View biển', icon: 'Compass' },
-  { id: 'pets', label: 'Pet friendly', icon: 'PawPrint' },
-];
+export function normalizeLocationCity(location: string): string {
+  const value = location.trim();
+  const knownCities = [...DEFAULT_LOCATIONS, 'Đà Lạt', 'Vũng Tàu', 'Phú Quốc', 'Nha Trang', 'TP.HCM'];
+  const matchedCity = knownCities.find(city => value.toLowerCase().includes(city.toLowerCase()));
+  return matchedCity || value.split(',').map(part => part.trim()).filter(Boolean).pop() || value;
+}
+
+export { FACILITIES, FILTER_FACILITIES } from '../data/amenities';
 
 export const BOOKING_STATUSES = {
   PENDING: {

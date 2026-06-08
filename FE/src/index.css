@@ -6,10 +6,12 @@
   body,
   #root {
     min-height: 100%;
+    scrollbar-gutter: stable;
   }
 
   html {
     scroll-behavior: smooth;
+    overflow-y: scroll;
   }
 
   *,

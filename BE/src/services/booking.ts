@@ -1,4 +1,4 @@
-import type { Booking, Prisma, Villa } from '@prisma/client';
+import type { Booking, Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/errors';
@@ -20,7 +20,7 @@ export async function generateBookingCode(): Promise<string> {
   return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
 
-export async function checkOverlap(
+export async function checkBookingOverlap(
   villaId: string,
   checkIn: Date,
   checkOut: Date,
@@ -48,9 +48,37 @@ export async function checkOverlap(
   return Boolean(overlap);
 }
 
-export function calculateHoldExpireAt(villa: Pick<Villa, 'holdMinutes'>): Date {
-  const holdMinutes = villa.holdMinutes && villa.holdMinutes > 0 ? villa.holdMinutes : 15;
-  return new Date(Date.now() + holdMinutes * 60 * 1000);
+export async function checkBlockedDateOverlap(
+  villaId: string,
+  checkIn: Date,
+  checkOut: Date,
+  excludeBlockedDateId?: string
+): Promise<boolean> {
+  const overlap = await prisma.villaBlockedDate.findFirst({
+    where: {
+      villaId,
+      ...(excludeBlockedDateId ? { id: { not: excludeBlockedDateId } } : {}),
+      startDate: { lt: checkOut },
+      endDate: { gt: checkIn },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(overlap);
+}
+
+export async function checkOverlap(
+  villaId: string,
+  checkIn: Date,
+  checkOut: Date,
+  excludeBookingId?: string
+): Promise<boolean> {
+  const [bookingOverlap, blockedDateOverlap] = await Promise.all([
+    checkBookingOverlap(villaId, checkIn, checkOut, excludeBookingId),
+    checkBlockedDateOverlap(villaId, checkIn, checkOut),
+  ]);
+
+  return bookingOverlap || blockedDateOverlap;
 }
 
 export interface CreateBookingInput {
@@ -62,6 +90,9 @@ export interface CreateBookingInput {
   checkIn: Date;
   checkOut: Date;
   guestsCount: number;
+  adultCount: number;
+  childrenCount: number;
+  infantCount: number;
   roomsCount: number;
   specialRequest?: string;
   holdExpireAt: Date;
@@ -86,6 +117,9 @@ export async function createBookingWithRetry(
           checkIn: data.checkIn,
           checkOut: data.checkOut,
           guestsCount: data.guestsCount,
+          adultCount: data.adultCount,
+          childrenCount: data.childrenCount,
+          infantCount: data.infantCount,
           roomsCount: data.roomsCount,
           specialRequest: data.specialRequest,
           status: 'pending_hold',

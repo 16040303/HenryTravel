@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Search, ShieldAlert, Phone, Key, HelpCircle, MessageSquare, Star, Info, CalendarClock, CreditCard } from 'lucide-react';
 import { BookingStatus, Booking } from '../types';
 import { checkBooking, submitFeedback, getPublicSettings } from '../lib/api';
@@ -10,7 +10,7 @@ import EmptyState from './common/EmptyState';
 
 export default function LookupView() {
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [bookingCode, setBookingCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searching, setSearching] = useState(false);
@@ -48,10 +48,7 @@ export default function LookupView() {
     const normalizedPhone = phoneNumber.trim();
 
     if (!normalizedCode || !normalizedPhone) {
-      showToast('warning', language === 'vi'
-        ? 'Vui lòng nhập mã booking và số điện thoại.'
-        : (language === 'ko' ? '예약 코드와 전화번호를 입력해 주세요.' : 'Please enter both booking code and phone number.')
-      );
+      showToast('warning', t('look.requiredFields'));
       return;
     }
 
@@ -64,7 +61,7 @@ export default function LookupView() {
       setLookupResult(result);
     } catch (err) {
       console.error(err);
-      showToast('error', language === 'vi' ? 'Không thể tra cứu lúc này. Vui lòng thử lại.' : 'Lookup failed. Please try again.');
+      showToast('error', t('look.lookupFailed'));
     } finally {
       setSearching(false);
     }
@@ -74,10 +71,7 @@ export default function LookupView() {
     e.preventDefault();
     if (!lookupResult?.booking) return;
     if (!comment.trim()) {
-      showToast('warning', language === 'vi'
-        ? 'Vui lòng nhập nội dung đánh giá.'
-        : (language === 'ko' ? '리뷰 내용을 입력해 주세요.' : 'Please write your feedback content.')
-      );
+      showToast('warning', t('look.feedbackCommentRequired'));
       return;
     }
 
@@ -94,7 +88,7 @@ export default function LookupView() {
       setComment('');
     } catch (err) {
       console.error(err);
-      showToast('error', err instanceof Error ? err.message : (language === 'vi' ? 'Chưa gửi được đánh giá. Vui lòng thử lại.' : 'Could not submit feedback. Please try again.'));
+      showToast('error', err instanceof Error ? err.message : t('booking.feedbackError'));
     } finally {
       setSubmittingFeedback(false);
     }
@@ -199,7 +193,7 @@ export default function LookupView() {
                   <div className="flex flex-col">
                     <span className="text-[9px] text-neutral-400 uppercase font-black">{t('look.totalCost')}</span>
                     <span className="text-[#fe6a34] font-black text-sm mt-0.5">
-                      {lookupResult.booking.totalPrice.toLocaleString('vi-VN')}₫
+                      {lookupResult.booking.totalPrice.toLocaleString('vi-VN')} VND
                     </span>
                   </div>
                 </div>
@@ -271,7 +265,7 @@ export default function LookupView() {
                           <span className="text-[10px] font-bold text-neutral-500 uppercase">{t('look.feedbackName')}</span>
                           <input 
                             type="text"
-                            placeholder={language === 'vi' ? 'Ví dụ: Tùng Chi' : (language === 'ko' ? '예: 김철수' : 'e.g. John Doe')}
+                            placeholder={t('look.feedbackNamePlaceholder')}
                             value={reviewerName}
                             onChange={(e) => setReviewerName(e.target.value)}
                             className="bg-neutral-50 border border-neutral-200 px-3 py-2 text-xs font-semibold rounded-lg outline-none"
@@ -310,7 +304,7 @@ export default function LookupView() {
                         disabled={submittingFeedback}
                         className="self-end bg-[#fe6a34] hover:bg-[#ab3500] text-white font-bold text-xs py-2 px-5 rounded-lg transition-colors cursor-pointer"
                       >
-                        {submittingFeedback ? (language === 'vi' ? 'Đang gửi phản hồi...' : (language === 'ko' ? '전송 중...' : 'Sending...')) : t('look.feedbackBtn')}
+                        {submittingFeedback ? t('look.feedbackSending') : t('look.feedbackBtn')}
                       </button>
                     </form>
                   )}
@@ -331,3 +325,4 @@ export default function LookupView() {
     </div>
   );
 }
+

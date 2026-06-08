@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateBookingCode = generateBookingCode;
+exports.checkBookingOverlap = checkBookingOverlap;
+exports.checkBlockedDateOverlap = checkBlockedDateOverlap;
 exports.checkOverlap = checkOverlap;
-exports.calculateHoldExpireAt = calculateHoldExpireAt;
 exports.createBookingWithRetry = createBookingWithRetry;
 exports.cancelExpiredPendingBooking = cancelExpiredPendingBooking;
 exports.isPrismaKnownError = isPrismaKnownError;
@@ -22,7 +23,7 @@ async function generateBookingCode() {
     const nextNumber = latestNumber ? Number(latestNumber) + 1 : 1;
     return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
-async function checkOverlap(villaId, checkIn, checkOut, excludeBookingId) {
+async function checkBookingOverlap(villaId, checkIn, checkOut, excludeBookingId) {
     const now = new Date();
     const overlap = await prisma_1.prisma.booking.findFirst({
         where: {
@@ -42,9 +43,24 @@ async function checkOverlap(villaId, checkIn, checkOut, excludeBookingId) {
     });
     return Boolean(overlap);
 }
-function calculateHoldExpireAt(villa) {
-    const holdMinutes = villa.holdMinutes && villa.holdMinutes > 0 ? villa.holdMinutes : 15;
-    return new Date(Date.now() + holdMinutes * 60 * 1000);
+async function checkBlockedDateOverlap(villaId, checkIn, checkOut, excludeBlockedDateId) {
+    const overlap = await prisma_1.prisma.villaBlockedDate.findFirst({
+        where: {
+            villaId,
+            ...(excludeBlockedDateId ? { id: { not: excludeBlockedDateId } } : {}),
+            startDate: { lt: checkOut },
+            endDate: { gt: checkIn },
+        },
+        select: { id: true },
+    });
+    return Boolean(overlap);
+}
+async function checkOverlap(villaId, checkIn, checkOut, excludeBookingId) {
+    const [bookingOverlap, blockedDateOverlap] = await Promise.all([
+        checkBookingOverlap(villaId, checkIn, checkOut, excludeBookingId),
+        checkBlockedDateOverlap(villaId, checkIn, checkOut),
+    ]);
+    return bookingOverlap || blockedDateOverlap;
 }
 async function createBookingWithRetry(data, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -61,6 +77,9 @@ async function createBookingWithRetry(data, maxRetries = 3) {
                     checkIn: data.checkIn,
                     checkOut: data.checkOut,
                     guestsCount: data.guestsCount,
+                    adultCount: data.adultCount,
+                    childrenCount: data.childrenCount,
+                    infantCount: data.infantCount,
                     roomsCount: data.roomsCount,
                     specialRequest: data.specialRequest,
                     status: 'pending_hold',

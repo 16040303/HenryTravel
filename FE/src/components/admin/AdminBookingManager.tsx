@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ClipboardList, Search, Eye, Check, X, Copy,
   Calendar, Users, DollarSign, Clock, Phone, Mail,
@@ -25,13 +26,15 @@ export default function AdminBookingManager({
   onCompleteBooking,
   mutationLoading = false
 }: AdminBookingManagerProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusTab, setActiveStatusTab] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
 
   // Details Modal State
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const bookingModalOverlayRef = useRef<HTMLDivElement>(null);
+  const bookingModalScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedBooking) return;
@@ -41,6 +44,15 @@ export default function AdminBookingManager({
     };
   }, [selectedBooking]);
 
+  useEffect(() => {
+    if (!selectedBooking) return;
+
+    requestAnimationFrame(() => {
+      bookingModalOverlayRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      bookingModalScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [selectedBooking?.code]);
+
   // 1. Calculate stats counts
   const totalPending = bookings.filter(b => b.status === 'PENDING').length;
   const totalConfirmed = bookings.filter(b => b.status === 'CONFIRMED' && new Date(b.checkOut) >= new Date()).length;
@@ -49,10 +61,7 @@ export default function AdminBookingManager({
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    showToast('success', language === 'vi'
-      ? `Đã sao chép mã đặt phòng: ${code}`
-      : `Copied booking code: ${code}`
-    );
+    showToast('success', t('admin.booking.copiedCode', { code }));
   };
 
   // 2. Export CSV from backend with current status filter
@@ -65,9 +74,9 @@ export default function AdminBookingManager({
             ? 'pending_hold'
             : activeStatusTab.toLowerCase(),
       });
-      showToast('success', language === 'vi' ? 'Đã xuất file CSV thành công!' : 'CSV exported successfully!');
+      showToast('success', t('admin.booking.exportSuccess'));
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : (language === 'vi' ? 'Không thể xuất CSV.' : 'Could not export CSV.'));
+      showToast('error', error instanceof Error ? error.message : t('admin.booking.exportError'));
     }
   };
 
@@ -75,15 +84,15 @@ export default function AdminBookingManager({
   const handlePrintBooking = (b: Booking) => {
     const printWindow = window.open('', '_blank', 'width=800,height=900');
     if (!printWindow) {
-      showToast('error', 'Trình chặn pop-up đã chặn quyền in hóa đơn. Vui lòng mở lại!');
+      showToast('error', t('admin.booking.popupBlocked'));
       return;
     }
 
     const isCompleted = b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date();
     const resolvedStatusText =
-      isCompleted ? 'COMPLETED (HOÀN TẤT)' :
-        b.status === 'CONFIRMED' ? 'CONFIRMED (ĐÃ CỌC)' :
-          b.status === 'PENDING' ? 'PENDING (ĐỢI CỌC)' : 'CANCELLED (ĐÃ HỦY)';
+      isCompleted ? t('admin.booking.printStatusCompleted') :
+        b.status === 'CONFIRMED' ? t('admin.booking.printStatusConfirmed') :
+          b.status === 'PENDING' ? t('admin.booking.printStatusPending') : t('admin.booking.printStatusCancelled');
 
     const printHtml = `
       <html>
@@ -115,17 +124,17 @@ export default function AdminBookingManager({
         <body>
           <div class="header">
             <div class="brand">Henry<span>Travel</span></div>
-            <div class="title">Hóa đơn thanh toán giữ chỗ</div>
-            <div class="receipt-code">MÃ ĐƠN: ${b.code}</div>
+            <div class="title">${t('admin.booking.printTitle')}</div>
+            <div class="receipt-code">${t('admin.booking.printCode')}: ${b.code}</div>
           </div>
 
           <div class="grid">
             <div class="card">
-              <h4>Thông tin khách hàng</h4>
-              <div class="row"><span class="label">Khách hàng:</span><span class="value">${b.fullName}</span></div>
-              <div class="row"><span class="label">Số điện thoại:</span><span class="value">${b.phone}</span></div>
-              <div class="row"><span class="label">Email:</span><span class="value">${b.email || 'N/A'}</span></div>
-              <div class="row"><span class="label">Trạng thái:</span>
+              <h4>${t('admin.booking.printCustomerInfo')}</h4>
+              <div class="row"><span class="label">${t('admin.booking.printCustomer')}:</span><span class="value">${b.fullName}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printPhone')}:</span><span class="value">${b.phone}</span></div>
+              <div class="row"><span class="label">Email:</span><span class="value">${b.email || t('admin.booking.notProvided')}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printStatus')}:</span>
                 <span class="badge ${isCompleted ? 'badge-completed' :
         b.status === 'CONFIRMED' ? 'badge-confirmed' :
           b.status === 'PENDING' ? 'badge-pending' : 'badge-cancelled'
@@ -134,22 +143,24 @@ export default function AdminBookingManager({
             </div>
 
             <div class="card">
-              <h4>Thông tin kỳ nghỉ</h4>
-              <div class="row"><span class="label">Biệt thự:</span><span class="value">${b.villaName}</span></div>
-              <div class="row"><span class="label">Nhận phòng:</span><span class="value">${b.checkIn}</span></div>
-              <div class="row"><span class="label">Trả phòng:</span><span class="value">${b.checkOut}</span></div>
-              <div class="row"><span class="label">Lượng khách:</span><span class="value">${b.guests} người (Max)</span></div>
+              <h4>${t('admin.booking.printStayInfo')}</h4>
+              <div class="row"><span class="label">${t('admin.booking.printProperty')}:</span><span class="value">${b.villaName}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printCheckIn')}:</span><span class="value">${b.checkIn}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printCheckOut')}:</span><span class="value">${b.checkOut}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printGuests')}:</span><span class="value">${b.guests} ${t('admin.booking.guestUnit')}</span></div>
+              <div class="row"><span class="label">${t('admin.booking.printGuestMix')}:</span><span class="value">${b.adultCount ?? b.guests} ${t('admin.booking.adultUnit')}, ${b.childrenCount ?? 0} ${t('admin.booking.childUnit')}, ${b.infantCount ?? 0} ${t('admin.booking.infantUnit')}</span></div>
             </div>
           </div>
 
           <div class="price-total">
-            <div style="font-weight: 800; color: #005899; font-size: 13px; text-transform: uppercase;">Tổng thanh toán tiền cọc</div>
-            <div style="margin-top: 5px;"><span>${b.totalPrice.toLocaleString('vi-VN')}₫</span></div>
+            <div style="font-weight: 800; color: #005899; font-size: 13px; text-transform: uppercase;">${t('admin.booking.printDepositTotal')}</div>
+            <div style="margin-top: 5px;"><span>${b.totalPrice.toLocaleString('vi-VN')} VND</span></div>
           </div>
 
           <div class="footer">
-            Cảm ơn quý khách đã tin tưởng và lựa chọn đặt phòng tại HenryTravel homestay.<br>
-            Hệ thống đặt phòng tự động HenryTravel - Hotline 24/7: 0901 234 567
+            ${t('admin.booking.printThanks')}<br>
+            ${t('admin.booking.printSystem')}<br>
+            ${t('admin.booking.printSupport')}
           </div>
 
           <script>
@@ -190,7 +201,7 @@ export default function AdminBookingManager({
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-[18px] font-black text-amber-600 font-mono">{totalPending}</span>
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{language === 'vi' ? 'Đang đợi cọc' : 'Awaiting holds'}</span>
+            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{t('admin.booking.awaitingHolds')}</span>
           </div>
         </div>
 
@@ -201,7 +212,7 @@ export default function AdminBookingManager({
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-[18px] font-black text-emerald-600 font-mono">{totalConfirmed}</span>
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{language === 'vi' ? 'Đã cọc cọc' : 'Confirmed stays'}</span>
+            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{t('admin.booking.confirmedStays')}</span>
           </div>
         </div>
 
@@ -212,7 +223,7 @@ export default function AdminBookingManager({
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-[18px] font-black text-[#0071c2] font-mono">{totalCompleted}</span>
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{language === 'vi' ? 'Hoàn tất stay' : 'Checked out'}</span>
+            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{t('admin.booking.checkedOut')}</span>
           </div>
         </div>
 
@@ -223,7 +234,7 @@ export default function AdminBookingManager({
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-[18px] font-black text-rose-500 font-mono">{totalCancelled}</span>
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{language === 'vi' ? 'Đơn đã hủy' : 'Holds cancelled'}</span>
+            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{t('admin.booking.cancelledHolds')}</span>
           </div>
         </div>
       </div>
@@ -237,7 +248,7 @@ export default function AdminBookingManager({
           </span>
           <input
             type="text"
-            placeholder={language === 'vi' ? 'Tìm theo tên, SĐT, mã đặt phòng...' : 'Search guest, phone, code...'}
+            placeholder={t('admin.booking.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2 pl-10 pr-4 text-xs font-semibold outline-none focus:bg-white focus:border-[#0071c2]"
@@ -250,20 +261,20 @@ export default function AdminBookingManager({
           <button
             onClick={handleExportCSV}
             className="bg-neutral-50 hover:bg-neutral-100 text-neutral-600 border border-neutral-250 font-bold text-xs py-2 px-4.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-            title="Export CSV to Excel"
+            title={t('admin.booking.exportCsv')}
           >
             <Download className="w-4 h-4 shrink-0" />
-            <span>Xuất file CSV</span>
+            <span>{t('admin.booking.exportCsv')}</span>
           </button>
 
           {/* Status Tabs capsules */}
           <div className="flex bg-neutral-100 p-0.5 rounded-xl border border-neutral-200/50">
             {(['ALL', 'PENDING', 'CONFIRMED', 'CANCELLED'] as const).map((tab) => {
               const labelMap = {
-                ALL: language === 'vi' ? 'Tất cả' : 'All',
-                PENDING: language === 'vi' ? 'Chờ duyệt' : 'Pending',
-                CONFIRMED: language === 'vi' ? 'Đã duyệt' : 'Confirmed',
-                CANCELLED: language === 'vi' ? 'Đã huỷ' : 'Cancelled'
+                ALL: t('admin.booking.all'),
+                PENDING: t('admin.booking.pending'),
+                CONFIRMED: t('admin.booking.confirmed'),
+                CANCELLED: t('admin.booking.cancelled')
               };
               return (
                 <button
@@ -283,25 +294,25 @@ export default function AdminBookingManager({
       </div>
 
       {/* Bookings Queue table */}
-      <div className="bg-white rounded-3xl border border-neutral-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex min-h-[360px] flex-col overflow-hidden rounded-3xl border border-neutral-100 bg-white shadow-sm">
         <div className="w-full overflow-x-auto scrollbar-safe">
           <table className="w-full min-w-[900px] text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-neutral-100 font-bold text-neutral-400 uppercase tracking-widest text-[9px] bg-neutral-50/50">
-                <th className="p-4">{language === 'vi' ? 'Khách hàng' : 'Guest'}</th>
-                <th className="p-4">{language === 'vi' ? 'Mã số' : 'Booking Code'}</th>
-                <th className="p-4">{language === 'vi' ? 'Điểm lưu trú' : 'Accommodation'}</th>
-                <th className="p-4">{language === 'vi' ? 'Thời gian nhận/trả' : 'Dates'}</th>
-                <th className="p-4">{language === 'vi' ? 'Trị giá' : 'Cost'}</th>
-                <th className="p-4 text-center">{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
-                <th className="p-4 text-right">{language === 'vi' ? 'Hành động' : 'Actions'}</th>
+                <th className="p-4">{t('admin.booking.guest')}</th>
+                <th className="p-4">{t('admin.booking.code')}</th>
+                <th className="p-4">{t('admin.booking.accommodation')}</th>
+                <th className="p-4">{t('admin.booking.dates')}</th>
+                <th className="p-4">{t('admin.booking.cost')}</th>
+                <th className="p-4 text-center">{t('admin.booking.status')}</th>
+                <th className="p-4 text-right">{t('admin.booking.actions')}</th>
               </tr>
             </thead>
             <tbody className="font-semibold text-neutral-700">
               {filteredBookings.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-neutral-400 italic">
-                    {language === 'vi' ? 'Chưa có lịch sử đặt phòng nào trùng khớp' : 'No matching bookings history found'}
+                    {t('admin.booking.empty')}
                   </td>
                 </tr>
               ) : (
@@ -332,7 +343,7 @@ export default function AdminBookingManager({
                         <button
                           onClick={() => copyCode(b.code)}
                           className="hover:text-[#0071c2] cursor-pointer flex items-center gap-1"
-                          title="Click to Copy"
+                          title={t('admin.booking.copyTitle')}
                         >
                           <span>{b.code}</span>
                           <Copy className="w-3 h-3 text-neutral-300" />
@@ -351,7 +362,7 @@ export default function AdminBookingManager({
 
                       {/* Price */}
                       <td className="p-4 font-mono font-black text-[#fe6a34] text-xs">
-                        {b.totalPrice.toLocaleString('vi-VN')}₫
+                        {b.totalPrice.toLocaleString('vi-VN')} VND
                       </td>
 
                       {/* Status */}
@@ -367,7 +378,7 @@ export default function AdminBookingManager({
                           <button
                             onClick={() => setSelectedBooking(b)}
                             className="p-1.5 border border-neutral-200 hover:bg-neutral-50 hover:text-[#0071c2] rounded-lg text-neutral-400 transition-colors cursor-pointer"
-                            title="View Details"
+                            title={t('admin.booking.viewDetails')}
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -376,7 +387,7 @@ export default function AdminBookingManager({
                           <button
                             onClick={() => handlePrintBooking(b)}
                             className="p-1.5 border border-neutral-200 hover:bg-neutral-50 hover:text-neutral-800 rounded-lg text-neutral-400 transition-colors cursor-pointer"
-                            title="Print invoice"
+                            title={t('admin.booking.printInvoice')}
                           >
                             <Printer className="w-3.5 h-3.5" />
                           </button>
@@ -387,7 +398,7 @@ export default function AdminBookingManager({
                                 onClick={() => onApproveBooking(b.code)}
                                 disabled={mutationLoading}
                                 className="p-1.5 border border-[#a1c9ff] bg-[#edf3ff] hover:bg-[#0071c2] hover:text-white rounded-lg text-[#0071c2] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                title="Approve"
+                                title={t('admin.booking.approve')}
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </button>
@@ -395,7 +406,7 @@ export default function AdminBookingManager({
                                 onClick={() => onRejectBooking(b.code)}
                                 disabled={mutationLoading}
                                 className="p-1.5 border border-neutral-200 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                title="Cancel Hold"
+                                title={t('admin.booking.cancelHold')}
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -406,7 +417,7 @@ export default function AdminBookingManager({
                               onClick={() => onCompleteBooking(b.code)}
                               disabled={mutationLoading}
                               className="p-1.5 border border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                              title="Complete"
+                              title={t('admin.booking.complete')}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                             </button>
@@ -423,9 +434,10 @@ export default function AdminBookingManager({
       </div>
 
       {/* Booking Receipt Detail Modal Popup overlay */}
-      {selectedBooking && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl animate-scaleIn border my-auto mx-auto">
+      {selectedBooking && createPortal(
+        <div ref={bookingModalOverlayRef} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
+          <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
+            <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl animate-scaleIn border">
             {/* Header banner */}
             <div className="bg-[#003b66] text-white p-6 text-center flex flex-col items-center relative">
               <button
@@ -435,14 +447,14 @@ export default function AdminBookingManager({
                 <X className="w-4 h-4" />
               </button>
               <ClipboardList className="w-10 h-10 text-[#a1c9ff] mb-1.5" />
-              <h3 className="text-sm font-display font-black text-white">{language === 'vi' ? 'Hóa đơn đặt phòng chi tiết' : 'Reservation Receipt'}</h3>
+              <h3 className="text-sm font-display font-black text-white">{t('admin.booking.receiptTitle')}</h3>
               <span className="bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full font-mono font-bold text-[9px] uppercase mt-2">
                 CODE: {selectedBooking.code}
               </span>
             </div>
 
             {/* Content Receipt Body */}
-            <div className="p-5 flex flex-col gap-4.5 text-xs font-semibold text-neutral-600 max-h-[75vh] overflow-y-auto overscroll-contain">
+            <div ref={bookingModalScrollRef} className="p-5 flex flex-col gap-4.5 text-xs font-semibold text-neutral-600 max-h-[75vh] overflow-y-auto overscroll-contain">
 
               {/* PRINT BUTTON TRIGGER */}
               <div className="flex justify-end border-b border-neutral-100 pb-2">
@@ -451,13 +463,13 @@ export default function AdminBookingManager({
                   className="bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-250 py-1.5 px-3 rounded-lg flex items-center gap-1 transition-all cursor-pointer font-bold text-[10px]"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>In hoá đơn (Print)</span>
+                  <span>{t('admin.booking.printButton')}</span>
                 </button>
               </div>
 
               {/* 3. BOOKING TIMELINE COMPONENT */}
               <div className="flex flex-col gap-1.5 bg-neutral-50 p-4.5 rounded-2xl border border-neutral-100/50">
-                <span className="text-[8px] uppercase font-bold text-neutral-400 tracking-wider">Lịch trình đơn hàng (Timeline)</span>
+                <span className="text-[8px] uppercase font-bold text-neutral-400 tracking-wider">{t('admin.booking.timeline')}</span>
 
                 {selectedBooking.status === 'CANCELLED' ? (
                   /* Cancelled Timeline */
@@ -469,12 +481,12 @@ export default function AdminBookingManager({
                     </div>
                     <div className="flex flex-col gap-5 leading-none">
                       <div className="flex flex-col mt-0.5">
-                        <span className="text-neutral-800">1. Đã khởi tạo đơn hàng (Created)</span>
+                        <span className="text-neutral-800">{t('admin.booking.timelineCreated')}</span>
                         <span className="text-[8px] text-neutral-400 font-normal font-mono">{selectedBooking.createdAt.split('T')[0]}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-rose-600">2. Đã hủy giữ phòng (Cancelled)</span>
-                        <span className="text-[8px] text-rose-500 font-medium">Lưu kho phòng giải phóng tự động</span>
+                        <span className="text-rose-600">{t('admin.booking.timelineCancelled')}</span>
+                        <span className="text-[8px] text-rose-500 font-medium">{t('admin.booking.timelineReleased')}</span>
                       </div>
                     </div>
                   </div>
@@ -502,20 +514,20 @@ export default function AdminBookingManager({
                         <div className="flex flex-col gap-4.5 leading-none justify-between">
                           {/* Step 1 */}
                           <div className="flex flex-col mt-0.5">
-                            <span className="text-neutral-800">1. Đã tạo & Tạm giữ phòng 15p (Created)</span>
+                            <span className="text-neutral-800">{t('admin.booking.timelineHold')}</span>
                             <span className="text-[8px] text-neutral-400 font-normal font-mono">{selectedBooking.createdAt.split('T')[0]}</span>
                           </div>
                           {/* Step 2 */}
                           <div className="flex flex-col">
                             <span className={isConfirmed || isCompleted ? 'text-neutral-800' : 'text-amber-600 animate-pulse'}>
-                              {isConfirmed || isCompleted ? '2. Đã khớp cọc ngân hàng (Confirmed)' : '2. Đang chờ đối soát cọc (Pending)'}
+                              {isConfirmed || isCompleted ? t('admin.booking.timelineConfirmed') : t('admin.booking.timelinePending')}
                             </span>
-                            <span className="text-[8px] text-neutral-400 font-normal">Khoá lịch calendar tự động chống trùng</span>
+                            <span className="text-[8px] text-neutral-400 font-normal">{t('admin.booking.timelineLock')}</span>
                           </div>
                           {/* Step 3 */}
                           <div className="flex flex-col">
                             <span className={isCompleted ? 'text-[#0071c2]' : 'text-neutral-400'}>
-                              3. Hoàn tất lưu trú và trả phòng (Completed)
+                              {t('admin.booking.timelineCompleted')}
                             </span>
                             <span className="text-[8px] text-neutral-400 font-normal font-mono">{selectedBooking.checkOut}</span>
                           </div>
@@ -528,7 +540,7 @@ export default function AdminBookingManager({
 
               {/* Status Indicator */}
               <div className="flex justify-between items-center border-b border-neutral-100 pb-3 mt-1">
-                <span className="text-neutral-400 uppercase text-[9px] font-bold">{language === 'vi' ? 'Trạng thái cọc' : 'Deposit Status'}</span>
+                <span className="text-neutral-400 uppercase text-[9px] font-bold">{t('admin.booking.depositStatus')}</span>
                 <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${selectedBooking.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
                     selectedBooking.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border-amber-100' :
                       'bg-neutral-50 text-neutral-500 border-neutral-200'
@@ -542,7 +554,7 @@ export default function AdminBookingManager({
                 <div className="flex items-start gap-2.5">
                   <DollarSign className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Họ và tên khách' : 'FullName'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.booking.fullName')}</span>
                     <span className="text-neutral-800 font-bold mt-0.5 text-sm">{selectedBooking.fullName}</span>
                   </div>
                 </div>
@@ -550,7 +562,7 @@ export default function AdminBookingManager({
                 <div className="flex items-start gap-2.5">
                   <Phone className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Số điện thoại di động' : 'Phone'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.booking.phone')}</span>
                     <span className="text-neutral-800 font-bold mt-0.5 font-mono">{selectedBooking.phone}</span>
                   </div>
                 </div>
@@ -569,38 +581,41 @@ export default function AdminBookingManager({
               {/* Accommodation grid */}
               <div className="bg-neutral-50 border border-neutral-100 p-3.5 rounded-xl flex flex-col gap-2.5">
                 <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Địa điểm nghỉ dưỡng' : 'Lodging'}</span>
+                  <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.booking.lodging')}</span>
                   <span className="text-neutral-800 font-black mt-0.5">{selectedBooking.villaName}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 border-t border-neutral-200/50 pt-2.5 font-mono text-[11px]">
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400 font-sans">{language === 'vi' ? 'Nhận phòng (Check-in)' : 'Check-in'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400 font-sans">{t('admin.booking.checkIn')}</span>
                     <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.checkIn}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400 font-sans">{language === 'vi' ? 'Trả phòng (Check-out)' : 'Check-out'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400 font-sans">{t('admin.booking.checkOut')}</span>
                     <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.checkOut}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 border-t border-neutral-200/50 pt-2.5">
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Lượng khách' : 'Guests'}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.guests} {language === 'vi' ? 'người' : 'guests'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.booking.guests')}</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.guests} {t('admin.booking.guestUnit')}</span>
+                    <span className="text-[10px] text-neutral-500 font-semibold mt-1">
+                      {selectedBooking.adultCount ?? selectedBooking.guests} {t('admin.booking.adultUnit')} · {selectedBooking.childrenCount ?? 0} {t('admin.booking.childUnit')} · {selectedBooking.infantCount ?? 0} {t('admin.booking.infantUnit')}
+                    </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[8px] uppercase font-bold text-neutral-400">{language === 'vi' ? 'Số lượng phòng ngủ' : 'Bedrooms'}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.rooms} {language === 'vi' ? 'phòng' : 'rooms'}</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.booking.bedrooms')}</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{selectedBooking.rooms} {t('admin.booking.roomUnit')}</span>
                   </div>
                 </div>
               </div>
 
               {/* Prices summary footer */}
               <div className="flex justify-between items-baseline mt-1 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
-                <span className="text-[#005899] font-black">{language === 'vi' ? 'Tổng tiền cọc yêu cầu' : 'Total Deposit cọc'}</span>
+                <span className="text-[#005899] font-black">{t('admin.booking.depositTotal')}</span>
                 <span className="text-lg font-black text-[#fe6a34] font-mono">
-                  {selectedBooking.totalPrice.toLocaleString('vi-VN')}₫
+                  {selectedBooking.totalPrice.toLocaleString('vi-VN')} VND
                 </span>
               </div>
 
@@ -615,7 +630,7 @@ export default function AdminBookingManager({
                       }}
                       className="flex-grow bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl cursor-pointer shadow text-center transition-colors"
                     >
-                      {language === 'vi' ? 'Duyệt chuyển khoản' : 'Approve Booking'}
+                      {t('admin.booking.approveTransfer')}
                     </button>
                     <button
                       onClick={() => {
@@ -624,25 +639,28 @@ export default function AdminBookingManager({
                       }}
                       className="flex-grow border border-neutral-200 hover:bg-neutral-50 text-neutral-500 font-bold py-2.5 rounded-xl cursor-pointer text-center transition-colors"
                     >
-                      {language === 'vi' ? 'Từ chối cọc' : 'Cancel Hold'}
+                      {t('admin.booking.rejectDeposit')}
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => {
-                      const msg = `Xin chào ${selectedBooking.fullName}, tôi cần liên hệ hỗ trợ về đơn hàng HenryTravel mã ${selectedBooking.code}.`;
+                      const msg = t('admin.booking.contactMessage', { name: selectedBooking.fullName, code: selectedBooking.code });
                       window.open(getZaloLink(selectedBooking.phone, msg), '_blank');
                     }}
                     className="w-full bg-[#0071c2] hover:bg-[#005899] text-white font-black py-2.5 rounded-xl cursor-pointer text-center transition-colors"
                   >
-                    {language === 'vi' ? 'Hỗ trợ khách hàng (Zalo)' : 'Contact Guest (Zalo)'}
+                    {t('admin.booking.contactGuest')}
                   </button>
                 )}
               </div>
             </div>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
 }
+

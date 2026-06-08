@@ -49,7 +49,7 @@ router.post('/', (req, res, next) => {
             }
             const uploadedFiles = await Promise.all(files.map(async (file) => {
                 try {
-                    return await (0, upload_1.uploadBufferToCloudinary)(file.buffer, { folder: 'henrytravel/villas' });
+                    return await (0, upload_1.uploadBufferToCloudinary)(file.buffer, { folder: 'henrytravel/villas/images', resourceType: 'image' });
                 }
                 catch (uploadError) {
                     if (uploadError instanceof errors_1.AppError)

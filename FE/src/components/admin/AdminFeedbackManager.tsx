@@ -20,7 +20,7 @@ export default function AdminFeedbackManager({
   onToggleVerifyFeedback,
   mutationLoading = false
 }: AdminFeedbackManagerProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [selectedVillaId, setSelectedVillaId] = useState<EntityId | 'ALL'>('ALL');
   const [ratingFilter, setRatingFilter] = useState<'ALL' | number>('ALL');
 
@@ -38,10 +38,10 @@ export default function AdminFeedbackManager({
         <div>
           <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-1.5">
             <MessageSquare className="w-4 h-4 text-[#0071c2]" />
-            <span>{language === 'vi' ? 'Quản lý Đánh giá từ khách' : 'Guest Reviews Management'}</span>
+            <span>{t('admin.feedback.title')}</span>
           </h3>
           <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">
-            {language === 'vi' ? 'Duyệt hiển thị feedback của những khách lưu trú thực tế' : 'Toggle public visibility of verified reviews'}
+            {t('admin.feedback.desc')}
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export default function AdminFeedbackManager({
             onChange={(e) => setSelectedVillaId(e.target.value === 'ALL' ? 'ALL' : e.target.value)}
             className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-[180px] truncate"
           >
-            <option value="ALL">{language === 'vi' ? 'Tất cả biệt thự' : 'All Villas'}</option>
+            <option value="ALL">{t('admin.feedback.allVillas')}</option>
             {villas.map(v => (
               <option key={v.id} value={v.id}>{v.name}</option>
             ))}
@@ -65,7 +65,7 @@ export default function AdminFeedbackManager({
             onChange={(e) => setRatingFilter(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
             className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
           >
-            <option value="ALL">{language === 'vi' ? 'Tất cả điểm số' : 'All Ratings'}</option>
+            <option value="ALL">{t('admin.feedback.allRatings')}</option>
             {[5, 4, 3, 2, 1].map(r => (
               <option key={r} value={r}>{r} ⭐</option>
             ))}
@@ -74,16 +74,17 @@ export default function AdminFeedbackManager({
       </div>
 
       {/* Reviews list rows */}
-      {filteredFeedbacks.length === 0 ? (
-        <EmptyState
-          title={language === 'vi' ? 'Không có nhận xét nào phù hợp' : 'No matching reviews found'}
-          description={language === 'vi' ? 'Hệ thống chưa tìm thấy bình luận đánh giá nào thỏa mãn các điều kiện tìm kiếm lọc hiện hữu.' : 'Try widening your filters to view more review logs.'}
-          icon="feedback"
-        />
-      ) : (
-        <div className="flex flex-col gap-4">
+      <div className="min-h-[360px]">
+        {filteredFeedbacks.length === 0 ? (
+          <EmptyState
+            title={t('admin.feedback.emptyTitle')}
+            description={t('admin.feedback.emptyDesc')}
+            icon="feedback"
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
           {filteredFeedbacks.map((f) => {
-            const villaName = villas.find(v => String(v.id) === String(f.villaId))?.name || `Villa ID: ${f.villaId}`;
+            const villaName = villas.find(v => String(v.id) === String(f.villaId))?.name || t('admin.feedback.villaCode', { id: f.villaId });
             return (
               <div 
                 key={f.id} 
@@ -118,7 +119,7 @@ export default function AdminFeedbackManager({
                     {f.isVerified && (
                       <span className="flex items-center gap-0.5 text-emerald-600 bg-emerald-50 py-0.5 px-2 rounded-full border border-emerald-100 font-bold">
                         <ShieldCheck className="w-3 h-3" />
-                        {language === 'vi' ? 'Khách hàng thực tế' : 'Verified Booking'}
+                        {t('admin.feedback.verified')}
                       </span>
                     )}
                   </div>
@@ -131,28 +132,29 @@ export default function AdminFeedbackManager({
                       onClick={() => onToggleVerifyFeedback(String(f.id))}
                       disabled={mutationLoading}
                       className="bg-emerald-50 hover:bg-rose-50 text-emerald-600 hover:text-rose-600 border border-emerald-200 hover:border-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
-                      title="Click to Hide from Public site"
+                      title={t('admin.feedback.hideTitle')}
                     >
                       <Eye className="w-4 h-4 shrink-0" />
-                      <span>{language === 'vi' ? 'Đang Hiển Thị' : 'Public Active'}</span>
+                      <span>{t('admin.feedback.publicActive')}</span>
                     </button>
                   ) : (
                     <button
                       onClick={() => onToggleVerifyFeedback(String(f.id))}
                       disabled={mutationLoading}
                       className="bg-neutral-50 hover:bg-emerald-50 text-neutral-500 hover:text-emerald-700 border border-neutral-200 hover:border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      title="Click to Show on Public site"
+                      title={t('admin.feedback.showTitle')}
                     >
                       <EyeOff className="w-4 h-4 shrink-0" />
-                      <span>{language === 'vi' ? 'Đang Ẩn' : 'Public Hidden'}</span>
+                      <span>{t('admin.feedback.publicHidden')}</span>
                     </button>
                   )}
                 </div>
               </div>
             );
           })}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
