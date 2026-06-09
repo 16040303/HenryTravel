@@ -192,13 +192,10 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
           <Link
             to="/"
             className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer group"
-            aria-label="HenryTravel home"
           >
-            <img
-              src="/logo.jpg"
-              alt="HenryTravel"
-              className="h-10 w-auto max-w-[150px] object-contain"
-            />
+            <span className="text-2xl font-black tracking-tight text-[#005899] font-display">
+              Henry<span className="text-[#fe6a34]">Travel</span>
+            </span>
             <div className="hidden sm:flex h-7 items-center rounded-full border border-[#d7e8ff] bg-[#f5f9ff] px-2 shadow-sm transition-colors duration-200 group-hover:border-[#b8d8ff] group-hover:bg-white">
               {renderLanguageFlag(language)}
             </div>
