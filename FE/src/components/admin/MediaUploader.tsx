@@ -30,7 +30,10 @@ export default function MediaUploader({ villaId, value, onChange, onPendingFiles
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const sortedMedia = [...value].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedMedia = React.useMemo(
+    () => [...value].sort((a, b) => a.sortOrder - b.sortOrder),
+    [value]
+  );
 
   const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFileList = event.currentTarget.files;

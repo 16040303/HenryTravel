@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { SearchCode, Home, Building2, ChevronDown, Hotel, X, Clock3, ExternalLink, Headset } from 'lucide-react';
 import { FaWhatsapp, FaFacebookF, FaInstagram, FaTiktok } from 'react-icons/fa';
@@ -20,10 +20,13 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
   const [mobileCategory, setMobileCategory] = useState<'villa' | 'hotel_resort' | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
   const [zaloPhone, setZaloPhone] = useState(ZALO_PHONE_FALLBACK);
-  const [zaloUrl, setZaloUrl] = useState(() => getZaloLink(
-    ZALO_PHONE_FALLBACK,
-    'Xin chào HenryTravel, tôi cần tư vấn về dịch vụ đặt phòng villa.'
-  ));
+  const [settingsZaloUrl, setSettingsZaloUrl] = useState('');
+  const [, startLanguageTransition] = useTransition();
+  const contactConsultMessage = t('contact.consultMessage');
+  const zaloUrl = useMemo(
+    () => settingsZaloUrl || getZaloLink(ZALO_PHONE_FALLBACK, contactConsultMessage),
+    [settingsZaloUrl, contactConsultMessage]
+  );
   const [whatsappUrl, setWhatsappUrl] = useState('');
   const [wechatId, setWechatId] = useState('');
   const [kakaoTalkId, setKakaoTalkId] = useState('');
@@ -129,9 +132,9 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
         if (!mounted) return;
         const nextZaloPhone = settings.zaloPhone || ZALO_PHONE_FALLBACK;
         setZaloPhone(nextZaloPhone);
-        setZaloUrl(settings.zaloUrl || getZaloLink(
+        setSettingsZaloUrl(settings.zaloUrl || getZaloLink(
           nextZaloPhone,
-          'Xin chào HenryTravel, tôi cần tư vấn về dịch vụ đặt phòng villa.'
+          contactConsultMessage
         ));
         setWhatsappUrl(settings.whatsappUrl || '');
         setWechatId(settings.wechatId || '');
@@ -147,10 +150,7 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
       .catch(() => {
         if (!mounted) return;
         setZaloPhone(ZALO_PHONE_FALLBACK);
-        setZaloUrl(getZaloLink(
-          ZALO_PHONE_FALLBACK,
-          'Xin chào HenryTravel, tôi cần tư vấn về dịch vụ đặt phòng villa.'
-        ));
+        setSettingsZaloUrl('');
         setWhatsappUrl('');
         setWechatId('');
         setKakaoTalkId('');
@@ -192,10 +192,13 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
           <Link
             to="/"
             className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer group"
+            aria-label="HenryTravel home"
           >
-            <span className="text-2xl font-black tracking-tight text-[#005899] font-display">
-              Henry<span className="text-[#fe6a34]">Travel</span>
-            </span>
+            <img
+              src="/logo.jpg"
+              alt="HenryTravel"
+              className="h-10 w-auto max-w-[150px] object-contain"
+            />
             <div className="hidden sm:flex h-7 items-center rounded-full border border-[#d7e8ff] bg-[#f5f9ff] px-2 shadow-sm transition-colors duration-200 group-hover:border-[#b8d8ff] group-hover:bg-white">
               {renderLanguageFlag(language)}
             </div>
@@ -290,7 +293,7 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
             {(['vi', 'en', 'ko', 'zh'] as const).map((lang) => (
               <button
                 key={lang}
-                onClick={() => setLanguage(lang)}
+                onClick={() => startLanguageTransition(() => setLanguage(lang))}
                 aria-label={`Switch language to ${lang}`}
                 className={`flex h-7 w-8 items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${language === lang
                     ? 'bg-[#edf3ff] ring-1 ring-[#9dccff] shadow-sm scale-105'
@@ -311,7 +314,7 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-[#0071c2] shadow-sm transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-105">
               <Headset className="h-4 w-4" />
             </span>
-            <span className="hidden sm:inline pr-0.5">Liên hệ</span>
+            <span className="hidden sm:inline pr-0.5">{t('contact.button')}</span>
           </button>
         </div>
       </div>
@@ -390,18 +393,18 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
                 type="button"
                 onClick={() => setShowContactModal(false)}
                 className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25 cursor-pointer"
-                aria-label="Đóng"
+                aria-label={t('contact.close')}
               >
                 <X className="h-4 w-4" />
               </button>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/75">HenryTravel</p>
-              <h2 className="mt-1 text-2xl font-black">Thông tin liên hệ</h2>
+              <h2 className="mt-1 text-2xl font-black">{t('contact.title')}</h2>
               <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-white/85">
-                Chọn kênh phù hợp để được tư vấn nhanh về villa, khách sạn - resort và booking.
+                {t('contact.desc')}
               </p>
               <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/20">
                 <Clock3 className="h-4 w-4 text-[#ffd7c5]" />
-                <span>{t('footer.workingHours')} · Vietnam time (UTC+7)</span>
+                <span>{t('footer.workingHours')} · {t('contact.timezone')}</span>
               </div>
             </div>
 
@@ -421,25 +424,25 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
                 )}
                 {wechatId && (
                   <button type="button" onClick={() => handleAppContactClick(buildWeChatLink(wechatId), wechatId, 'WeChat')} className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><SiWechat size={18} color="#07C160" /> WeChat ID: {wechatId}</span>
+                    <span className="flex items-center gap-3"><SiWechat size={18} color="#07C160" /> {t('contact.wechatId')}: {wechatId}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </button>
                 )}
                 {kakaoTalkId && (
                   <button type="button" onClick={() => handleAppContactClick(buildKakaoTalkLink(kakaoTalkId), kakaoTalkId, 'KakaoTalk')} className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><SiKakaotalk size={18} color="#FEE500" /> KakaoTalk ID: {kakaoTalkId}</span>
+                    <span className="flex items-center gap-3"><SiKakaotalk size={18} color="#FEE500" /> {t('contact.kakaoTalkId')}: {kakaoTalkId}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </button>
                 )}
                 {socialLinks.facebookFanpageUrl && (
                   <a href={socialLinks.facebookFanpageUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><FaFacebookF size={16} color="#1877F2" /> Facebook Fanpage</span>
+                    <span className="flex items-center gap-3"><FaFacebookF size={16} color="#1877F2" /> {t('contact.facebookFanpage')}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}
                 {socialLinks.facebookPersonalUrl && (
                   <a href={socialLinks.facebookPersonalUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><FaFacebookF size={16} color="#1877F2" /> Facebook cá nhân</span>
+                    <span className="flex items-center gap-3"><FaFacebookF size={16} color="#1877F2" /> {t('contact.facebookPersonal')}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}

@@ -101,12 +101,31 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     setActiveEditDateField(null);
   };
 
-  // Sort villas
   const sortedVillas = useMemo(() => [...villas].sort((a, b) => {
     if (sortBy === 'priceAsc') return a.price - b.price;
     if (sortBy === 'priceDesc') return b.price - a.price;
     return b.rating - a.rating; // default popular
   }), [villas, sortBy]);
+
+  const villaCardModels = useMemo(() => sortedVillas.map((villa) => {
+    const cardAmenities = getCardAmenities(villa.facilities, 5);
+    return {
+      villa,
+      isAvailable: villa.status === 'Available',
+      badgeColor: villa.status === 'Available'
+        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        : villa.status === 'Hết phòng'
+          ? 'bg-rose-50 text-rose-800 border-rose-200'
+          : 'bg-neutral-100 text-neutral-600',
+      locationLabel: getLocationLabel(villa.location),
+      priceRange: formatPriceRange(villa.price, villa.priceMax),
+      amenities: cardAmenities.items.map(item => ({
+        key: item.key,
+        label: getAmenityLabel(item, language),
+      })),
+      remainingAmenities: cardAmenities.remainingCount,
+    };
+  }), [sortedVillas, language, t]);
 
   const handleFacilityCheck = (id: string) => {
     const isMatched = filterParams.facilities.includes(id);
@@ -587,7 +606,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
               <div className="flex flex-col gap-6">
                 {[1, 2, 3].map((n) => <VillaCardSkeleton key={n} />)}
               </div>
-            ) : sortedVillas.length === 0 ? (
+            ) : villaCardModels.length === 0 ? (
               <EmptyState
                 title={t('list.emptyTitle')}
                 description={t('list.emptyDesc')}
@@ -597,15 +616,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
               />
             ) : (
               <div className="relative z-0 flex flex-col gap-6">
-              {sortedVillas.map((villa) => {
-                
-                const hasMatchingStatus = villa.status === 'Available';
-                const badgeColor = villa.status === 'Available'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : villa.status === 'Hết phòng' 
-                    ? 'bg-rose-50 text-rose-800 border-rose-200' 
-                    : 'bg-neutral-100 text-neutral-600';
-                
+              {villaCardModels.map(({ villa, isAvailable, badgeColor, locationLabel, priceRange, amenities, remainingAmenities }) => {
                 return (
                   <div 
                     key={villa.id}
@@ -648,7 +659,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
                         <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-medium mb-3">
                           <MapPin className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>{getLocationLabel(villa.location)}</span>
+                          <span>{locationLabel}</span>
                         </div>
 
                         <p className="text-xs text-neutral-500 line-clamp-3 leading-relaxed mb-4">
@@ -658,23 +669,16 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
                       {/* Display key tags of amenities */}
                       <div className="flex flex-wrap gap-1.5">
-                        {(() => {
-                          const cardAmenities = getCardAmenities(villa.facilities, 5);
-                          return (
-                            <>
-                              {cardAmenities.items.map(item => (
-                                <span key={item.key} className="bg-neutral-50 text-neutral-500 px-2 py-1 rounded text-[10px] font-bold">
-                                  ✓ {getAmenityLabel(item, language)}
-                                </span>
-                              ))}
-                              {cardAmenities.remainingCount > 0 && (
-                                <span className="bg-sky-50 text-sky-700 px-2 py-1 rounded text-[10px] font-bold">
-                                  +{cardAmenities.remainingCount} tiện ích
-                                </span>
-                              )}
-                            </>
-                          );
-                        })()}
+                        {amenities.map(item => (
+                          <span key={item.key} className="bg-neutral-50 text-neutral-500 px-2 py-1 rounded text-[10px] font-bold">
+                            ✓ {item.label}
+                          </span>
+                        ))}
+                        {remainingAmenities > 0 && (
+                          <span className="bg-sky-50 text-sky-700 px-2 py-1 rounded text-[10px] font-bold">
+                            +{remainingAmenities} tiện ích
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -688,7 +692,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                         <div className="text-right">
                           <span className="text-[10px] uppercase font-bold text-neutral-400">{t('list.rateLabel')}</span>
                           <div className="mt-1 text-sm font-black leading-6 tracking-tight text-[#fe6a34] font-display md:text-right">
-                            <span>{formatPriceRange(villa.price, villa.priceMax)}</span>
+                            <span>{priceRange}</span>
                             <span className="block text-[11px] font-bold text-neutral-400">{t('public.pricePerNight')}</span>
                           </div>
                         </div>
@@ -696,12 +700,12 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                         <button
                           onClick={() => onViewDetail(villa.id, villa.type)}
                           className={`w-full text-center py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                            hasMatchingStatus
+                            isAvailable
                               ? 'bg-[#0071c2] hover:bg-[#005899] text-white shadow-md hover:scale-[1.01]'
                               : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-600'
                           }`}
                         >
-                          {hasMatchingStatus 
+                          {isAvailable 
                             ? t('list.bookNow') 
                             : t('list.viewInfo')}
                         </button>

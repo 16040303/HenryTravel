@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState, useTransition } from 'react';
 import { 
   Building2, CalendarCheck, Landmark, AlertCircle, Sparkles, 
   ArrowUpRight, PlusCircle, CalendarDays, ClipboardList, 
@@ -67,17 +67,37 @@ export default function AdminLayout({
   // Trigger add villa modal directly from dashboard quick action
   const [directOpenAddVilla, setDirectOpenAddVilla] = useState(false);
 
-  const pendingBookingsCount = adminStats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length;
-  const confirmedBookingsCount = adminStats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length;
-  const cancelledBookingsCount = adminStats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length;
+  const [isTabPending, startTabTransition] = useTransition();
 
-  const totalRevenue = bookings
-    .filter(b => b.status === 'CONFIRMED')
-    .reduce((sum, curr) => sum + curr.totalPrice, 0) + 128000000;
+  const pendingBookingsCount = useMemo(
+    () => adminStats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length,
+    [adminStats?.pendingBookings, bookings]
+  );
+  const confirmedBookingsCount = useMemo(
+    () => adminStats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length,
+    [adminStats?.confirmedBookings, bookings]
+  );
+  const cancelledBookingsCount = useMemo(
+    () => adminStats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length,
+    [adminStats?.cancelledBookings, bookings]
+  );
+
+  const totalRevenue = useMemo(
+    () => bookings
+      .filter(b => b.status === 'CONFIRMED')
+      .reduce((sum, curr) => sum + curr.totalPrice, 0) + 128000000,
+    [bookings]
+  );
+
+  const switchAdminTab = (tab: AdminLayoutProps['activeTab']) => {
+    startTabTransition(() => {
+      onTabChange(tab);
+    });
+  };
 
   const handleOpenAddVillaDirectly = () => {
     setDirectOpenAddVilla(true);
-    onTabChange('villas');
+    switchAdminTab('villas');
   };
 
   interface MenuItem {
@@ -87,7 +107,7 @@ export default function AdminLayout({
     readonly badge?: number;
   }
 
-  const menuItems: MenuItem[] = [
+  const menuItems: MenuItem[] = useMemo(() => [
     { id: 'dashboard', label: t('admin.nav.dashboard'), icon: <Landmark className="w-4.5 h-4.5" /> },
     { id: 'villas', label: t('admin.nav.villas'), icon: <Building2 className="w-4.5 h-4.5" /> },
     { id: 'bookings', label: t('admin.nav.bookings'), icon: <ClipboardList className="w-4.5 h-4.5" />, badge: pendingBookingsCount > 0 ? pendingBookingsCount : undefined },
@@ -95,7 +115,7 @@ export default function AdminLayout({
     { id: 'availability', label: t('admin.nav.availability'), icon: <CalendarDays className="w-4.5 h-4.5" /> },
     { id: 'info', label: t('admin.nav.info'), icon: <Info className="w-4.5 h-4.5" /> },
     { id: 'settings', label: t('admin.nav.settings'), icon: <Sliders className="w-4.5 h-4.5" /> }
-  ];
+  ], [pendingBookingsCount, t]);
 
   return (
     <div className="flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-4 overflow-hidden px-4 py-4 mx-auto md:px-8 lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
@@ -120,7 +140,7 @@ export default function AdminLayout({
               <button
                 key={item.id}
                 onClick={() => {
-                  onTabChange(item.id);
+                  switchAdminTab(item.id);
                   if (item.id !== 'villas') {
                     setDirectOpenAddVilla(false);
                   }
@@ -147,7 +167,7 @@ export default function AdminLayout({
       </aside>
 
       <section className="flex-1 min-h-0 w-full overflow-hidden flex flex-col relative">
-        {isRefreshing && (
+        {(isRefreshing || isTabPending) && (
           <div className="absolute left-0 right-0 top-0 z-20 h-1 overflow-hidden rounded-full bg-[#edf3ff]">
             <div className="h-full w-1/3 animate-pulse rounded-full bg-[#0071c2]" />
           </div>
@@ -159,7 +179,7 @@ export default function AdminLayout({
             bookings={bookings}
             feedbacks={feedbacks}
             onNavigateToTab={(tab) => {
-              onTabChange(tab);
+              switchAdminTab(tab);
               if (tab !== 'villas') {
                 setDirectOpenAddVilla(false);
               }
