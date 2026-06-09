@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Building2, Trash2, Edit, PlusCircle, Search, MapPin, 
@@ -239,10 +239,13 @@ export default function AdminVillaManager({
     });
   };
 
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
   // Filter & Search
-  const filteredVillas = villas.filter(v => {
-    const matchesSearch = v.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          v.location.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredVillas = useMemo(() => villas.filter(v => {
+    const matchesSearch = !normalizedSearchQuery ||
+      v.name.toLowerCase().includes(normalizedSearchQuery) ||
+      v.location.toLowerCase().includes(normalizedSearchQuery);
     const matchesStatus = statusFilter === 'All' || v.status === statusFilter;
     
     // Active/Inactive filter matching
@@ -256,7 +259,7 @@ export default function AdminVillaManager({
     const matchesType = typeFilter === 'All' || v.type === typeFilter;
 
     return matchesSearch && matchesStatus && matchesActive && matchesType;
-  });
+  }), [activeFilter, normalizedSearchQuery, statusFilter, typeFilter, villas]);
 
   // Checkbox handlers
   const handleToggleSelect = (id: EntityId) => {
@@ -278,9 +281,13 @@ export default function AdminVillaManager({
     setSelectedVillaIds([]);
   };
 
-  const locationSuggestions = VIETNAM_PROVINCES_2025.filter((province) =>
-    province.toLowerCase().includes(villaLocation.trim().toLowerCase())
-  ).slice(0, 8);
+  const locationSuggestions = useMemo(() => {
+    const query = villaLocation.trim().toLowerCase();
+    if (!query) return VIETNAM_PROVINCES_2025.slice(0, 8);
+    return VIETNAM_PROVINCES_2025.filter((province) =>
+      province.toLowerCase().includes(query)
+    ).slice(0, 8);
+  }, [villaLocation]);
 
   const handleBulkDelete = () => {
     onBulkDeleteVillas(selectedVillaIds);

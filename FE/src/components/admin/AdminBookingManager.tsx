@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ClipboardList, Search, Eye, Check, X, Copy,
@@ -54,10 +54,26 @@ export default function AdminBookingManager({
   }, [selectedBooking?.code]);
 
   // 1. Calculate stats counts
-  const totalPending = bookings.filter(b => b.status === 'PENDING').length;
-  const totalConfirmed = bookings.filter(b => b.status === 'CONFIRMED' && new Date(b.checkOut) >= new Date()).length;
-  const totalCompleted = bookings.filter(b => b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date()).length;
-  const totalCancelled = bookings.filter(b => b.status === 'CANCELLED').length;
+  const bookingStats = useMemo(() => {
+    const nowTime = Date.now();
+    return bookings.reduce(
+      (acc, booking) => {
+        if (booking.status === 'PENDING') acc.pending += 1;
+        if (booking.status === 'CANCELLED') acc.cancelled += 1;
+        if (booking.status === 'CONFIRMED') {
+          if (new Date(booking.checkOut).getTime() >= nowTime) acc.confirmed += 1;
+          else acc.completed += 1;
+        }
+        return acc;
+      },
+      { pending: 0, confirmed: 0, completed: 0, cancelled: 0 }
+    );
+  }, [bookings]);
+
+  const totalPending = bookingStats.pending;
+  const totalConfirmed = bookingStats.confirmed;
+  const totalCompleted = bookingStats.completed;
+  const totalCancelled = bookingStats.cancelled;
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -179,16 +195,17 @@ export default function AdminBookingManager({
   };
 
   // Filter bookings
-  const filteredBookings = bookings.filter(b => {
-    const matchesSearch =
-      b.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.villaName.toLowerCase().includes(searchQuery.toLowerCase());
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredBookings = useMemo(() => bookings.filter(b => {
+    const matchesSearch = !normalizedSearchQuery ||
+      b.code.toLowerCase().includes(normalizedSearchQuery) ||
+      b.fullName.toLowerCase().includes(normalizedSearchQuery) ||
+      b.phone.toLowerCase().includes(normalizedSearchQuery) ||
+      b.villaName.toLowerCase().includes(normalizedSearchQuery);
 
     const matchesTab = activeStatusTab === 'ALL' || b.status === activeStatusTab;
     return matchesSearch && matchesTab;
-  });
+  }), [activeStatusTab, bookings, normalizedSearchQuery]);
 
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">

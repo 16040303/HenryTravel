@@ -469,6 +469,16 @@ export const TRANSLATIONS: Record<Language, Partial<Record<string, string>>> = {
     'footer.social': 'Mạng xã hội',
     'footer.contactInfo': 'Thông tin liên hệ',
     'footer.hotline': 'Hotline 24/7',
+    'contact.button': 'Liên hệ',
+    'contact.close': 'Đóng',
+    'contact.title': 'Thông tin liên hệ',
+    'contact.desc': 'Chọn kênh phù hợp để được tư vấn nhanh về villa, khách sạn - resort và booking.',
+    'contact.timezone': 'Giờ Việt Nam (UTC+7)',
+    'contact.consultMessage': 'Xin chào HenryTravel, tôi cần tư vấn về dịch vụ đặt phòng villa.',
+    'contact.wechatId': 'WeChat ID',
+    'contact.kakaoTalkId': 'KakaoTalk ID',
+    'contact.facebookFanpage': 'Facebook Fanpage',
+    'contact.facebookPersonal': 'Facebook cá nhân',
 
     // Admin media
 
@@ -1277,6 +1287,16 @@ export const TRANSLATIONS: Record<Language, Partial<Record<string, string>>> = {
     'footer.social': 'Social media',
     'footer.contactInfo': 'Contact information',
     'footer.hotline': 'Hotline 24/7',
+    'contact.button': 'Contact',
+    'contact.close': 'Close',
+    'contact.title': 'Contact information',
+    'contact.desc': 'Choose the best channel for quick advice about villas, hotels - resorts, and bookings.',
+    'contact.timezone': 'Vietnam time (UTC+7)',
+    'contact.consultMessage': 'Hello HenryTravel, I need advice about villa booking services.',
+    'contact.wechatId': 'WeChat ID',
+    'contact.kakaoTalkId': 'KakaoTalk ID',
+    'contact.facebookFanpage': 'Facebook Fanpage',
+    'contact.facebookPersonal': 'Personal Facebook',
 
     // Common
     'common.backToTop': 'Back to top',
@@ -2084,6 +2104,16 @@ export const TRANSLATIONS: Record<Language, Partial<Record<string, string>>> = {
     'footer.social': '소셜 미디어',
     'footer.contactInfo': '연락처 정보',
     'footer.hotline': '연중무휴 상담',
+    'contact.button': '문의하기',
+    'contact.close': '닫기',
+    'contact.title': '연락처 정보',
+    'contact.desc': '빌라, 호텔·리조트 및 예약 상담을 빠르게 받을 채널을 선택해 주세요.',
+    'contact.timezone': '베트남 시간 (UTC+7)',
+    'contact.consultMessage': '안녕하세요 HenryTravel, 빌라 예약 서비스 상담이 필요합니다.',
+    'contact.wechatId': 'WeChat ID',
+    'contact.kakaoTalkId': 'KakaoTalk ID',
+    'contact.facebookFanpage': 'Facebook 팬페이지',
+    'contact.facebookPersonal': '개인 Facebook',
 
     // Admin media
 
@@ -3030,6 +3060,16 @@ export const TRANSLATIONS: Record<Language, Partial<Record<string, string>>> = {
     'common.previousMonth': '上个月',
     'common.today': '今天',
     'common.selectDate': '选择日期',
+    'contact.button': '联系',
+    'contact.close': '关闭',
+    'contact.title': '联系方式',
+    'contact.desc': '请选择合适渠道，快速咨询别墅、酒店 - 度假村和预订事宜。',
+    'contact.timezone': '越南时间 (UTC+7)',
+    'contact.consultMessage': '您好 HenryTravel，我想咨询别墅预订服务。',
+    'contact.wechatId': 'WeChat ID',
+    'contact.kakaoTalkId': 'KakaoTalk ID',
+    'contact.facebookFanpage': 'Facebook 主页',
+    'contact.facebookPersonal': '个人 Facebook',
 
     'detail.policies': '住宿规定与指南',
   },

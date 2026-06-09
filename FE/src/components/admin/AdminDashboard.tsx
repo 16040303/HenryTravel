@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Building2, CalendarCheck, Landmark, AlertCircle,
   ArrowUpRight, ArrowDownRight, PlusCircle, CalendarDays,
@@ -43,88 +43,113 @@ export default function AdminDashboard({
     };
   }, []);
 
-  const villasCount = stats?.totalVillas ?? villas.length;
-  const bookingsCount = stats ? stats.pendingBookings + stats.confirmedBookings + stats.cancelledBookings + stats.completedBookings : bookings.length;
-  const pendingCount = stats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length;
-  const confirmedCount = stats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length;
-  const cancelledCount = stats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length;
-  const completedCount = stats?.completedBookings ?? bookings.filter(b => 
-    b.status === 'CONFIRMED' && new Date(b.checkOut) < new Date()
-  ).length;
+  const dashboardDerived = useMemo(() => {
+    const villasCount = stats?.totalVillas ?? villas.length;
+    const bookingsCount = stats ? stats.pendingBookings + stats.confirmedBookings + stats.cancelledBookings + stats.completedBookings : bookings.length;
+    const pendingCount = stats?.pendingBookings ?? bookings.filter(b => b.status === 'PENDING').length;
+    const confirmedCount = stats?.confirmedBookings ?? bookings.filter(b => b.status === 'CONFIRMED').length;
+    const cancelledCount = stats?.cancelledBookings ?? bookings.filter(b => b.status === 'CANCELLED').length;
+    const now = new Date();
+    const nowTime = now.getTime();
+    const completedCount = stats?.completedBookings ?? bookings.filter(b =>
+      b.status === 'CONFIRMED' && new Date(b.checkOut).getTime() < nowTime
+    ).length;
 
-  // Booking analytics from current API data, grouped by the last 6 months.
-  const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
-  const currentMonthStart = new Date();
-  currentMonthStart.setDate(1);
-  currentMonthStart.setHours(0, 0, 0, 0);
-  const monthlyData = Array.from({ length: 6 }, (_, index) => {
-    const monthDate = new Date(currentMonthStart);
-    monthDate.setMonth(currentMonthStart.getMonth() - (5 - index));
-    const month = monthDate.getMonth();
-    const year = monthDate.getFullYear();
-    return {
-      name: monthFormatter.format(monthDate),
-      count: bookings.filter((booking) => {
+    // Booking analytics from current API data, grouped by the last 6 months.
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+    const currentMonthStart = new Date();
+    currentMonthStart.setDate(1);
+    currentMonthStart.setHours(0, 0, 0, 0);
+    const monthlyData = Array.from({ length: 6 }, (_, index) => {
+      const monthDate = new Date(currentMonthStart);
+      monthDate.setMonth(currentMonthStart.getMonth() - (5 - index));
+      const month = monthDate.getMonth();
+      const year = monthDate.getFullYear();
+      return {
+        name: monthFormatter.format(monthDate),
+        count: bookings.filter((booking) => {
+          const createdAt = new Date(booking.createdAt);
+          return createdAt.getMonth() === month && createdAt.getFullYear() === year;
+        }).length,
+      };
+    });
+
+    const thisMonthRevenue = stats?.estimatedRevenue ?? bookings
+      .filter((booking) => {
         const createdAt = new Date(booking.createdAt);
-        return createdAt.getMonth() === month && createdAt.getFullYear() === year;
-      }).length,
+        return booking.status === 'CONFIRMED' && createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, curr) => sum + curr.totalPrice, 0);
+    const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthRevenue = bookings
+      .filter((booking) => {
+        const createdAt = new Date(booking.createdAt);
+        return booking.status === 'CONFIRMED' && createdAt.getMonth() === previousMonthDate.getMonth() && createdAt.getFullYear() === previousMonthDate.getFullYear();
+      })
+      .reduce((sum, curr) => sum + curr.totalPrice, 0);
+    const revenuePercentChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+
+    const topVillas = (stats?.topVillas && stats.topVillas.length > 0
+      ? stats.topVillas.map((villa) => {
+          const matchedVilla = villas.find((item) => String(item.id) === String(villa.id));
+          return {
+            id: villa.id,
+            name: villa.name,
+            image: matchedVilla?.image || '',
+            bookingCount: villa.bookingCount,
+            occupancy: Math.max(35, Math.min(95, villa.bookingCount * 15)),
+          };
+        })
+      : villas.map(villa => {
+          const count = bookings.filter(b => String(b.villaId) === String(villa.id)).length;
+          const occupancy = villa.bookedDates ? Math.min(Math.round((villa.bookedDates.length / 30) * 100), 100) : 0;
+          return {
+            id: villa.id,
+            name: villa.name,
+            image: villa.image,
+            bookingCount: count,
+            occupancy: occupancy || Math.max(35, Math.min(95, count * 15))
+          };
+        }))
+      .sort((a, b) => b.bookingCount - a.bookingCount)
+      .slice(0, 5);
+
+    const recentBookings = [...bookings]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+
+    const recentFeedbacks = [...feedbacks]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 4);
+
+    return {
+      villasCount,
+      bookingsCount,
+      pendingCount,
+      confirmedCount,
+      cancelledCount,
+      completedCount,
+      monthlyData,
+      thisMonthRevenue,
+      lastMonthRevenue,
+      revenuePercentChange,
+      isRevenueUp: revenuePercentChange >= 0,
+      topVillas,
+      recentBookings,
+      recentFeedbacks,
     };
-  });
+  }, [bookings, feedbacks, stats, villas]);
+
+  const {
+    villasCount, bookingsCount, pendingCount, confirmedCount, cancelledCount, completedCount,
+    monthlyData, thisMonthRevenue, lastMonthRevenue, revenuePercentChange, isRevenueUp,
+    topVillas, recentBookings, recentFeedbacks,
+  } = dashboardDerived;
 
   const maxCount = Math.max(1, ...monthlyData.map(d => d.count));
   const svgHeight = 160;
   const barWidth = 32;
   const gap = 20;
-
-  const now = new Date();
-  const thisMonthRevenue = stats?.estimatedRevenue ?? bookings
-    .filter((booking) => {
-      const createdAt = new Date(booking.createdAt);
-      return booking.status === 'CONFIRMED' && createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, curr) => sum + curr.totalPrice, 0);
-  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthRevenue = bookings
-    .filter((booking) => {
-      const createdAt = new Date(booking.createdAt);
-      return booking.status === 'CONFIRMED' && createdAt.getMonth() === previousMonthDate.getMonth() && createdAt.getFullYear() === previousMonthDate.getFullYear();
-    })
-    .reduce((sum, curr) => sum + curr.totalPrice, 0);
-  const revenuePercentChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
-  const isRevenueUp = revenuePercentChange >= 0;
-
-  const topVillas = (stats?.topVillas && stats.topVillas.length > 0
-    ? stats.topVillas.map((villa) => {
-        const matchedVilla = villas.find((item) => String(item.id) === String(villa.id));
-        return {
-          id: villa.id,
-          name: villa.name,
-          image: matchedVilla?.image || '',
-          bookingCount: villa.bookingCount,
-          occupancy: Math.max(35, Math.min(95, villa.bookingCount * 15)),
-        };
-      })
-    : villas.map(villa => {
-        const count = bookings.filter(b => String(b.villaId) === String(villa.id)).length;
-        const occupancy = villa.bookedDates ? Math.min(Math.round((villa.bookedDates.length / 30) * 100), 100) : 0;
-        return {
-          id: villa.id,
-          name: villa.name,
-          image: villa.image,
-          bookingCount: count,
-          occupancy: occupancy || Math.max(35, Math.min(95, count * 15))
-        };
-      }))
-    .sort((a, b) => b.bookingCount - a.bookingCount)
-    .slice(0, 5);
-
-  const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
-
-  const recentFeedbacks = [...feedbacks]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 4);
 
   // Hover state for SVG chart tooltips
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
