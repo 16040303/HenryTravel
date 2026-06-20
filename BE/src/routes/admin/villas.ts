@@ -151,6 +151,112 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+router.post('/bulk-delete', async (req, res, next) => {
+  try {
+    const rawIds = (req.body as { ids?: unknown }).ids;
+    if (!Array.isArray(rawIds)) throw new AppError(400, 'VALIDATION_ERROR', 'ids phải là mảng.');
+
+    const ids = Array.from(new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map((id) => id.trim())));
+    if (ids.length === 0) throw new AppError(400, 'VALIDATION_ERROR', 'ids không được rỗng.');
+
+    const villas = await prisma.villa.findMany({ where: { id: { in: ids } }, include: { media: true } });
+    if (villas.length === 0) {
+      res.json({ deletedCount: 0 });
+      return;
+    }
+
+    const villaIds = villas.map((villa) => villa.id);
+    const activeCount = await prisma.booking.count({
+      where: {
+        villaId: { in: villaIds },
+        OR: [{ status: 'confirmed' }, { status: 'pending_hold', holdExpireAt: { gt: new Date() } }],
+      },
+    });
+    if (activeCount > 0) throw new AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Một hoặc nhiều villa đang có booking hoạt động.');
+
+    const historicalBookingCount = await prisma.booking.count({ where: { villaId: { in: villaIds } } });
+    if (historicalBookingCount > 0) {
+      throw new AppError(409, 'VILLA_HAS_BOOKING_HISTORY', 'Không thể xóa villa vì vẫn còn lịch sử booking liên quan. Hãy ẩn villa thay vì xóa để giữ dữ liệu phân tích.');
+    }
+
+    const cleanupJobs: Prisma.CloudinaryCleanupJobCreateManyInput[] = villas.flatMap((villa) =>
+      villa.media
+        .filter((media) => media.publicId)
+        .map((media) => ({
+          publicId: media.publicId as string,
+          resourceType: media.type,
+          url: media.secureUrl || media.url,
+          villaId: villa.id,
+          reason: 'Deleted villa',
+        }))
+    );
+
+    const adminId = getAdminId(req);
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.feedback.deleteMany({ where: { villaId: { in: villaIds } } });
+      await tx.villaBlockedDate.deleteMany({ where: { villaId: { in: villaIds } } });
+      const deleteResult = await tx.villa.deleteMany({ where: { id: { in: villaIds } } });
+      if (cleanupJobs.length > 0) {
+        await tx.cloudinaryCleanupJob.createMany({ data: cleanupJobs, skipDuplicates: true });
+      }
+      await tx.adminLog.createMany({
+        data: villaIds.map((id) => ({
+          adminId,
+          action: 'BULK_DELETE_VILLA',
+          targetType: 'villa',
+          targetId: id,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        })),
+      });
+      return deleteResult;
+    });
+
+    res.json({ deletedCount: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/bulk-status', async (req, res, next) => {
+  try {
+    const body = req.body as { ids?: unknown; active?: unknown };
+    if (!Array.isArray(body.ids)) throw new AppError(400, 'VALIDATION_ERROR', 'ids phải là mảng.');
+    if (typeof body.active !== 'boolean') throw new AppError(400, 'VALIDATION_ERROR', 'active phải là boolean.');
+
+    const ids = Array.from(new Set(body.ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map((id) => id.trim())));
+    if (ids.length === 0) throw new AppError(400, 'VALIDATION_ERROR', 'ids không được rỗng.');
+
+    const villas = await prisma.villa.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (villas.length === 0) {
+      res.json({ updatedCount: 0 });
+      return;
+    }
+
+    const villaIds = villas.map((villa) => villa.id);
+    const status: VillaStatus = body.active ? 'available' : 'hidden';
+    const adminId = getAdminId(req);
+    const result = await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.villa.updateMany({ where: { id: { in: villaIds } }, data: { status } });
+      await tx.adminLog.createMany({
+        data: villaIds.map((id) => ({
+          adminId,
+          action: 'BULK_UPDATE_VILLA_STATUS',
+          targetType: 'villa',
+          targetId: id,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        })),
+      });
+      return updateResult;
+    });
+
+    res.json({ updatedCount: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.put('/:id', async (req, res, next) => {
   try {
     const existing = await prisma.villa.findUnique({ where: { id: req.params.id } });
@@ -173,8 +279,16 @@ router.delete('/:id', async (req, res, next) => {
       where: { villaId: req.params.id, OR: [{ status: 'confirmed' }, { status: 'pending_hold', holdExpireAt: { gt: new Date() } }] },
     });
     if (activeCount > 0) throw new AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Villa đang có booking hoạt động.');
+    const historicalBookingCount = await prisma.booking.count({ where: { villaId: req.params.id } });
+    if (historicalBookingCount > 0) {
+      throw new AppError(409, 'VILLA_HAS_BOOKING_HISTORY', 'Không thể xóa villa vì vẫn còn lịch sử booking liên quan. Hãy ẩn villa thay vì xóa để giữ dữ liệu phân tích.');
+    }
 
-    await prisma.villa.delete({ where: { id: req.params.id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.feedback.deleteMany({ where: { villaId: req.params.id } });
+      await tx.villaBlockedDate.deleteMany({ where: { villaId: req.params.id } });
+      await tx.villa.delete({ where: { id: req.params.id } });
+    });
     for (const media of existing.media) {
       if (!media.publicId) continue;
       await prisma.cloudinaryCleanupJob.upsert({

@@ -22,6 +22,8 @@ import {
   toggleAdminFeedback,
   updateAdminVilla,
   addAdminVillaMedia,
+  bulkDeleteAdminVillas,
+  bulkStatusUpdateAdminVillas,
 } from '../lib/api';
 import { AdminStats, AdminUser, AdminVillaMutationPayload, EntityId, VillaDetail, Booking, Feedback } from '../types';
 import type { UploadedMedia } from '../lib/api';
@@ -187,8 +189,9 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       showToast('error', t('admin.dateOverlapError'));
       return;
     }
-    if (code === 'VILLA_HAS_ACTIVE_BOOKINGS' || code === 'VILLA_HAS_BOOKINGS') {
-      showToast('error', t('admin.villaHasBookingsError'));
+    if (code === 'VILLA_HAS_ACTIVE_BOOKINGS' || code === 'VILLA_HAS_BOOKINGS' || code === 'VILLA_HAS_BOOKING_HISTORY') {
+      const message = error instanceof Error && error.message ? error.message : t('admin.villaHasBookingsError');
+      showToast('error', message);
       return;
     }
 
@@ -541,12 +544,44 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   // 9. BULK DELETE Villas
   const handleBulkDeleteVillas = (ids: EntityId[]) => {
-    showToast('info', t('admin.bulkDeleteLater', { count: ids.length }));
+    const normalizedIds = ids.map(String).filter(Boolean);
+    if (normalizedIds.length === 0 || mutationLoading) return;
+    triggerConfirmModal({
+      title: t('admin.bulkDeleteTitle', { count: normalizedIds.length }),
+      message: t('admin.bulkDeleteMessage', { count: normalizedIds.length }),
+      type: 'danger',
+      onConfirm: async () => {
+        if (mutationLoading) return;
+        setMutationLoading(true);
+        try {
+          const result = await bulkDeleteAdminVillas(normalizedIds);
+          await loadAdminStats({ preserveScroll: true, silent: true });
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+          showToast('success', t('admin.bulkDeleteSuccess', { count: result.deletedCount }));
+        } catch (error) {
+          handleMutationError(error, t('admin.bulkDeleteError'));
+          setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+        } finally {
+          setMutationLoading(false);
+        }
+      }
+    });
   };
 
   // 10. BULK STATUS UPDATE
-  const handleBulkStatusUpdateVillas = (ids: EntityId[], _active: boolean) => {
-    showToast('info', t('admin.bulkStatusLater', { count: ids.length }));
+  const handleBulkStatusUpdateVillas = async (ids: EntityId[], active: boolean) => {
+    const normalizedIds = ids.map(String).filter(Boolean);
+    if (normalizedIds.length === 0 || mutationLoading) return;
+    setMutationLoading(true);
+    try {
+      const result = await bulkStatusUpdateAdminVillas(normalizedIds, active);
+      await loadAdminStats({ preserveScroll: true, silent: true });
+      showToast('success', t(active ? 'admin.bulkStatusActiveSuccess' : 'admin.bulkStatusInactiveSuccess', { count: result.updatedCount }));
+    } catch (error) {
+      handleMutationError(error, t('admin.bulkStatusError'));
+    } finally {
+      setMutationLoading(false);
+    }
   };
 
   // Auth screen layout

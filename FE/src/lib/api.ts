@@ -160,7 +160,8 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   if (!response.ok) {
     const body = (data || {}) as ApiErrorBody;
     const error = new Error(body.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
-    (error as Error & { code?: string }).code = body.error;
+    (error as Error & { code?: string; status?: number }).code = body.error;
+    (error as Error & { code?: string; status?: number }).status = response.status;
     throw error;
   }
 
@@ -732,6 +733,20 @@ export async function deleteAdminVillaMedia(villaId: string, mediaId: string): P
 export async function deleteAdminVilla(id: string): Promise<void> {
   await adminApiRequest<void>(`/admin/villas/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+  });
+}
+
+export async function bulkDeleteAdminVillas(ids: string[]): Promise<{ deletedCount: number }> {
+  return adminApiRequest<{ deletedCount: number }>('/admin/villas/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function bulkStatusUpdateAdminVillas(ids: string[], active: boolean): Promise<{ updatedCount: number }> {
+  return adminApiRequest<{ updatedCount: number }>('/admin/villas/bulk-status', {
+    method: 'POST',
+    body: JSON.stringify({ ids, active }),
   });
 }
 

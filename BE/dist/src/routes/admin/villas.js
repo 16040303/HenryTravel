@@ -168,6 +168,111 @@ router.post('/', async (req, res, next) => {
         next(error);
     }
 });
+router.post('/bulk-delete', async (req, res, next) => {
+    try {
+        const rawIds = req.body.ids;
+        if (!Array.isArray(rawIds))
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'ids phải là mảng.');
+        const ids = Array.from(new Set(rawIds.filter((id) => typeof id === 'string' && id.trim().length > 0).map((id) => id.trim())));
+        if (ids.length === 0)
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'ids không được rỗng.');
+        const villas = await prisma_1.prisma.villa.findMany({ where: { id: { in: ids } }, include: { media: true } });
+        if (villas.length === 0) {
+            res.json({ deletedCount: 0 });
+            return;
+        }
+        const villaIds = villas.map((villa) => villa.id);
+        const activeCount = await prisma_1.prisma.booking.count({
+            where: {
+                villaId: { in: villaIds },
+                OR: [{ status: 'confirmed' }, { status: 'pending_hold', holdExpireAt: { gt: new Date() } }],
+            },
+        });
+        if (activeCount > 0)
+            throw new errors_1.AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Một hoặc nhiều villa đang có booking hoạt động.');
+        const cleanupJobs = villas.flatMap((villa) => villa.media
+            .filter((media) => media.publicId)
+            .map((media) => ({
+            publicId: media.publicId,
+            resourceType: media.type,
+            url: media.secureUrl || media.url,
+            villaId: villa.id,
+            reason: 'Deleted villa',
+        })));
+        const adminId = getAdminId(req);
+        const result = await prisma_1.prisma.$transaction(async (tx) => {
+            const relatedBookings = await tx.booking.findMany({ where: { villaId: { in: villaIds } }, select: { id: true } });
+            const bookingIds = relatedBookings.map((booking) => booking.id);
+            if (bookingIds.length > 0) {
+                await tx.bookingHistory.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                await tx.zaloMessage.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                await tx.feedback.deleteMany({ where: { OR: [{ bookingId: { in: bookingIds } }, { villaId: { in: villaIds } }] } });
+                await tx.booking.deleteMany({ where: { id: { in: bookingIds } } });
+            }
+            else {
+                await tx.feedback.deleteMany({ where: { villaId: { in: villaIds } } });
+            }
+            await tx.villaBlockedDate.deleteMany({ where: { villaId: { in: villaIds } } });
+            const deleteResult = await tx.villa.deleteMany({ where: { id: { in: villaIds } } });
+            if (cleanupJobs.length > 0) {
+                await tx.cloudinaryCleanupJob.createMany({ data: cleanupJobs, skipDuplicates: true });
+            }
+            await tx.adminLog.createMany({
+                data: villaIds.map((id) => ({
+                    adminId,
+                    action: 'BULK_DELETE_VILLA',
+                    targetType: 'villa',
+                    targetId: id,
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent'],
+                })),
+            });
+            return deleteResult;
+        });
+        res.json({ deletedCount: result.count });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/bulk-status', async (req, res, next) => {
+    try {
+        const body = req.body;
+        if (!Array.isArray(body.ids))
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'ids phải là mảng.');
+        if (typeof body.active !== 'boolean')
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'active phải là boolean.');
+        const ids = Array.from(new Set(body.ids.filter((id) => typeof id === 'string' && id.trim().length > 0).map((id) => id.trim())));
+        if (ids.length === 0)
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'ids không được rỗng.');
+        const villas = await prisma_1.prisma.villa.findMany({ where: { id: { in: ids } }, select: { id: true } });
+        if (villas.length === 0) {
+            res.json({ updatedCount: 0 });
+            return;
+        }
+        const villaIds = villas.map((villa) => villa.id);
+        const status = body.active ? 'available' : 'hidden';
+        const adminId = getAdminId(req);
+        const result = await prisma_1.prisma.$transaction(async (tx) => {
+            const updateResult = await tx.villa.updateMany({ where: { id: { in: villaIds } }, data: { status } });
+            await tx.adminLog.createMany({
+                data: villaIds.map((id) => ({
+                    adminId,
+                    action: 'BULK_UPDATE_VILLA_STATUS',
+                    targetType: 'villa',
+                    targetId: id,
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent'],
+                })),
+            });
+            return updateResult;
+        });
+        res.json({ updatedCount: result.count });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 router.put('/:id', async (req, res, next) => {
     try {
         const existing = await prisma_1.prisma.villa.findUnique({ where: { id: req.params.id } });
@@ -192,7 +297,21 @@ router.delete('/:id', async (req, res, next) => {
         });
         if (activeCount > 0)
             throw new errors_1.AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Villa đang có booking hoạt động.');
-        await prisma_1.prisma.villa.delete({ where: { id: req.params.id } });
+        await prisma_1.prisma.$transaction(async (tx) => {
+            const relatedBookings = await tx.booking.findMany({ where: { villaId: req.params.id }, select: { id: true } });
+            const bookingIds = relatedBookings.map((booking) => booking.id);
+            if (bookingIds.length > 0) {
+                await tx.bookingHistory.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                await tx.zaloMessage.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                await tx.feedback.deleteMany({ where: { OR: [{ bookingId: { in: bookingIds } }, { villaId: req.params.id }] } });
+                await tx.booking.deleteMany({ where: { id: { in: bookingIds } } });
+            }
+            else {
+                await tx.feedback.deleteMany({ where: { villaId: req.params.id } });
+            }
+            await tx.villaBlockedDate.deleteMany({ where: { villaId: req.params.id } });
+            await tx.villa.delete({ where: { id: req.params.id } });
+        });
         for (const media of existing.media) {
             if (!media.publicId)
                 continue;
