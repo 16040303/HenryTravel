@@ -1,15 +1,28 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sliders, CheckSquare, RefreshCw } from 'lucide-react';
+import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sliders, CheckSquare, RefreshCw, Check, Waves, Compass, Utensils, ParkingCircle, WashingMachine, PawPrint, KeyRound, Sparkles } from 'lucide-react';
 import { AccommodationTypeValue, FilterParams, Villa } from '../types';
 import { DEFAULT_LOCATIONS, FILTER_FACILITIES, normalizeLocationCity } from '../constants';
-import { getAmenityDisplay, getAmenityLabel, getCardAmenities } from '../data/amenities';
+import { getAmenityDisplay, getAmenityLabel, getCardAmenities, FILTER_AMENITY_KEYS } from '../data/amenities';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useVillasQuery } from '../hooks/queries';
 import OptimizedImage from './OptimizedImage';
 import { VillaCardSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
 import GuestCategoryPicker from './common/GuestCategoryPicker';
+import AmenitiesModal from './common/AmenitiesModal';
 import { getLocalDateString } from '../lib/date';
+
+const AMENITY_ICON_COMPONENTS = {
+  Waves,
+  Compass,
+  Utensils,
+  ParkingCircle,
+  WashingMachine,
+  PawPrint,
+  KeyRound,
+  Sparkles,
+} satisfies Record<string, React.ComponentType<{ className?: string }>>;
+
 
 interface ListingViewProps {
   initialSearchParams: {
@@ -39,6 +52,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
   // Edit Search Popup Toggle
   const [showEditSearch, setShowEditSearch] = useState(false);
+  const [isAmenitiesModalOpen, setIsAmenitiesModalOpen] = useState(false);
   const villaQueryFilters = useMemo(() => ({
     location: params.location,
     checkIn: params.checkIn,
@@ -514,22 +528,83 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
           {/* Amenities checklist */}
           <div className="flex flex-col gap-2 pt-3 border-t border-neutral-100">
             <span className="text-xs font-bold text-neutral-600 uppercase">{t('list.amenities')}</span>
-            <div className="flex flex-col gap-2.5 mt-1 max-h-[220px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2 mt-1.5 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
               {FILTER_FACILITIES.map(facility => {
                 const isChecked = filterParams.facilities.includes(facility.id);
+                const Icon = AMENITY_ICON_COMPONENTS[facility.icon as keyof typeof AMENITY_ICON_COMPONENTS] || Sparkles;
                 return (
-                  <label key={facility.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-neutral-700">
+                  <label 
+                    key={facility.id} 
+                    className={`flex items-center justify-between p-2 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer select-none ${
+                      isChecked
+                        ? 'bg-[#edf3ff] border-[#a1c9ff] text-[#005899]'
+                        : 'bg-white border-neutral-100 text-neutral-700 hover:bg-neutral-50'
+                    }`}
+                  >
                     <input 
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => handleFacilityCheck(facility.id)}
-                      className="w-4 h-4 rounded text-[#0071c2] border-neutral-300 focus:ring-[#0071c2]"
+                      className="sr-only"
                     />
-                    <span>{getAmenityLabel(getAmenityDisplay(facility.id), language)}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                        isChecked ? 'bg-[#cbdfff] text-[#005899]' : 'bg-neutral-50 text-neutral-500'
+                      }`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate pr-1">{getAmenityLabel(getAmenityDisplay(facility.id), language)}</span>
+                    </div>
+                    <div className={`h-4.5 w-4.5 shrink-0 rounded-md border flex items-center justify-center transition-all ${
+                      isChecked ? 'bg-[#0071c2] border-[#0071c2] text-white' : 'border-neutral-300'
+                    }`}>
+                      {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                    </div>
                   </label>
                 );
               })}
+              {filterParams.facilities
+                .filter(id => !FILTER_AMENITY_KEYS.includes(id))
+                .map(id => {
+                  const facility = getAmenityDisplay(id);
+                  const Icon = AMENITY_ICON_COMPONENTS[facility.icon as keyof typeof AMENITY_ICON_COMPONENTS] || Sparkles;
+                  return (
+                    <label 
+                      key={id} 
+                      className="flex items-center justify-between p-2 rounded-xl border border-[#a1c9ff] bg-[#edf3ff] text-[#005899] text-left text-xs font-bold transition-all cursor-pointer select-none animate-fadeIn"
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={true}
+                        onChange={() => handleFacilityCheck(id)}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#cbdfff] text-[#005899]">
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="truncate pr-1">{getAmenityLabel(facility, language)}</span>
+                      </div>
+                      <div className="h-4.5 w-4.5 shrink-0 rounded-md border border-[#0071c2] bg-[#0071c2] text-white flex items-center justify-center transition-all">
+                        <Check className="h-3 w-3 stroke-[3]" />
+                      </div>
+                    </label>
+                  );
+                })}
             </div>
+            
+            <button
+              type="button"
+              onClick={() => setIsAmenitiesModalOpen(true)}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl border border-dashed border-[#a1c9ff] bg-[#edf3ff]/40 text-[#0071c2] hover:bg-[#edf3ff] text-xs font-bold transition-all cursor-pointer"
+            >
+              <span>+ {t('list.moreAmenitiesBtn')}</span>
+              {filterParams.facilities.length > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0071c2] text-[9px] font-black text-white px-1">
+                  {filterParams.facilities.length}
+                </span>
+              )}
+            </button>
           </div>
         </aside>
 
@@ -625,7 +700,8 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                 return (
                   <div 
                     key={villa.id}
-                    className="bg-white rounded-2xl border border-neutral-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden grid grid-cols-1 md:grid-cols-12 hover:-translate-y-1 group"
+                    onClick={() => onViewDetail(villa.id, villa.type)}
+                    className="bg-white rounded-2xl border border-neutral-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden grid grid-cols-1 md:grid-cols-12 hover:-translate-y-1 group cursor-pointer"
                   >
                     {/* Media Column */}
                     <div className="relative aspect-[4/3] min-h-[220px] md:col-span-4 md:aspect-auto">
@@ -703,7 +779,10 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                         </div>
 
                         <button
-                          onClick={() => onViewDetail(villa.id, villa.type)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewDetail(villa.id, villa.type);
+                          }}
                           className={`w-full text-center py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
                             isAvailable
                               ? 'bg-[#0071c2] hover:bg-[#005899] text-white shadow-md hover:scale-[1.01]'
@@ -726,6 +805,19 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         </section>
 
       </div>
+      <AmenitiesModal
+        isOpen={isAmenitiesModalOpen}
+        onClose={() => setIsAmenitiesModalOpen(false)}
+        selectedFacilities={filterParams.facilities}
+        onChange={(updated) => {
+          const nextFilter = {
+            ...filterParams,
+            facilities: updated
+          };
+          setFilterParams(nextFilter);
+          onSearchParamsUpdate?.(params, nextFilter);
+        }}
+      />
     </div>
   );
 }

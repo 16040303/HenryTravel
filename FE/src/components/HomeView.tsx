@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart, ChevronDown } from 'lucide-react';
+import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart, ChevronDown, Waves, Compass, Utensils, ParkingCircle, WashingMachine, PawPrint, KeyRound, Sparkles, Plus } from 'lucide-react';
 import { Villa, SearchParams, FilterParams } from '../types';
 import { DEFAULT_LOCATIONS, FILTER_FACILITIES, normalizeLocationCity } from '../constants';
 import { getAmenityDisplay, getAmenityLabel } from '../data/amenities';
@@ -9,7 +9,20 @@ import { useFeaturedVillasQuery } from '../hooks/queries';
 import OptimizedImage from './OptimizedImage';
 import CustomDatePicker from './common/CustomDatePicker';
 import GuestCategoryPicker from './common/GuestCategoryPicker';
+import AmenitiesModal from './common/AmenitiesModal';
 import { getLocalDateString } from '../lib/date';
+
+const AMENITY_ICON_COMPONENTS = {
+  Waves,
+  Compass,
+  Utensils,
+  ParkingCircle,
+  WashingMachine,
+  PawPrint,
+  KeyRound,
+  Sparkles,
+} satisfies Record<string, React.ComponentType<{ className?: string }>>;
+
 
 interface HomeViewProps {
   onSearch: (searchParams: SearchParams, filterParams: FilterParams) => void;
@@ -68,6 +81,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   const [priceMax, setPriceMax] = useState(10000000);
   const [propertyType, setPropertyType] = useState<FilterParams['type']>('All');
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
+  const [isAmenitiesModalOpen, setIsAmenitiesModalOpen] = useState(false);
 
   // Villa listings state for Featured Section
   const { data: featuredVillas = [], isLoading: loading, refetch: refetchFeaturedVillas } = useFeaturedVillasQuery(language);
@@ -124,7 +138,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     setSearchLocation('All');
     setCheckIn(defaultCheckIn);
     setCheckOut('');
-    setAdultCount(2);
+    setAdultCount(0);
     setChildrenCount(0);
     setInfantCount(0);
     setRooms(1);
@@ -184,7 +198,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
           {/* Search Main Box Container */}
           <div className="w-full max-w-[920px] bg-white rounded-2xl shadow-xl p-4 sm:p-6 text-left border border-white/25">
-            <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <form id="search-form" onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               
               {/* Location selection */}
               <div className="md:col-span-4 flex flex-col gap-1.5 min-w-0">
@@ -421,30 +435,59 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                 {/* Amenities */}
                 <div className="flex flex-col gap-2">
                   <span className="text-xs font-bold text-neutral-500 tracking-wide">{t('list.amenities')}</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mt-1.5">
+                  <div className="flex flex-wrap gap-2 mt-1.5">
                     {FILTER_FACILITIES.map(facility => {
                       const isChecked = selectedFacilities.includes(facility.id);
+                      const Icon = AMENITY_ICON_COMPONENTS[facility.icon as keyof typeof AMENITY_ICON_COMPONENTS] || Sparkles;
                       return (
                         <label 
                           key={facility.id}
-                          className={`flex items-center gap-2 p-1.5 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                          className={`group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl border text-left h-[42px] transition-all cursor-pointer relative select-none shadow-sm hover:shadow-md ${
                             isChecked 
-                              ? 'bg-[#edf3ff] border-[#a1c9ff] text-[#005899]'
-                              : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-100'
+                              ? 'bg-[#edf3ff] border-[#0071c2] text-[#0071c2]'
+                              : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300'
                           }`}
                         >
                           <input 
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => handleFacilityToggle(facility.id)}
-                            className="w-3.5 h-3.5 text-[#0071c2] rounded border-neutral-300 focus:ring-[#0071c2]"
+                            className="sr-only"
                           />
-                          <span>{getAmenityLabel(getAmenityDisplay(facility.id), language)}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon className={`h-4 w-4 shrink-0 transition-colors ${isChecked ? 'text-[#0071c2]' : 'text-neutral-400 group-hover:text-neutral-500'}`} />
+                            <span className="truncate text-[11px] font-extrabold tracking-tight leading-none">
+                              {getAmenityLabel(getAmenityDisplay(facility.id), language)}
+                            </span>
+                          </div>
+                          <div className={`h-4 w-4 shrink-0 rounded-md border flex items-center justify-center transition-all ${
+                            isChecked ? 'bg-[#0071c2] border-[#0071c2] text-white' : 'border-neutral-300 group-hover:border-neutral-400'
+                          }`}>
+                            {isChecked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                          </div>
                         </label>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => setIsAmenitiesModalOpen(true)}
+                      className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl border border-dashed border-[#a1c9ff] bg-[#edf3ff]/20 text-[#0071c2] hover:bg-[#edf3ff]/50 h-[42px] cursor-pointer transition-all relative shadow-sm"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Plus className="h-4 w-4 shrink-0 stroke-[2.5]" />
+                        <span className="truncate text-[11px] font-extrabold tracking-tight leading-none">
+                          {t('list.moreAmenitiesBtn')}
+                        </span>
+                      </div>
+                      {selectedFacilities.length > 0 && (
+                        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0071c2] text-[8px] font-black text-white px-1 animate-scaleIn">
+                          {selectedFacilities.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
+
 
                 <div className="border-t border-neutral-200/50 pt-3 flex justify-end gap-3 text-xs">
                   <button 
@@ -456,6 +499,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                   </button>
                   <button 
                     type="submit"
+                    form="search-form"
                     className="px-5 py-2 font-black bg-[#0071c2] text-white hover:bg-[#005899] rounded-lg shadow transition-all cursor-pointer"
                   >
                     {t('home.searchBtn')}
@@ -479,9 +523,9 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">
           {[
-            { loc: 'Huế', key: 'loc.hue', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=900&q=80', gradient: 'from-purple-900/70' },
-            { loc: 'Đà Nẵng', key: 'loc.danang', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80', gradient: 'from-blue-900/70' },
-            { loc: 'Hội An', key: 'loc.hoian', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAnJlGr3IgXtsgrN9e5EO8SF27R6jQle_YqTUX77vw7NdspyX-lGuIxv0FtNh2Ao3qOJ_ZDDPgwUGU2n5f001gO8pJNhizxzP2ybsfekot4YSRNi2NNiVyGoqnnVr6eBQbWzyfyAdKXuvMlrVe5EuADwuyL4_8UHpUdJUsckH22lcyv3Rm2SeJMm38VIbe_NUpC-bWjgwtyZcqCpYqP9TYHclDduFVsj3CnbcB2fjmPUudsTbwkp9JXyTzoCPlJ2At0r9YY02WFvEXv', gradient: 'from-amber-900/70' },
+            { loc: 'Huế', key: 'loc.hue', img: '/hue_citadel.png', gradient: 'from-purple-900/70' },
+            { loc: 'Đà Nẵng', key: 'loc.danang', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=900&q=80', gradient: 'from-blue-900/70' },
+            { loc: 'Hội An', key: 'loc.hoian', img: 'https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=900&q=80', gradient: 'from-amber-900/70' },
             { loc: 'All', key: 'loc.nationwide', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80', gradient: 'from-rose-900/70' },
           ].map((item) => (
             <button
@@ -561,7 +605,8 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               return (
                 <div 
                   key={villa.id} 
-                  className="bg-white rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group hover:-translate-y-1.5"
+                  onClick={() => onViewDetail(String(villa.id), villa.type)}
+                  className="bg-white rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group hover:-translate-y-1.5 cursor-pointer"
                 >
                   {/* Photo area */}
                   <div className="relative aspect-[4/3] w-full overflow-hidden">
@@ -604,7 +649,10 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                       </div>
 
                       <button 
-                        onClick={() => onViewDetail(String(villa.id), villa.type)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetail(String(villa.id), villa.type);
+                        }}
                         className="bg-white hover:bg-[#edf3ff] text-[#0071c2] font-semibold text-xs py-2 px-3.5 border border-[#a1c9ff] rounded-lg hover:border-[#0071c2] active:scale-95 transition-all cursor-pointer flex items-center gap-1"
                       >
                         <span>{t('home.viewDetails')}</span>
@@ -662,6 +710,12 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
         </div>
       </section>
 
+      <AmenitiesModal
+        isOpen={isAmenitiesModalOpen}
+        onClose={() => setIsAmenitiesModalOpen(false)}
+        selectedFacilities={selectedFacilities}
+        onChange={setSelectedFacilities}
+      />
     </div>
   );
 }
