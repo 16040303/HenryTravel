@@ -525,7 +525,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
           {[
             { loc: 'Huế', key: 'loc.hue', img: '/hue_citadel.png', gradient: 'from-purple-900/70' },
             { loc: 'Đà Nẵng', key: 'loc.danang', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=900&q=80', gradient: 'from-blue-900/70' },
-            { loc: 'Hội An', key: 'loc.hoian', img: 'https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=900&q=80', gradient: 'from-amber-900/70' },
+            { loc: 'Hội An', key: 'loc.hoian', img: '/hoi_an_town.png', gradient: 'from-amber-900/70' },
             { loc: 'All', key: 'loc.nationwide', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80', gradient: 'from-rose-900/70' },
           ].map((item) => (
             <button
