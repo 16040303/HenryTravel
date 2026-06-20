@@ -10,12 +10,14 @@ import {
   BriefcaseMedical, DoorOpen, Camera, ShieldCheck, Baby, Plug, Briefcase, ArrowUpDown,
   Plane, Car, Bike, Map, Languages, Flame
 } from 'lucide-react';
-import { VillaDetail, Feedback, BookingResult, Booking } from '../types';
-import { getVillaById, createBooking, getVillaFeedbacks, submitFeedback, getPublicSettings, checkBooking } from '../lib/api';
+import { VillaDetail, BookingResult, Booking } from '../types';
+import { checkBooking } from '../lib/api';
 import { getZaloLink, ZALO_PHONE_FALLBACK } from '../constants';
 import { AMENITY_CATEGORY_LABELS, getAmenitiesByCategory, getAmenityLabel } from '../data/amenities';
 import { useBookingCountdown } from '../hooks/useBookingCountdown';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePublicSettingsQuery, useVillaDetailQuery, useVillaFeedbacksQuery } from '../hooks/queries';
+import { useCreateBookingMutation, useSubmitFeedbackMutation } from '../hooks/mutations';
 import OptimizedImage from './OptimizedImage';
 import { useToast } from './Toast';
 import BookingCalendar from './calendar/BookingCalendar';
@@ -59,14 +61,18 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   // Determine active villa ID from route param or prop
   const activeVillaId = id || villaId || '';
 
-  const [villa, setVilla] = useState<VillaDetail | null>(null);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [feedbackSummary, setFeedbackSummary] = useState({ avgRating: 0, total: 0 });
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [publicZaloPhone, setPublicZaloPhone] = useState(ZALO_PHONE_FALLBACK);
-  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
-  const [commonPolicy, setCommonPolicy] = useState('');
+  const villaQuery = useVillaDetailQuery(activeVillaId, language);
+  const villa = villaQuery.data || null;
+  const feedbacksQuery = useVillaFeedbacksQuery(String(villa?.id || ''), 1, 10);
+  const feedbacks = feedbacksQuery.data?.feedbacks || [];
+  const feedbackSummary = { avgRating: feedbacksQuery.data?.avgRating || 0, total: feedbacksQuery.data?.total || 0 };
+  const feedbackLoading = feedbacksQuery.isLoading;
+  const loading = villaQuery.isLoading;
+  const publicSettingsQuery = usePublicSettingsQuery();
+  const publicSettings = publicSettingsQuery.data;
+  const publicZaloPhone = publicSettings?.zaloPhone || ZALO_PHONE_FALLBACK;
+  const publicZaloUrl = publicSettings?.zaloUrl || getZaloLink(publicZaloPhone || ZALO_PHONE_FALLBACK);
+  const commonPolicy = publicSettings?.commonPolicy || '';
 
   // Review Form States
   const [newFeedbackName, setNewFeedbackName] = useState('');
@@ -94,7 +100,9 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   const [phoneMissing, setPhoneMissing] = useState(false);
   const [phoneInvalid, setPhoneInvalid] = useState(false);
   const [emailInvalid, setEmailInvalid] = useState(false);
-  const [bookingLoading, setBookingLoading] = useState(false);
+  const createBookingMutation = useCreateBookingMutation();
+  const submitFeedbackMutation = useSubmitFeedbackMutation();
+  const bookingLoading = createBookingMutation.isPending;
 
   // Booking outcome state
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
@@ -149,47 +157,10 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   const isBookingCompleted = bookingStatus === 'COMPLETED';
 
   useEffect(() => {
-    async function loadVilla() {
-      setLoading(true);
-      const data = await getVillaById(activeVillaId, language);
-      if (data) {
-        setVilla(data);
-        setFeedbackLoading(true);
-        try {
-          const fList = await getVillaFeedbacks(data.id);
-          setFeedbacks(fList.feedbacks);
-          setFeedbackSummary({ avgRating: fList.avgRating, total: fList.total });
-        } finally {
-          setFeedbackLoading(false);
-        }
-
-        // Populate standard configs
-        setTotalCost(data.price * 3);
-      }
-      setLoading(false);
+    if (villa) {
+      setTotalCost(villa.price * 3);
     }
-    loadVilla();
-  }, [activeVillaId, language]);
-
-  useEffect(() => {
-    let mounted = true;
-    getPublicSettings()
-      .then((settings) => {
-        if (!mounted) return;
-        setPublicZaloPhone(settings.zaloPhone || ZALO_PHONE_FALLBACK);
-        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
-        setCommonPolicy(settings.commonPolicy || '');
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setPublicZaloPhone(ZALO_PHONE_FALLBACK);
-        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
-        setCommonPolicy('');
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [villa]);
 
   useEffect(() => {
     if (pollingIntervalRef.current) {
@@ -419,13 +390,12 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       return;
     }
 
-    setBookingLoading(true);
     try {
-      const resp = await createBooking({
+      const resp = await createBookingMutation.mutateAsync({
         fullName: bookingName,
         phone: bookingPhone,
         email: normalizedEmail || `${normalizedPhone}@vietnamstay.com`,
-        villaId: villa.id,
+        villaId: String(villa.id),
         checkIn,
         checkOut,
         guests: guestsCount,
@@ -462,8 +432,6 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       } else {
         showToast('error', t('booking.serverError'));
       }
-    } finally {
-      setBookingLoading(false);
     }
   };
 
@@ -476,7 +444,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
     setIsSubmittingFeedback(true);
     try {
-      await submitFeedback({
+      await submitFeedbackMutation.mutateAsync({
         bookingCode: newFeedbackBookingCode,
         phone: newFeedbackPhone,
         rating: newFeedbackRating,
@@ -488,17 +456,6 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       setNewFeedbackBookingCode('');
       setNewFeedbackPhone('');
       setNewFeedbackComment('');
-
-      // Reload feedbacks list
-      const updatedFeedbacks = await getVillaFeedbacks(villa.id);
-      setFeedbacks(updatedFeedbacks.feedbacks);
-      setFeedbackSummary({ avgRating: updatedFeedbacks.avgRating, total: updatedFeedbacks.total });
-
-      // Reload villa info to reflect updated ratings in UI
-      const refreshVilla = await getVillaById(villa.id, language);
-      if (refreshVilla) {
-        setVilla(refreshVilla);
-      }
     } catch (err) {
       console.error(err);
       showToast('error', err instanceof Error ? err.message : t('booking.feedbackError'));

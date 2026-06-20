@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Building2, CalendarCheck, Landmark, AlertCircle,
   ArrowUpRight, ArrowDownRight, PlusCircle, CalendarDays,
   ClipboardList, MessageSquare, Star, ArrowRight, User
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getAdminSettings, type AdminSettingsResponse } from '../../lib/api';
+import { useAdminSettingsQuery } from '../../hooks/queries';
 import { AdminStats, VillaDetail, Booking, Feedback } from '../../types';
 
 interface AdminDashboardProps {
@@ -26,22 +26,7 @@ export default function AdminDashboard({
   stats
 }: AdminDashboardProps) {
   const { t } = useLanguage();
-  const [dashboardSettings, setDashboardSettings] = useState<AdminSettingsResponse | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    getAdminSettings()
-      .then((settings) => {
-        if (mounted) setDashboardSettings(settings);
-      })
-      .catch(() => {
-        if (mounted) setDashboardSettings(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const dashboardSettings = useAdminSettingsQuery(true).data;
 
   const dashboardDerived = useMemo(() => {
     const villasCount = stats?.totalVillas ?? villas.length;

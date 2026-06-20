@@ -4,8 +4,8 @@ import { SearchCode, Home, Building2, ChevronDown, Hotel, X, Clock3, ExternalLin
 import { FaWhatsapp, FaFacebookF, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { SiKakaotalk, SiNaver, SiWechat, SiZalo } from 'react-icons/si';
 import { getZaloLink, ZALO_PHONE_FALLBACK } from '../constants';
-import { getPublicSettings } from '../lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePublicSettingsQuery } from '../hooks/queries';
 
 interface NavbarProps {
   currentView?: 'home' | 'listings' | 'detail' | 'lookup' | 'admin';
@@ -19,24 +19,29 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
   const [scrolled, setScrolled] = useState(false);
   const [mobileCategory, setMobileCategory] = useState<'villa' | 'hotel_resort' | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
-  const [zaloPhone, setZaloPhone] = useState(ZALO_PHONE_FALLBACK);
-  const [settingsZaloUrl, setSettingsZaloUrl] = useState('');
   const [, startLanguageTransition] = useTransition();
   const contactConsultMessage = t('contact.consultMessage');
-  const zaloUrl = useMemo(
-    () => settingsZaloUrl || getZaloLink(ZALO_PHONE_FALLBACK, contactConsultMessage),
-    [settingsZaloUrl, contactConsultMessage]
+  const publicSettingsQuery = usePublicSettingsQuery();
+  const settings = publicSettingsQuery.data;
+  const queryZaloPhone = settings?.zaloPhone || ZALO_PHONE_FALLBACK;
+  const querySettingsZaloUrl = settings?.zaloUrl || getZaloLink(
+    queryZaloPhone,
+    contactConsultMessage
   );
-  const [whatsappUrl, setWhatsappUrl] = useState('');
-  const [wechatId, setWechatId] = useState('');
-  const [kakaoTalkId, setKakaoTalkId] = useState('');
-  const [socialLinks, setSocialLinks] = useState({
-    tikTokUrl: '',
-    facebookPersonalUrl: '',
-    facebookFanpageUrl: '',
-    naverBlogUrl: '',
-    instagramWorkUrl: '',
-  });
+  const zaloUrl = useMemo(
+    () => querySettingsZaloUrl || getZaloLink(ZALO_PHONE_FALLBACK, contactConsultMessage),
+    [querySettingsZaloUrl, contactConsultMessage]
+  );
+  const whatsappUrl = settings?.whatsappUrl || '';
+  const wechatId = settings?.wechatId || '';
+  const kakaoTalkId = settings?.kakaoTalkId || '';
+  const socialLinks = useMemo(() => ({
+    tikTokUrl: settings?.tikTokUrl || '',
+    facebookPersonalUrl: settings?.facebookPersonalUrl || '',
+    facebookFanpageUrl: settings?.facebookFanpageUrl || '',
+    naverBlogUrl: settings?.naverBlogUrl || '',
+    instagramWorkUrl: settings?.instagramWorkUrl || '',
+  }), [settings]);
 
   const listingLink = (location: string, type: 'villa' | 'hotel_resort') => {
     const query = new URLSearchParams();
@@ -129,47 +134,6 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
     };
   }, [showContactModal]);
 
-  useEffect(() => {
-    let mounted = true;
-    getPublicSettings()
-      .then((settings) => {
-        if (!mounted) return;
-        const nextZaloPhone = settings.zaloPhone || ZALO_PHONE_FALLBACK;
-        setZaloPhone(nextZaloPhone);
-        setSettingsZaloUrl(settings.zaloUrl || getZaloLink(
-          nextZaloPhone,
-          contactConsultMessage
-        ));
-        setWhatsappUrl(settings.whatsappUrl || '');
-        setWechatId(settings.wechatId || '');
-        setKakaoTalkId(settings.kakaoTalkId || '');
-        setSocialLinks({
-          tikTokUrl: settings.tikTokUrl || '',
-          facebookPersonalUrl: settings.facebookPersonalUrl || '',
-          facebookFanpageUrl: settings.facebookFanpageUrl || '',
-          naverBlogUrl: settings.naverBlogUrl || '',
-          instagramWorkUrl: settings.instagramWorkUrl || '',
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setZaloPhone(ZALO_PHONE_FALLBACK);
-        setSettingsZaloUrl('');
-        setWhatsappUrl('');
-        setWechatId('');
-        setKakaoTalkId('');
-        setSocialLinks({
-          tikTokUrl: '',
-          facebookPersonalUrl: '',
-          facebookFanpageUrl: '',
-          naverBlogUrl: '',
-          instagramWorkUrl: '',
-        });
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const isMobileDevice = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const buildWeChatLink = (id: string) => `weixin://dl/chat?${encodeURIComponent(id)}`;
@@ -418,7 +382,7 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
               <div className="grid grid-cols-1 gap-2.5">
                 {zaloUrl && (
                   <a href={zaloUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><SiZalo size={18} color="#0068ff" /> Zalo{zaloPhone ? `: ${zaloPhone}` : ''}</span>
+                    <span className="flex items-center gap-3"><SiZalo size={18} color="#0068ff" /> Zalo{queryZaloPhone ? `: ${queryZaloPhone}` : ''}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}

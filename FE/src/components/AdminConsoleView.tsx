@@ -1,37 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { queryClient } from '../lib/queryClient';
 import {
   ShieldCheck, AlertCircle, Lock, User, LogIn, Eye, EyeOff, LogOut
 } from 'lucide-react';
 import {
   adminLogin,
   adminLogout,
-  cancelAdminBooking,
-  completeAdminBooking,
-  confirmAdminBooking,
-  createAdminVilla,
-  deleteAdminVilla,
-  getAdminBookings,
-  getAdminFeedbacks,
-  getAdminStats,
   getAdminToken,
-  getAdminVillas,
   getStoredAdminUser,
   mapAdminBookingToFrontendBooking,
   mapAdminFeedbackToFrontendFeedback,
   mapAdminVillaToFrontendVilla,
-  toggleAdminFeedback,
-  updateAdminVilla,
-  addAdminVillaMedia,
-  bulkDeleteAdminVillas,
-  bulkStatusUpdateAdminVillas,
 } from '../lib/api';
-import { AdminStats, AdminUser, AdminVillaMutationPayload, EntityId, VillaDetail, Booking, Feedback } from '../types';
+import { AdminUser, AdminVillaMutationPayload, EntityId, VillaDetail, Booking } from '../types';
 import type { UploadedMedia } from '../lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from './Toast';
 import { AdminDashboardSkeleton } from './common/Skeleton';
 import ConfirmModal from './common/ConfirmModal';
 import AdminLayout from './admin/AdminLayout';
+import { useAdminBookingsQuery, useAdminFeedbacksQuery, useAdminStatsQuery, useAdminVillasQuery } from '../hooks/queries';
+import {
+  useAddAdminVillaMediaMutation,
+  useBulkDeleteAdminVillasMutation,
+  useBulkStatusUpdateAdminVillasMutation,
+  useCancelAdminBookingMutation,
+  useCompleteAdminBookingMutation,
+  useConfirmAdminBookingMutation,
+  useCreateAdminVillaMutation,
+  useDeleteAdminVillaMutation,
+  useToggleAdminFeedbackMutation,
+  useUpdateAdminVillaMutation,
+} from '../hooks/mutations';
 
 interface AdminConsoleViewProps {
   onVillaAddedNotification: () => void;
@@ -49,16 +49,49 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const [loginError, setLoginError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Model states
-  const [allVillas, setAllVillas] = useState<VillaDetail[]>([]);
-  const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
-  const [allFeedbacks, setAllFeedbacks] = useState<Feedback[]>([]);
-  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  // Server data reads
+  const adminListParams = useMemo(() => ({ limit: 100 }), []);
+  const adminStatsQuery = useAdminStatsQuery(isLoggedIn, isLoggedIn);
+  const adminVillasQuery = useAdminVillasQuery(adminListParams, isLoggedIn);
+  const adminBookingsQuery = useAdminBookingsQuery(adminListParams, isLoggedIn, isLoggedIn);
+  const adminFeedbacksQuery = useAdminFeedbacksQuery(adminListParams, isLoggedIn);
+  const allVillas = useMemo(
+    () => (adminVillasQuery.data?.villas || []).map(mapAdminVillaToFrontendVilla),
+    [adminVillasQuery.data?.villas]
+  );
+  const recentBookings = useMemo(
+    () => (adminBookingsQuery.data?.bookings || []).map(mapAdminBookingToFrontendBooking),
+    [adminBookingsQuery.data?.bookings]
+  );
+  const allFeedbacks = useMemo(
+    () => (adminFeedbacksQuery.data?.feedbacks || []).map(mapAdminFeedbackToFrontendFeedback),
+    [adminFeedbacksQuery.data?.feedbacks]
+  );
+  const adminStats = adminStatsQuery.data || null;
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const loading = isLoggedIn && (adminStatsQuery.isLoading || adminVillasQuery.isLoading || adminBookingsQuery.isLoading || adminFeedbacksQuery.isLoading);
+  const isRefreshing = adminStatsQuery.isFetching || adminVillasQuery.isFetching || adminBookingsQuery.isFetching || adminFeedbacksQuery.isFetching;
   const [adminDataError, setAdminDataError] = useState('');
-  const [mutationLoading, setMutationLoading] = useState(false);
+  const createVillaMutation = useCreateAdminVillaMutation();
+  const updateVillaMutation = useUpdateAdminVillaMutation();
+  const deleteVillaMutation = useDeleteAdminVillaMutation();
+  const addVillaMediaMutation = useAddAdminVillaMediaMutation();
+  const bulkDeleteVillasMutation = useBulkDeleteAdminVillasMutation();
+  const bulkStatusUpdateVillasMutation = useBulkStatusUpdateAdminVillasMutation();
+  const confirmBookingMutation = useConfirmAdminBookingMutation();
+  const cancelBookingMutation = useCancelAdminBookingMutation();
+  const completeBookingMutation = useCompleteAdminBookingMutation();
+  const toggleFeedbackMutation = useToggleAdminFeedbackMutation();
+  const mutationLoading = createVillaMutation.isPending
+    || updateVillaMutation.isPending
+    || deleteVillaMutation.isPending
+    || addVillaMediaMutation.isPending
+    || bulkDeleteVillasMutation.isPending
+    || bulkStatusUpdateVillasMutation.isPending
+    || confirmBookingMutation.isPending
+    || cancelBookingMutation.isPending
+    || completeBookingMutation.isPending
+    || toggleFeedbackMutation.isPending;
   const adminScrollRef = useRef<HTMLDivElement>(null);
   const didRestoreAdminScrollRef = useRef(false);
   type AdminTab = 'dashboard' | 'villas' | 'bookings' | 'feedback' | 'availability' | 'info' | 'settings';
@@ -123,6 +156,31 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     };
   }, [isLoggedIn, loading, activeAdminTab]);
 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAdminDataError('');
+      return;
+    }
+
+    const queryErrors = [
+      { error: adminStatsQuery.error, fallback: t('admin.loadStatsError') },
+      { error: adminVillasQuery.error, fallback: t('admin.loadVillasError') },
+      { error: adminBookingsQuery.error, fallback: t('admin.loadBookingsError') },
+      { error: adminFeedbacksQuery.error, fallback: t('admin.loadFeedbacksError') },
+    ];
+
+    const authFailure = queryErrors.find((item) => item.error && isAuthError(item.error));
+    if (authFailure?.error) {
+      logoutToLogin(t('admin.authExpired'));
+      return;
+    }
+
+    const errors = queryErrors
+      .filter((item) => item.error)
+      .map((item) => item.error instanceof Error && item.error.message ? item.error.message : item.fallback);
+    setAdminDataError(errors.join(' '));
+  }, [adminBookingsQuery.error, adminFeedbacksQuery.error, adminStatsQuery.error, adminVillasQuery.error, isLoggedIn, t]);
+
   const handleAdminTabChange = (tab: AdminTab) => {
     setActiveAdminTab(tab);
     sessionStorage.setItem('henrytravel_admin_active_tab', tab);
@@ -158,18 +216,14 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
     if (token && storedUser) {
       setAdminUser(storedUser);
       setIsLoggedIn(true);
-      loadAdminStats();
-      return;
     }
-    setLoading(false);
   }, []);
 
   const logoutToLogin = (message?: string) => {
     adminLogout();
+    queryClient.removeQueries({ queryKey: ['admin'] });
     setAdminUser(null);
-    setAdminStats(null);
     setIsLoggedIn(false);
-    setLoading(false);
     if (message) setLoginError(message);
   };
 
@@ -236,83 +290,19 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   const bookingApiId = (booking: Booking | undefined) => String(booking?.id || '');
 
-  const loadAdminStats = async (options?: { preserveScroll?: boolean; silent?: boolean }) => {
-    const previousScrollTop = options?.preserveScroll ? (adminScrollRef.current?.scrollTop ?? 0) : 0;
-    if (options?.silent) {
-      setIsRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setAdminDataError('');
-    const errors: string[] = [];
-
-    const [statsResult, villasResult, bookingsResult, feedbacksResult] = await Promise.allSettled([
-      getAdminStats(),
-      getAdminVillas({ limit: 100 }),
-      getAdminBookings({ limit: 100 }),
-      getAdminFeedbacks({ limit: 100 }),
-    ]);
-
-    const settled = [statsResult, villasResult, bookingsResult, feedbacksResult];
-    const authFailure = settled.find((result) => result.status === 'rejected' && isAuthError(result.reason));
-    if (authFailure) {
-      logoutToLogin(t('admin.authExpired'));
-      return;
-    }
-
-    if (statsResult.status === 'fulfilled') {
-      setAdminStats(statsResult.value);
-    } else {
-      errors.push(statsResult.reason instanceof Error ? statsResult.reason.message : t('admin.loadStatsError'));
-    }
-
-    if (villasResult.status === 'fulfilled') {
-      setAllVillas(villasResult.value.villas.map(mapAdminVillaToFrontendVilla));
-    } else {
-      errors.push(villasResult.reason instanceof Error ? villasResult.reason.message : t('admin.loadVillasError'));
-    }
-
-    if (bookingsResult.status === 'fulfilled') {
-      setRecentBookings(bookingsResult.value.bookings.map(mapAdminBookingToFrontendBooking));
-    } else {
-      errors.push(bookingsResult.reason instanceof Error ? bookingsResult.reason.message : t('admin.loadBookingsError'));
-    }
-
-    if (feedbacksResult.status === 'fulfilled') {
-      setAllFeedbacks(feedbacksResult.value.feedbacks.map(mapAdminFeedbackToFrontendFeedback));
-    } else {
-      errors.push(feedbacksResult.reason instanceof Error ? feedbacksResult.reason.message : t('admin.loadFeedbacksError'));
-    }
-
-    if (errors.length > 0) {
-      setAdminDataError(errors.join(' '));
-    }
-    setLoading(false);
-    setIsRefreshing(false);
-    if (options?.preserveScroll) {
-      requestAnimationFrame(() => {
-        if (adminScrollRef.current) {
-          adminScrollRef.current.scrollTop = previousScrollTop;
-        }
-      });
-    }
-  };
-
   // Login handler
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    setLoading(true);
     try {
       const response = await adminLogin(username, password);
       setAdminUser(response.user);
       setIsLoggedIn(true);
       setPassword('');
-      await loadAdminStats();
     } catch (error) {
       adminLogout();
+      queryClient.removeQueries({ queryKey: ['admin'] });
       setIsLoggedIn(false);
-      setLoading(false);
       setLoginError(
         error instanceof Error && error.message
           ? error.message
@@ -329,9 +319,9 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'warning',
       onConfirm: () => {
         adminLogout();
+        queryClient.removeQueries({ queryKey: ['admin'] });
         setIsLoggedIn(false);
         setAdminUser(null);
-        setAdminStats(null);
         setUsername('');
         setPassword('');
         setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -342,13 +332,12 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   const handleAddVilla = async (v: Omit<VillaDetail, 'id' | 'rating' | 'reviewsCount' | 'bookedDates' | 'pendingDates' | 'blockedDates'>) => {
     if (mutationLoading) return;
-    setMutationLoading(true);
     try {
       const payload = toAdminVillaPayload(v);
       validateVillaPayload(payload);
-      const createdVilla = await createAdminVilla(payload);
+      const createdVilla = await createVillaMutation.mutateAsync(payload);
       if (v.media.length > 0) {
-        await addAdminVillaMedia(createdVilla.id, v.media.map((media): UploadedMedia => ({
+        await addVillaMediaMutation.mutateAsync({ villaId: createdVilla.id, files: v.media.map((media): UploadedMedia => ({
           type: media.type,
           url: media.url,
           secureUrl: media.url,
@@ -359,16 +348,13 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
           duration: media.duration || undefined,
           format: media.type === 'video' ? 'video' : 'image',
           bytes: 0,
-        })));
+        })) });
       }
-      await loadAdminStats({ preserveScroll: true, silent: true });
       onVillaAddedNotification();
       showToast('success', t('admin.createVillaSuccess', { name: v.name }));
     } catch (error) {
       handleMutationError(error, t('admin.createVillaError'));
       throw error;
-    } finally {
-      setMutationLoading(false);
     }
   };
 
@@ -380,16 +366,12 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'danger',
       onConfirm: async () => {
         if (mutationLoading) return;
-        setMutationLoading(true);
         try {
-          await deleteAdminVilla(String(id));
-          await loadAdminStats({ preserveScroll: true, silent: true });
+          await deleteVillaMutation.mutateAsync(String(id));
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
           showToast('success', t('admin.deleteVillaSuccess', { name }));
         } catch (error) {
           handleMutationError(error, t('admin.deleteVillaError'));
-        } finally {
-          setMutationLoading(false);
         }
       }
     });
@@ -398,19 +380,15 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   // 3. UPDATE Villa properties
   const handleUpdateVilla = async (v: VillaDetail) => {
     if (mutationLoading) return;
-    setMutationLoading(true);
     try {
       const payload = toAdminVillaPayload(v);
       validateVillaPayload(payload);
-      await updateAdminVilla(String(v.id), payload);
-      await loadAdminStats({ preserveScroll: true, silent: true });
+      await updateVillaMutation.mutateAsync({ id: String(v.id), data: payload });
       onVillaAddedNotification();
       showToast('success', t('admin.updateVillaSuccess', { name: v.name }));
     } catch (error) {
       handleMutationError(error, t('admin.updateVillaError'));
       throw error;
-    } finally {
-      setMutationLoading(false);
     }
   };
 
@@ -428,16 +406,12 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'info',
       onConfirm: async () => {
         if (mutationLoading) return;
-        setMutationLoading(true);
         try {
-          await confirmAdminBooking(id);
-          await loadAdminStats({ preserveScroll: true, silent: true });
+          await confirmBookingMutation.mutateAsync(id);
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
           showToast('success', t('admin.confirmBookingSuccess', { code }));
         } catch (error) {
           handleMutationError(error, t('admin.confirmBookingError'));
-        } finally {
-          setMutationLoading(false);
         }
       }
     });
@@ -457,16 +431,12 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'danger',
       onConfirm: async () => {
         if (mutationLoading) return;
-        setMutationLoading(true);
         try {
-          await cancelAdminBooking(id, 'Admin cancelled booking');
-          await loadAdminStats({ preserveScroll: true, silent: true });
+          await cancelBookingMutation.mutateAsync({ id, reason: 'Admin cancelled booking' });
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
           showToast('success', t('admin.cancelBookingSuccess', { code }));
         } catch (error) {
           handleMutationError(error, t('admin.cancelBookingError'));
-        } finally {
-          setMutationLoading(false);
         }
       }
     });
@@ -485,16 +455,12 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'info',
       onConfirm: async () => {
         if (mutationLoading) return;
-        setMutationLoading(true);
         try {
-          await completeAdminBooking(id);
-          await loadAdminStats({ preserveScroll: true, silent: true });
+          await completeBookingMutation.mutateAsync(id);
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
           showToast('success', t('admin.completeBookingSuccess', { code }));
         } catch (error) {
           handleMutationError(error, t('admin.completeBookingError'));
-        } finally {
-          setMutationLoading(false);
         }
       }
     });
@@ -502,19 +468,11 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   const handleToggleVerifyFeedback = async (id: string) => {
     if (mutationLoading) return;
-    setMutationLoading(true);
     try {
-      const updated = await toggleAdminFeedback(id);
-      setAllFeedbacks(prev => prev.map(feedback => (
-        String(feedback.id) === String(updated.id)
-          ? { ...feedback, isVerified: updated.verified }
-          : feedback
-      )));
+      await toggleFeedbackMutation.mutateAsync(id);
       showToast('success', t('admin.feedbackUpdateSuccess'));
     } catch (error) {
       handleMutationError(error, t('admin.feedbackUpdateError'));
-    } finally {
-      setMutationLoading(false);
     }
   };
 
@@ -527,18 +485,14 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const handleDuplicateVilla = async (id: EntityId) => {
     const target = allVillas.find(v => String(v.id) === String(id));
     if (!target || mutationLoading) return;
-    setMutationLoading(true);
     try {
       const payload = toAdminVillaPayload({ ...target, name: `${target.name} (Copy)` });
       validateVillaPayload(payload);
-      await createAdminVilla(payload);
-      await loadAdminStats({ preserveScroll: true, silent: true });
+      await createVillaMutation.mutateAsync(payload);
       onVillaAddedNotification();
       showToast('success', t('admin.duplicateVillaSuccess', { name: target.name }));
     } catch (error) {
       handleMutationError(error, t('admin.duplicateVillaError'));
-    } finally {
-      setMutationLoading(false);
     }
   };
 
@@ -552,17 +506,13 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       type: 'danger',
       onConfirm: async () => {
         if (mutationLoading) return;
-        setMutationLoading(true);
         try {
-          const result = await bulkDeleteAdminVillas(normalizedIds);
-          await loadAdminStats({ preserveScroll: true, silent: true });
+          const result = await bulkDeleteVillasMutation.mutateAsync(normalizedIds);
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
           showToast('success', t('admin.bulkDeleteSuccess', { count: result.deletedCount }));
         } catch (error) {
           handleMutationError(error, t('admin.bulkDeleteError'));
           setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
-        } finally {
-          setMutationLoading(false);
         }
       }
     });
@@ -572,15 +522,11 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const handleBulkStatusUpdateVillas = async (ids: EntityId[], active: boolean) => {
     const normalizedIds = ids.map(String).filter(Boolean);
     if (normalizedIds.length === 0 || mutationLoading) return;
-    setMutationLoading(true);
     try {
-      const result = await bulkStatusUpdateAdminVillas(normalizedIds, active);
-      await loadAdminStats({ preserveScroll: true, silent: true });
+      const result = await bulkStatusUpdateVillasMutation.mutateAsync({ ids: normalizedIds, active });
       showToast('success', t(active ? 'admin.bulkStatusActiveSuccess' : 'admin.bulkStatusInactiveSuccess', { count: result.updatedCount }));
     } catch (error) {
       handleMutationError(error, t('admin.bulkStatusError'));
-    } finally {
-      setMutationLoading(false);
     }
   };
 

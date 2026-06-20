@@ -4,13 +4,15 @@
  */
 
 import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/common/ScrollToTop';
 import { ToastProvider, useToast } from './components/Toast';
 import { SearchParams, FilterParams } from './types';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
-import { getPublicSettings } from './lib/api';
+import { queryClient } from './lib/queryClient';
+import { usePublicSettingsQuery } from './hooks/queries';
 import { getZaloLink, ZALO_PHONE_FALLBACK } from './constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock3 } from 'lucide-react';
@@ -213,56 +215,20 @@ function AppContent() {
 
   // Trigger state increments to re-fetch villas list from storage across components
   const [villasTriggerUpdate, setVillasTriggerUpdate] = useState<number>(0);
-  const [publicZaloPhone, setPublicZaloPhone] = useState(ZALO_PHONE_FALLBACK);
-  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
-  const [publicWhatsAppUrl, setPublicWhatsAppUrl] = useState('');
-  const [publicWeChatId, setPublicWeChatId] = useState('');
-  const [publicKakaoTalkId, setPublicKakaoTalkId] = useState('');
-  const [publicSocialLinks, setPublicSocialLinks] = useState({
-    tikTokUrl: '',
-    facebookPersonalUrl: '',
-    facebookFanpageUrl: '',
-    naverBlogUrl: '',
-    instagramWorkUrl: '',
-  });
-
-  useEffect(() => {
-    let mounted = true;
-    getPublicSettings()
-      .then((settings) => {
-        if (!mounted) return;
-        setPublicZaloPhone(settings.zaloPhone || ZALO_PHONE_FALLBACK);
-        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
-        setPublicWhatsAppUrl(settings.whatsappUrl || '');
-        setPublicWeChatId(settings.wechatId || '');
-        setPublicKakaoTalkId(settings.kakaoTalkId || '');
-        setPublicSocialLinks({
-          tikTokUrl: settings.tikTokUrl || '',
-          facebookPersonalUrl: settings.facebookPersonalUrl || '',
-          facebookFanpageUrl: settings.facebookFanpageUrl || '',
-          naverBlogUrl: settings.naverBlogUrl || '',
-          instagramWorkUrl: settings.instagramWorkUrl || '',
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setPublicZaloPhone(ZALO_PHONE_FALLBACK);
-        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
-        setPublicWhatsAppUrl('');
-        setPublicWeChatId('');
-        setPublicKakaoTalkId('');
-        setPublicSocialLinks({
-          tikTokUrl: '',
-          facebookPersonalUrl: '',
-          facebookFanpageUrl: '',
-          naverBlogUrl: '',
-          instagramWorkUrl: '',
-        });
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const publicSettingsQuery = usePublicSettingsQuery();
+  const publicSettings = publicSettingsQuery.data;
+  const publicZaloPhone = publicSettings?.zaloPhone || ZALO_PHONE_FALLBACK;
+  const publicZaloUrl = publicSettings?.zaloUrl || getZaloLink(publicZaloPhone || ZALO_PHONE_FALLBACK);
+  const publicWhatsAppUrl = publicSettings?.whatsappUrl || '';
+  const publicWeChatId = publicSettings?.wechatId || '';
+  const publicKakaoTalkId = publicSettings?.kakaoTalkId || '';
+  const publicSocialLinks = {
+    tikTokUrl: publicSettings?.tikTokUrl || '',
+    facebookPersonalUrl: publicSettings?.facebookPersonalUrl || '',
+    facebookFanpageUrl: publicSettings?.facebookFanpageUrl || '',
+    naverBlogUrl: publicSettings?.naverBlogUrl || '',
+    instagramWorkUrl: publicSettings?.instagramWorkUrl || '',
+  };
 
   const listingQueryState = parseListingQuery(location.search, location.pathname);
   const activeSearchParams = listingQueryState.search;
@@ -611,7 +577,9 @@ function LanguageScopedApp() {
 export default function App() {
   return (
     <HashRouter>
-      <LanguageScopedApp />
+      <QueryClientProvider client={queryClient}>
+        <LanguageScopedApp />
+      </QueryClientProvider>
     </HashRouter>
   );
 }

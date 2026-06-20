@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart, ChevronDown } from 'lucide-react';
 import { Villa, SearchParams, FilterParams } from '../types';
-import { getVillas } from '../lib/api';
 import { DEFAULT_LOCATIONS, FILTER_FACILITIES, normalizeLocationCity } from '../constants';
 import { getAmenityDisplay, getAmenityLabel } from '../data/amenities';
 import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useFeaturedVillasQuery } from '../hooks/queries';
 import OptimizedImage from './OptimizedImage';
 import CustomDatePicker from './common/CustomDatePicker';
 import GuestCategoryPicker from './common/GuestCategoryPicker';
@@ -70,40 +70,17 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
 
   // Villa listings state for Featured Section
-  const [featuredVillas, setFeaturedVillas] = useState<Villa[]>([]);
+  const { data: featuredVillas = [], isLoading: loading, refetch: refetchFeaturedVillas } = useFeaturedVillasQuery(language);
   const locationOptions = useMemo(
     () => Array.from(new Set([...DEFAULT_LOCATIONS, ...featuredVillas.map(v => normalizeLocationCity(v.location)).filter(Boolean)])),
     [featuredVillas]
   );
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadFeatured() {
-      setLoading(true);
-      try {
-        const list = await getVillas({ lang: language });
-        if (isMounted) {
-          setFeaturedVillas(list.slice(0, 6));
-        }
-      } catch (err) {
-        console.error(err);
-        if (isMounted) {
-          setFeaturedVillas([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+    if (villasTriggerUpdate > 0) {
+      void refetchFeaturedVillas();
     }
-
-    loadFeatured();
-    return () => {
-      isMounted = false;
-    };
-  }, [villasTriggerUpdate, language]);
+  }, [refetchFeaturedVillas, villasTriggerUpdate]);
 
   const handleFacilityToggle = (id: string) => {
     setSelectedFacilities(prev => 
@@ -627,7 +604,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                       </div>
 
                       <button 
-                        onClick={() => onViewDetail(villa.id, villa.type)}
+                        onClick={() => onViewDetail(String(villa.id), villa.type)}
                         className="bg-white hover:bg-[#edf3ff] text-[#0071c2] font-semibold text-xs py-2 px-3.5 border border-[#a1c9ff] rounded-lg hover:border-[#0071c2] active:scale-95 transition-all cursor-pointer flex items-center gap-1"
                       >
                         <span>{t('home.viewDetails')}</span>

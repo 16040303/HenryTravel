@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Search, ShieldAlert, Phone, Key, HelpCircle, MessageSquare, Star, Info, CalendarClock, CreditCard } from 'lucide-react';
-import { BookingStatus, Booking } from '../types';
-import { checkBooking, submitFeedback, getPublicSettings } from '../lib/api';
+import { BookingStatus } from '../types';
 import { BOOKING_STATUSES, getZaloLink, ZALO_PHONE_FALLBACK } from '../constants';
 import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePublicSettingsQuery } from '../hooks/queries';
+import { useLookupBookingMutation, useSubmitFeedbackMutation } from '../hooks/mutations';
 import { LookupSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
 
@@ -13,34 +14,22 @@ export default function LookupView() {
   const { t } = useLanguage();
   const [bookingCode, setBookingCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [searching, setSearching] = useState(false);
+  const lookupBookingMutation = useLookupBookingMutation();
+  const submitFeedbackMutation = useSubmitFeedbackMutation();
+  const searching = lookupBookingMutation.isPending;
   
   // Results structures
   const [lookupResult, setLookupResult] = useState<BookingStatus | null>(null);
-  const [publicZaloUrl, setPublicZaloUrl] = useState(() => getZaloLink(ZALO_PHONE_FALLBACK));
+  const publicSettingsQuery = usePublicSettingsQuery();
+  const publicSettings = publicSettingsQuery.data;
+  const publicZaloUrl = publicSettings?.zaloUrl || getZaloLink(publicSettings?.zaloPhone || ZALO_PHONE_FALLBACK);
 
   // Review states inside lookup page
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [reviewerName, setReviewerName] = useState('');
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const submittingFeedback = submitFeedbackMutation.isPending;
   const [feedbackSuccess, setFeedbackSuccess] = useState('');
-
-  React.useEffect(() => {
-    let mounted = true;
-    getPublicSettings()
-      .then((settings) => {
-        if (!mounted) return;
-        setPublicZaloUrl(settings.zaloUrl || getZaloLink(settings.zaloPhone || ZALO_PHONE_FALLBACK));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setPublicZaloUrl(getZaloLink(ZALO_PHONE_FALLBACK));
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const handleLookupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,16 +43,13 @@ export default function LookupView() {
 
     setBookingCode(normalizedCode);
     setPhoneNumber(normalizedPhone);
-    setSearching(true);
     setFeedbackSuccess('');
     try {
-      const result = await checkBooking(normalizedCode, normalizedPhone);
+      const result = await lookupBookingMutation.mutateAsync({ bookingCode: normalizedCode, phone: normalizedPhone });
       setLookupResult(result);
     } catch (err) {
       console.error(err);
       showToast('error', t('look.lookupFailed'));
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -75,9 +61,8 @@ export default function LookupView() {
       return;
     }
 
-    setSubmittingFeedback(true);
     try {
-      await submitFeedback({
+      await submitFeedbackMutation.mutateAsync({
         bookingCode: lookupResult.booking.code,
         phone: lookupResult.booking.phone,
         rating,
@@ -89,8 +74,6 @@ export default function LookupView() {
     } catch (err) {
       console.error(err);
       showToast('error', err instanceof Error ? err.message : t('booking.feedbackError'));
-    } finally {
-      setSubmittingFeedback(false);
     }
   };
 

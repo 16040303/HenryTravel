@@ -5,7 +5,9 @@ import {
   LogOut, CheckCircle2, Phone, AlertCircle, Info
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { adminLogout, changeAdminPassword, getAdminSettings, updateAdminSettings } from '../../lib/api';
+import { adminLogout } from '../../lib/api';
+import { useAdminSettingsQuery } from '../../hooks/queries';
+import { useChangeAdminPasswordMutation, useUpdateAdminSettingsMutation } from '../../hooks/mutations';
 import { useToast } from '../Toast';
 
 interface AdminSettingsProps {
@@ -53,44 +55,41 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+  const updateSettingsMutation = useUpdateAdminSettingsMutation();
+  const changePasswordMutation = useChangeAdminPasswordMutation();
+  const settingsQuery = useAdminSettingsQuery(true);
+  const settings = settingsQuery.data;
+  const isSaving = updateSettingsMutation.isPending;
+  const isChangingPassword = changePasswordMutation.isPending;
 
   useEffect(() => {
-    let mounted = true;
-    getAdminSettings()
-      .then((settings) => {
-        if (mounted) {
-          setZaloUrl(settings.zaloPhone || extractContactDigits(settings.zaloUrl || ''));
-          setWhatsappUrl(extractContactDigits(settings.whatsappUrl || ''));
-          setWechatId(settings.wechatId || '');
-          setKakaoTalkId(settings.kakaoTalkId || '');
-          setTikTokUrl(settings.tikTokUrl || '');
-          setFacebookPersonalUrl(settings.facebookPersonalUrl || '');
-          setFacebookFanpageUrl(settings.facebookFanpageUrl || '');
-          setNaverBlogUrl(settings.naverBlogUrl || '');
-          setInstagramWorkUrl(settings.instagramWorkUrl || '');
-          setCommonPolicy(settings.commonPolicy || '');
-          setHoldTimeMode(settings.bookingHoldTimeMode);
-          setHoldMinutes(settings.holdMinutes);
-          setCustomMinutes(settings.customHoldMinutes);
-        }
-      })
-      .catch((error) => {
-        if (mounted) {
-          setValidationError(error instanceof Error ? error.message : t('admin.settings.loadZaloError'));
-        }
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (settings) {
+      setZaloUrl(settings.zaloPhone || extractContactDigits(settings.zaloUrl || ''));
+      setWhatsappUrl(extractContactDigits(settings.whatsappUrl || ''));
+      setWechatId(settings.wechatId || '');
+      setKakaoTalkId(settings.kakaoTalkId || '');
+      setTikTokUrl(settings.tikTokUrl || '');
+      setFacebookPersonalUrl(settings.facebookPersonalUrl || '');
+      setFacebookFanpageUrl(settings.facebookFanpageUrl || '');
+      setNaverBlogUrl(settings.naverBlogUrl || '');
+      setInstagramWorkUrl(settings.instagramWorkUrl || '');
+      setCommonPolicy(settings.commonPolicy || '');
+      setHoldTimeMode(settings.bookingHoldTimeMode);
+      setHoldMinutes(settings.holdMinutes);
+      setCustomMinutes(settings.customHoldMinutes);
+      return;
+    }
+
+    if (settingsQuery.error) {
+      setValidationError(settingsQuery.error instanceof Error ? settingsQuery.error.message : t('admin.settings.loadZaloError'));
+    }
+  }, [settings, settingsQuery.error, t]);
 
   const handleSaveConfigs = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +104,6 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
     }
 
     setValidationError(''); // Clear error
-    setIsSaving(true);
 
     try {
       const payload = section === 'info'
@@ -127,7 +125,7 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
             customHoldMinutes: customMinutes,
           };
 
-      const settings = await updateAdminSettings(payload);
+      const settings = await updateSettingsMutation.mutateAsync(payload);
       setZaloUrl(settings.zaloPhone || extractContactDigits(settings.zaloUrl || ''));
       setWhatsappUrl(extractContactDigits(settings.whatsappUrl || ''));
       setWechatId(settings.wechatId || '');
@@ -150,8 +148,6 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
       const message = error instanceof Error ? error.message : t('admin.settings.saveError');
       setValidationError(message);
       showToast('error', message);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -175,9 +171,8 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
       return;
     }
 
-    setIsChangingPassword(true);
     try {
-      const result = await changeAdminPassword(passwordForm);
+      const result = await changePasswordMutation.mutateAsync(passwordForm);
       showToast('success', result.message || t('admin.settings.passwordSuccess'));
       resetPasswordForm();
       setIsPasswordModalOpen(false);
@@ -186,8 +181,6 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
     } catch (error) {
       const message = error instanceof Error ? error.message : t('admin.settings.passwordError');
       showToast('error', message);
-    } finally {
-      setIsChangingPassword(false);
     }
   };
 

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Calendar, Lock, Trash2 } from 'lucide-react';
-import { AdminBlockedDate, EntityId, VillaDetail } from '../../types';
-import { createAdminBlockedDate, deleteAdminBlockedDate, getAdminBlockedDates } from '../../lib/api';
+import { EntityId, VillaDetail } from '../../types';
+import { useAdminBlockedDatesQuery } from '../../hooks/queries';
+import { useCreateAdminBlockedDateMutation, useDeleteAdminBlockedDateMutation } from '../../hooks/mutations';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../Toast';
 import CustomDatePicker from '../common/CustomDatePicker';
@@ -15,32 +16,19 @@ export default function AdminAvailabilityManager({ villas }: AdminAvailabilityMa
   const { language, t } = useLanguage();
   const { showToast } = useToast();
   const [activeVillaId, setActiveVillaId] = useState<EntityId>(() => villas.length > 0 ? villas[0].id : '');
-  const [blockedDates, setBlockedDates] = useState<AdminBlockedDate[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState(t('admin.availability.defaultReason'));
   const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const activeVilla = villas.find((villa) => String(villa.id) === String(activeVillaId));
-
-  const loadBlockedDates = async () => {
-    if (!activeVillaId) return;
-    setLoading(true);
-    try {
-      const response = await getAdminBlockedDates({ villaId: String(activeVillaId), limit: 100 });
-      setBlockedDates(response.blockedDates);
-    } catch (error) {
-      showToast('error', error instanceof Error ? error.message : t('admin.availability.loadError'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadBlockedDates();
-  }, [activeVillaId]);
+  const blockedDateParams = useMemo(() => ({ villaId: String(activeVillaId), limit: 100 }), [activeVillaId]);
+  const blockedDatesQuery = useAdminBlockedDatesQuery(blockedDateParams, Boolean(activeVillaId));
+  const createBlockedDateMutation = useCreateAdminBlockedDateMutation();
+  const deleteBlockedDateMutation = useDeleteAdminBlockedDateMutation();
+  const blockedDates = blockedDatesQuery.data?.blockedDates || [];
+  const loading = blockedDatesQuery.isLoading;
+  const saving = createBlockedDateMutation.isPending || deleteBlockedDateMutation.isPending;
 
   const handleCreateBlockedDate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -60,9 +48,8 @@ export default function AdminAvailabilityManager({ villas }: AdminAvailabilityMa
       return;
     }
 
-    setSaving(true);
     try {
-      await createAdminBlockedDate({
+      await createBlockedDateMutation.mutateAsync({
         villaId: String(activeVillaId),
         startDate,
         endDate: normalizedEndDate,
@@ -73,7 +60,6 @@ export default function AdminAvailabilityManager({ villas }: AdminAvailabilityMa
       setStartDate('');
       setEndDate('');
       setNote('');
-      await loadBlockedDates();
     } catch (error) {
       const code = (error as Error & { code?: string }).code;
       if (code === 'DATE_OVERLAP' || code === 'BLOCKED_DATE_OVERLAP') {
@@ -81,22 +67,16 @@ export default function AdminAvailabilityManager({ villas }: AdminAvailabilityMa
       } else {
         showToast('error', error instanceof Error ? error.message : t('admin.availability.createError'));
       }
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleDeleteBlockedDate = async (id: string) => {
     if (!window.confirm(t('admin.availability.deleteConfirm'))) return;
-    setSaving(true);
     try {
-      await deleteAdminBlockedDate(id);
+      await deleteBlockedDateMutation.mutateAsync(id);
       showToast('success', t('admin.availability.deleted'));
-      await loadBlockedDates();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : t('admin.availability.deleteError'));
-    } finally {
-      setSaving(false);
     }
   };
 

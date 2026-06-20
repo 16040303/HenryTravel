@@ -1,6 +1,8 @@
 import React, { createContext, useEffect, useState, useContext, ReactNode } from 'react';
 import { Language, TRANSLATIONS } from '../i18n';
 
+export type { Language };
+
 interface LanguageContextProps {
   language: Language;
   setLanguage: (lang: Language) => void;

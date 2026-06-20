@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, MapPin, Calendar, Users, SlidersHorizontal, Star, Sliders, CheckSquare, RefreshCw } from 'lucide-react';
 import { AccommodationTypeValue, FilterParams, Villa } from '../types';
-import { getVillas } from '../lib/api';
 import { DEFAULT_LOCATIONS, FILTER_FACILITIES, normalizeLocationCity } from '../constants';
 import { getAmenityDisplay, getAmenityLabel, getCardAmenities } from '../data/amenities';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useVillasQuery } from '../hooks/queries';
 import OptimizedImage from './OptimizedImage';
 import { VillaCardSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
@@ -39,8 +39,19 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
 
   // Edit Search Popup Toggle
   const [showEditSearch, setShowEditSearch] = useState(false);
-  const [villas, setVillas] = useState<Villa[]>([]);
-  const [loading, setLoading] = useState(true);
+  const villaQueryFilters = useMemo(() => ({
+    location: params.location,
+    checkIn: params.checkIn,
+    checkOut: params.checkOut,
+    guests: params.guests,
+    rooms: params.rooms,
+    priceMin: filterParams.priceMin,
+    priceMax: filterParams.priceMax,
+    type: filterParams.type,
+    facilities: [...filterParams.facilities].sort(),
+    lang: language
+  }), [params, filterParams, language]);
+  const { data: villas = [], isLoading: loading, refetch: refetchVillas } = useVillasQuery(villaQueryFilters);
   const [sortBy, setSortBy] = useState<'popular' | 'priceAsc' | 'priceDesc'>('popular');
   const locationOptions = useMemo(
     () => Array.from(new Set([...DEFAULT_LOCATIONS, ...villas.map(v => normalizeLocationCity(v.location)).filter(Boolean)])),
@@ -71,27 +82,11 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     setEditRooms(initialSearchParams.rooms);
   }, [initialSearchParams, initialFilterParams]);
 
-  // Load villas based on parameters
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const list = await getVillas({
-        location: params.location,
-        checkIn: params.checkIn,
-        checkOut: params.checkOut,
-        guests: params.guests,
-        rooms: params.rooms,
-        priceMin: filterParams.priceMin,
-        priceMax: filterParams.priceMax,
-        type: filterParams.type,
-        facilities: filterParams.facilities,
-        lang: language
-      });
-      setVillas(list);
-      setLoading(false);
+    if (villasTriggerUpdate > 0) {
+      void refetchVillas();
     }
-    loadData();
-  }, [params, filterParams, villasTriggerUpdate, language]);
+  }, [refetchVillas, villasTriggerUpdate]);
 
   // Safe mapping of location string for translation looks
   const getLocationLabel = useCallback((loc: string): string => {
