@@ -1,0 +1,73 @@
+src\App.tsx:480: [text] Travel
+src\App.tsx:493: [text] Facebook Fanpage
+src\App.tsx:499: [text] Personal Facebook
+src\App.tsx:505: [text] Instagram
+src\App.tsx:511: [text] TikTok
+src\App.tsx:517: [text] Naver Blog
+src\App.tsx:543: [title] Điện thoại: mở WeChat · Máy tính: sao chép ID
+src\App.tsx:554: [title] Điện thoại: mở KakaoTalk · Máy tính: sao chép ID
+src\components\DetailView.tsx:288: [title] Không tìm thấy biệt thự
+src\components\DetailView.tsx:597: [text] Vietnam
+src\components\DetailView.tsx:639: [text] Chia sẻ
+src\components\DetailView.tsx:711: [text] Sức chứa
+src\components\DetailView.tsx:716: [text] Phòng ngủ
+src\components\DetailView.tsx:721: [text] Phòng vệ sinh
+src\components\DetailView.tsx:726: [text] Trạng thái
+src\components\DetailView.tsx:727: [text] Sẵn sàng
+src\components\DetailView.tsx:733: [text] Giới thiệu dịch vụ
+src\components\DetailView.tsx:741: [text] Cơ sở vật chất & Tiện nghi
+src\components\DetailView.tsx:791: [text] Quy định chung
+src\components\DetailView.tsx:839: [text] ✓ Khách đặt thực tế
+src\components\DetailView.tsx:849: [text] Gửi nhận xét của bạn
+src\components\DetailView.tsx:850: [text] Chia sẻ ngắn gọn để những khách sau dễ chọn hơn
+src\components\DetailView.tsx:862: [text] Họ và tên của bạn
+src\components\DetailView.tsx:868: [placeholder] Ví dụ: Nguyễn Văn A
+src\components\DetailView.tsx:873: [text] Mã booking
+src\components\DetailView.tsx:879: [placeholder] VB-2026-001
+src\components\DetailView.tsx:884: [text] Số điện thoại đặt phòng
+src\components\DetailView.tsx:895: [text] Đánh giá số sao
+src\components\DetailView.tsx:901: [text] ⭐️⭐️⭐️⭐️⭐️ (5/5 tuyệt vời)
+src\components\DetailView.tsx:902: [text] ⭐️⭐️⭐️⭐️ (4/5 rất hài lòng)
+src\components\DetailView.tsx:903: [text] ⭐️⭐️⭐️ (3/5 bình thường)
+src\components\DetailView.tsx:904: [text] ⭐️⭐️ (2/5 chất lượng kém)
+src\components\DetailView.tsx:905: [text] ⭐️ (1/5 tệ hại)
+src\components\DetailView.tsx:911: [text] Bình luận của khách
+src\components\DetailView.tsx:917: [placeholder] Bạn có thể chia sẻ về phòng, vị trí, tiện nghi hoặc cách hỗ trợ của chủ nhà...
+src\components\DetailView.tsx:956: [text] Check-in
+src\components\DetailView.tsx:967: [text] Check-out
+src\components\DetailView.tsx:1227: [text] Code
+src\components\HomeView.tsx:163: [alt] Hero Background
+src\components\HomeView.tsx:342: [text] 1.000.000 VND
+src\components\HomeView.tsx:343: [text] 5.000.000 VND
+src\components\HomeView.tsx:344: [text] 10.000.000 VND+
+src\components\ListingView.tsx:317: [text] = checkInDay && d
+src\components\Navbar.tsx:201: [text] Travel
+src\components\Navbar.tsx:401: [text] HenryTravel
+src\components\Navbar.tsx:452: [text] Instagram
+src\components\Navbar.tsx:458: [text] TikTok
+src\components\Navbar.tsx:464: [text] Naver Blog
+src\components\admin\AdminBookingManager.tsx:142: [text] Henry
+src\components\admin\AdminBookingManager.tsx:142: [text] Travel
+src\components\admin\AdminBookingManager.tsx:152: [text] Email:
+src\components\admin\AdminBookingManager.tsx:591: [text] Email
+src\components\admin\AdminLayout.tsx:20: [text] Promise
+src\components\admin\AdminLayout.tsx:22: [text] void | Promise
+src\components\admin\AdminLayout.tsx:23: [text] void | Promise
+src\components\admin\AdminSettings.tsx:321: [text] WeChat ID
+src\components\admin\AdminSettings.tsx:325: [text] KakaoTalk ID
+src\components\admin\AdminSettings.tsx:336: [text] Facebook Fanpage
+src\components\admin\AdminSettings.tsx:348: [text] TikTok
+src\components\admin\AdminSettings.tsx:352: [text] Naver Blog
+src\components\admin\AdminVillaManager.tsx:16: [text] Promise
+src\components\admin\AdminVillaManager.tsx:18: [text] void | Promise
+src\components\admin\AdminVillaManager.tsx:19: [text] void | Promise
+src\components\admin\AdminVillaManager.tsx:337: [text] Villa
+src\components\admin\AdminVillaManager.tsx:705: [text] Villa
+src\components\admin\AdminVillaManager.tsx:801: [text] Name EN
+src\components\admin\AdminVillaManager.tsx:810: [text] Location EN
+src\components\admin\AdminVillaManager.tsx:821: [text] Description EN
+src\components\admin\AdminVillaManager.tsx:849: [placeholder] Tìm tiện ích...
+src\components\admin\MediaUploader.tsx:200: [text] Cover
+src\components\calendar\BookingCalendar.tsx:109: [text] = checkIn && dateStr
+src\components\common\ImageLightbox.tsx:43: [aria-label] Image gallery
+COUNT=72

@@ -14,7 +14,21 @@ interface AdminSettingsProps {
 }
 
 function extractContactDigits(value: string): string {
-  return value.replace(/[^0-9]/g, '');
+  const digits = value.replace(/[^0-9]/g, '');
+  if (digits && !digits.startsWith('0')) {
+    const clean = '+' + digits;
+    if (clean.startsWith('+84')) {
+      return '+84 ' + clean.slice(3);
+    }
+    if (digits.length > 2) {
+      if (digits.startsWith('1') || digits.startsWith('7')) {
+        return '+' + digits.slice(0, 1) + ' ' + digits.slice(1);
+      }
+      return '+' + digits.slice(0, 2) + ' ' + digits.slice(2);
+    }
+    return clean;
+  }
+  return digits;
 }
 
 export default function AdminSettings({ onLogout, section = 'system' }: AdminSettingsProps) {
@@ -334,11 +348,11 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
             </label>
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-black uppercase text-neutral-400">Facebook Fanpage</span>
-              <input type="url" value={facebookFanpageUrl} onChange={(e) => setFacebookFanpageUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link trang fanpage Facebook" />
+              <input type="url" value={facebookFanpageUrl} onChange={(e) => setFacebookFanpageUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder={t('admin.settings.facebookFanpagePlaceholder')} />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-black uppercase text-neutral-400">{t('admin.settings.facebookPersonal')}</span>
-              <input type="url" value={facebookPersonalUrl} onChange={(e) => setFacebookPersonalUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link {t('admin.settings.facebookPersonal')}" />
+              <input type="url" value={facebookPersonalUrl} onChange={(e) => setFacebookPersonalUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder={t('admin.settings.facebookPersonalPlaceholder')} />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-black uppercase text-neutral-400">{t('admin.settings.instagramWork')}</span>
@@ -350,7 +364,7 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-black uppercase text-neutral-400">Naver Blog</span>
-              <input type="url" value={naverBlogUrl} onChange={(e) => setNaverBlogUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder="Link blog Naver" />
+              <input type="url" value={naverBlogUrl} onChange={(e) => setNaverBlogUrl(e.target.value)} className="bg-white border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] font-mono text-neutral-850 text-xs" placeholder={t('admin.settings.naverBlogPlaceholder')} />
             </div>
           </div>
 

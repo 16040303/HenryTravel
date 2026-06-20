@@ -8,6 +8,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
 import { VillaCardSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
+import GuestCategoryPicker from './common/GuestCategoryPicker';
+import { getLocalDateString } from '../lib/date';
 
 interface ListingViewProps {
   initialSearchParams: {
@@ -51,7 +53,10 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   const [editLocation, setEditLocation] = useState(params.location);
   const [editCheckIn, setEditCheckIn] = useState(params.checkIn);
   const [editCheckOut, setEditCheckOut] = useState(params.checkOut);
-  const [editGuests, setEditGuests] = useState(params.guests);
+  const [editAdults, setEditAdults] = useState(Math.max(params.guests, 1));
+  const [editChildren, setEditChildren] = useState(0);
+  const [editInfants, setEditInfants] = useState(0);
+  const editGuests = editAdults + editChildren + editInfants;
   const [editRooms, setEditRooms] = useState(params.rooms);
 
   useEffect(() => {
@@ -60,7 +65,9 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     setEditLocation(initialSearchParams.location);
     setEditCheckIn(initialSearchParams.checkIn);
     setEditCheckOut(initialSearchParams.checkOut);
-    setEditGuests(initialSearchParams.guests);
+    setEditAdults(Math.max(initialSearchParams.guests, 1));
+    setEditChildren(0);
+    setEditInfants(0);
     setEditRooms(initialSearchParams.rooms);
   }, [initialSearchParams, initialFilterParams]);
 
@@ -86,20 +93,37 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     loadData();
   }, [params, filterParams, villasTriggerUpdate, language]);
 
-  const handleApplyEditSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const nextParams = {
-      location: editLocation,
-      checkIn: editCheckIn,
-      checkOut: editCheckOut,
-      guests: editGuests,
-      rooms: editRooms
+  // Safe mapping of location string for translation looks
+  const getLocationLabel = useCallback((loc: string): string => {
+    const keyMap: Record<string, string> = {
+      'Đà Lạt': 'loc.dalat',
+      'Vũng Tàu': 'loc.vungtau',
+      'Phú Quốc': 'loc.phuquoc',
+      'Hội An': 'loc.hoian',
+      'Huế': 'loc.hue',
+      'Đà Nẵng': 'loc.danang',
+      'All': 'loc.all',
+      'Nha Trang': 'loc.nhatrang',
+      'TP.HCM': 'loc.hcm',
     };
-    setParams(nextParams);
-    onSearchParamsUpdate?.(nextParams, filterParams);
-    setShowEditSearch(false);
-    setActiveEditDateField(null);
-  };
+    const key = keyMap[loc];
+    return key ? t(key) : loc;
+  }, [t]);
+
+  const handleApplyEditSearch = (e: React.FormEvent) => {
+     e.preventDefault();
+     const nextParams = {
+       location: editLocation,
+       checkIn: editCheckIn,
+       checkOut: editCheckOut,
+       guests: Math.max(editGuests, 1),
+       rooms: editRooms
+     };
+     setParams(nextParams);
+     onSearchParamsUpdate?.(nextParams, filterParams);
+     setShowEditSearch(false);
+     setActiveEditDateField(null);
+   };
 
   const sortedVillas = useMemo(() => [...villas].sort((a, b) => {
     if (sortBy === 'priceAsc') return a.price - b.price;
@@ -168,7 +192,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     });
     const resetParams = {
       location: 'All',
-      checkIn: new Date().toISOString().slice(0, 10),
+      checkIn: getLocalDateString(),
       checkOut: '',
       guests: 2,
       rooms: 1
@@ -177,7 +201,9 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     setEditLocation(resetParams.location);
     setEditCheckIn(resetParams.checkIn);
     setEditCheckOut(resetParams.checkOut);
-    setEditGuests(resetParams.guests);
+    setEditAdults(resetParams.guests);
+    setEditChildren(0);
+    setEditInfants(0);
     setEditRooms(resetParams.rooms);
     onSearchParamsUpdate?.(resetParams, {
       priceMin: 0,
@@ -218,11 +244,11 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             onClick={() => setActiveEditDateField(null)}
             className="rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
           >
-            {language === 'vi' ? 'Đóng' : 'Close'}
+            {t('common.close')}
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-400">
-          {(language === 'vi' ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']).map(day => (
+          {t('calendar.weekdays').split(',').map(day => (
             <span key={day}>{day}</span>
           ))}
           {Array.from({ length: offset }).map((_, index) => (
@@ -254,22 +280,6 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     );
   };
 
-  // Safe mapping of location string for translation looks
-  const getLocationLabel = useCallback((loc: string): string => {
-    const keyMap: Record<string, string> = {
-      'Đà Lạt': 'loc.dalat',
-      'Vũng Tàu': 'loc.vungtau',
-      'Phú Quốc': 'loc.phuquoc',
-      'Hội An': 'loc.hoian',
-      'Huế': 'loc.hue',
-      'Đà Nẵng': 'loc.danang',
-      'All': 'loc.all',
-      'Nha Trang': 'loc.nhatrang',
-      'TP.HCM': 'loc.hcm',
-    };
-    const key = keyMap[loc];
-    return key ? t(key) : loc;
-  }, [t]);
 
   // Mini-calendar formatter which highlights reservation states of a villa
   const renderMiniCalendar = (villaId: number) => {
@@ -298,22 +308,22 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         
         {/* Days grid row */}
         <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px]">
-          {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(w => (
+          {t('calendar.weekdays').split(',').map(w => (
             <span key={w} className="text-[8px] font-bold text-neutral-400">{w}</span>
           ))}
 
           {days.map(d => {
             let bgClass = 'bg-white hover:bg-neutral-100 text-neutral-700';
-            let title = 'Có phòng trống';
+            let title = t('list.calendarAvailable');
 
             const isSelectedRange = checkInDay !== null && checkOutDay !== null && isSameDisplayMonth && d >= checkInDay && d <= checkOutDay;
 
             if (isSelectedRange) {
               bgClass = 'bg-[#0071c2] text-white font-extrabold rounded-md';
-              title = 'Ngày bạn tìm kiếm';
+              title = t('list.calendarSearched');
             } else if (d === 25 || d === 26) {
               bgClass = 'bg-rose-100 text-rose-500 line-through rounded-md opacity-60';
-              title = 'Đã giữ chỗ';
+              title = t('list.calendarHeld');
             }
 
             return (
@@ -339,7 +349,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1.5 text-xs text-blue-100 uppercase font-black tracking-widest leading-none">
-              <span>{getLocationLabel(params.location)} — {params.guests} {t('home.guests')}</span>
+              <span>{getLocationLabel(params.location)} — {params.guests} {t('detail.guestUnit')}</span>
             </div>
             <h1 className="text-2xl md:text-3.5xl font-display font-black tracking-tight text-white leading-none">
               {t('nav.listings')} {getLocationLabel(params.location)}
@@ -410,17 +420,17 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('home.guests')}</span>
-                  <input 
-                    type="number" 
-                    min={1} 
-                    max={20}
-                    value={editGuests} 
-                    onChange={e => setEditGuests(Number(e.target.value))}
-                    className="bg-neutral-50 border p-2 rounded-lg text-sm font-semibold outline-none"
-                  />
-                </div>
+                <GuestCategoryPicker
+                  adults={editAdults}
+                  children={editChildren}
+                  infants={editInfants}
+                  onAdultsChange={setEditAdults}
+                  onChildrenChange={setEditChildren}
+                  onInfantsChange={setEditInfants}
+                  maxGuests={20}
+                  minAdults={0}
+                  showMax={false}
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
@@ -542,7 +552,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">
-                    {language === 'vi' ? 'Kết quả tìm kiếm' : 'Search results'}
+                    {t('list.searchResults')}
                   </p>
                   <div className="mt-1 flex items-baseline gap-1.5 text-sm font-semibold text-neutral-600">
                     <span>{t('list.foundPrefix')}</span>
@@ -676,7 +686,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
                         ))}
                         {remainingAmenities > 0 && (
                           <span className="bg-sky-50 text-sky-700 px-2 py-1 rounded text-[10px] font-bold">
-                            +{remainingAmenities} tiện ích
+                            {t('list.moreAmenities', { count: remainingAmenities })}
                           </span>
                         )}
                       </div>

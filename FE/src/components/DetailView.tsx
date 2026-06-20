@@ -21,6 +21,8 @@ import { useToast } from './Toast';
 import BookingCalendar from './calendar/BookingCalendar';
 import { VillaDetailSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
+import GuestCategoryPicker from './common/GuestCategoryPicker';
+import { getLocalDateString } from '../lib/date';
 
 const AMENITY_ICON_COMPONENTS = {
   Wifi, KeyRound, ParkingCircle, Snowflake, WashingMachine, Wind, Laptop, Waves,
@@ -79,7 +81,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   const [bookingName, setBookingName] = useState('');
   const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEmail, setBookingEmail] = useState('');
-  const [checkIn, setCheckIn] = useState(initialSearchParams?.checkIn || new Date().toISOString().slice(0, 10));
+  const [checkIn, setCheckIn] = useState(initialSearchParams?.checkIn || getLocalDateString());
   const [checkOut, setCheckOut] = useState(initialSearchParams?.checkOut || '');
   const [adultCount, setAdultCount] = useState(initialSearchParams?.guests || 2);
   const [childrenCount, setChildrenCount] = useState(0);
@@ -284,9 +286,9 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     return (
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 md:px-12 py-16 text-center">
         <EmptyState
-          title="Không tìm thấy biệt thự"
-          description="Hệ thống không tìm thấy biệt thự tương ứng với mã yêu cầu. Vui lòng quay lại danh sách để khám phá các lựa chọn tuyệt vời khác!"
-          actionText="Quay lại danh sách"
+          title={t('detail.notFoundTitle')}
+          description={t('detail.notFoundDesc')}
+          actionText={t('detail.backToList')}
           onAction={onBack}
           icon="villa"
         />
@@ -301,12 +303,13 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
   const formatFeedbackDate = (value: string) => {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Đánh giá gần đây';
-    return `Đánh giá ngày ${new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-GB', {
+    if (Number.isNaN(date.getTime())) return t('detail.recentReview');
+    const formattedDate = new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-GB', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(date)}`;
+    }).format(date);
+    return t('detail.feedbackDate', { date: formattedDate });
   };
 
   const calculatedAvgRating = feedbacks.length > 0
@@ -341,11 +344,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
             onClick={() => setActiveBookingDateField(null)}
             className="rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
           >
-            Đóng
+            {t('common.close')}
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-400">
-          {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(day => (
+          {t('calendar.weekdays').split(',').map(day => (
             <span key={day}>{day}</span>
           ))}
           {Array.from({ length: offset }).map((_, index) => (
@@ -388,7 +391,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     }
     if (!checkOut) {
       setCheckoutMissing(true);
-      showToast('warning', 'Vui lòng nhập ngày trả phòng.');
+      showToast('warning', t('booking.checkoutRequired'));
       return;
     }
     if (daysCount <= 0) {
@@ -412,7 +415,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
     const totalGuestsLimit = villa.guestsCount || 20;
     if (guestsCount > totalGuestsLimit) {
-      showToast('warning', `Tổng khách không được vượt quá sức chứa tối đa (${totalGuestsLimit} khách).`);
+      showToast('warning', t('booking.guestLimitExceeded', { limit: totalGuestsLimit }));
       return;
     }
 
@@ -543,7 +546,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
     const shareUrl = window.location.href;
     const shareData = {
       title: villa.name,
-      text: `Khám phá ${villa.name} tại ${villa.location} trên HenryTravel`,
+      text: t('detail.shareText', { name: villa.name, location: villa.location }),
       url: shareUrl,
     };
 
@@ -562,8 +565,8 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   };
 
   const fallbackZaloSupportMessage = bookingResult
-    ? `Xin chào HenryTravel, tôi vừa gửi yêu cầu giữ chỗ mã [ ${bookingResult.bookingCode} ] tại ${villa.name}. Nhờ anh/chị kiểm tra và xác nhận giúp tôi.`
-    : `Xin chào HenryTravel, tôi cần tư vấn thêm về ${villa.name}.`;
+    ? t('booking.zaloHoldMessage', { code: bookingResult.bookingCode, name: villa.name })
+    : t('booking.zaloConsultMessage', { name: villa.name });
   const zaloSupportMessage = bookingResult?.zaloLinks?.message || fallbackZaloSupportMessage;
   const fallbackPublicZaloUrl = getZaloLink(publicZaloPhone || ZALO_PHONE_FALLBACK, zaloSupportMessage) || publicZaloUrl;
   const zaloSupportUrl = bookingResult?.zaloLinks?.fallback || bookingResult?.zaloLinks?.web || fallbackPublicZaloUrl;
@@ -589,11 +592,11 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
             className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 hover:text-[#0071c2] cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            Quay lại danh sách
+            {t('detail.backToList')}
           </button>
 
           <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400">
-            <span>Vietnam</span>
+            <span>{t('detail.breadcrumbCountry')}</span>
             <span>/</span>
             <span>{villa.location}</span>
             <span>/</span>
@@ -614,7 +617,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               <div className="flex items-center gap-1.5 text-xs font-black text-[#fe6a34]">
                 <Star className="w-3.5 h-3.5 fill-[#fe6a34] text-[#fe6a34]" />
                 <span>{displayAvgRating}</span>
-                <span className="text-neutral-400 font-normal">({displayFeedbackCount} bình luận)</span>
+                <span className="text-neutral-400 font-normal">({displayFeedbackCount} {t('detail.comments')})</span>
               </div>
             </div>
 
@@ -635,7 +638,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               className="flex items-center gap-1.5 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg py-2 px-3.5 shadow-sm text-neutral-600 cursor-pointer"
             >
               <Share2 className="w-4 h-4 text-neutral-400" />
-              <span>Chia sẻ</span>
+              <span>{t('detail.share')}</span>
             </button>
           </div>
         </div>
@@ -677,7 +680,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                   <div className="md:col-span-2 relative aspect-[4/3] md:aspect-square bg-neutral-100">
                     {mainMedia ? renderMedia(mainMedia, villa.name, true) : (
                       <div className="w-full h-full flex items-center justify-center text-xs font-bold text-neutral-400 bg-neutral-100">
-                        Chưa có hình ảnh/video
+                        {t('detail.noMedia')}
                       </div>
                     )}
                   </div>
@@ -687,7 +690,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       {renderMedia(media, `${villa.name} ${index + 2}`)}
                       {index === visibleSecondaryMedia.length - 1 && galleryMedia.length > 5 && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-extrabold text-xs pointer-events-none text-center p-2">
-                          + {galleryMedia.length - 5} {language === 'vi' ? 'media khác' : (language === 'ko' ? '개의 미디어 더보기' : 'more media')}
+                          + {galleryMedia.length - 5} {t('detail.moreMedia')}
                         </div>
                       )}
                     </div>
@@ -707,29 +710,29 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
             <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div className="flex flex-col items-center border-r border-neutral-100 last:border-0 py-1">
                 <Users className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">Sức chứa</span>
-                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.guestsCount || 8} khách</span>
+                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.capacity')}</span>
+                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.guestsCount || 8} {t('detail.guestUnit')}</span>
               </div>
               <div className="flex flex-col items-center border-r border-[#fcf9f8] sm:border-neutral-100 last:border-0 py-1">
                 <Clock className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">Phòng ngủ</span>
-                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bedroomsCount || 4} phòng ngủ</span>
+                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bedrooms')}</span>
+                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bedroomsCount || 4} {t('detail.bedroomUnit')}</span>
               </div>
               <div className="flex flex-col items-center border-r border-neutral-100 last:border-0 py-1">
                 <Compass className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">Phòng vệ sinh</span>
-                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bathroomsCount || 4} phòng tắm</span>
+                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bathrooms')}</span>
+                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bathroomsCount || 4} {t('detail.bathroomUnit')}</span>
               </div>
               <div className="flex flex-col items-center last:border-0 py-1">
                 <CheckCircle2 className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">Trạng thái</span>
-                <span className="text-xs font-black text-emerald-600 bg-emerald-50 py-0.5 px-2 rounded-full mt-0.5">Sẵn sàng</span>
+                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.status')}</span>
+                <span className="text-xs font-black text-emerald-600 bg-emerald-50 py-0.5 px-2 rounded-full mt-0.5">{t('detail.available')}</span>
               </div>
             </div>
 
             {/* Description Text block */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-xl font-display font-black text-neutral-800">Giới thiệu dịch vụ</h3>
+              <h3 className="text-xl font-display font-black text-neutral-800">{t('detail.intro')}</h3>
               <p className="text-sm text-neutral-600 leading-relaxed font-normal whitespace-pre-line text-justify">
                 {villa.description}
               </p>
@@ -737,7 +740,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
             {/* Dynamic Amenities Grid list */}
             <div className="flex flex-col gap-5">
-              <h3 className="text-xl font-display font-black text-neutral-800">Cơ sở vật chất & Tiện nghi</h3>
+              <h3 className="text-xl font-display font-black text-neutral-800">{t('detail.amenities')}</h3>
               <div className="flex flex-col gap-5">
                 {getAmenitiesByCategory(villa.facilities).map(({ category, items }) => (
                   <div key={category} className="rounded-3xl border border-neutral-100 bg-white p-4 shadow-sm">
@@ -766,10 +769,10 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <h3 className="text-xl font-display font-black text-neutral-800">
-                  {language === 'vi' ? 'Lịch đặt phòng trực quan' : (language === 'ko' ? '실시간 예약 달력' : 'Interactive Reservation Calendar')}
+                  {t('detail.calendarTitle')}
                 </h3>
                 <span className="text-[9px] font-extrabold bg-[#edf3ff] text-[#005899] py-0.5 px-2 rounded-full uppercase tracking-wider">
-                  Lịch còn trống
+                  {t('detail.calendarAvailable')}
                 </span>
               </div>
               <BookingCalendar
@@ -787,14 +790,14 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
             {/* Core House Rules Policies list */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-xl font-display font-black text-neutral-800">Quy định chung</h3>
+              <h3 className="text-xl font-display font-black text-neutral-800">{t('detail.rules')}</h3>
               <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl flex flex-col gap-3">
                 <span className="text-xs font-extrabold text-amber-800 uppercase tracking-widest flex items-center gap-1">
                   <ShieldAlert className="w-4 h-4 text-[#fe6a34]" />
-                  Quy định chung áp dụng cho tất cả căn
+                  {t('detail.rulesApplyAll')}
                 </span>
                 <div className="flex flex-col gap-1.5 text-xs font-semibold text-neutral-700 mt-1">
-                  {(commonPolicy || 'Check in 14h\nCheck out 11h hôm sau\nThời gian giữ chỗ được áp dụng cho tất cả booking mới\nQuy định riêng của từng căn sẽ được admin tư vấn qua Zalo sau khi đặt phòng')
+                  {(commonPolicy || t('detail.defaultPolicies'))
                     .split('\n')
                     .map((item) => item.trim())
                     .filter(Boolean)
@@ -807,17 +810,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
 
             {/* Interactive Feedbacks reviews presentation box */}
             <div className="flex flex-col gap-5 pt-4 border-t border-neutral-100">
-              <h3 className="text-xl font-display font-black text-neutral-800">Đánh giá thực tế ({displayFeedbackCount})</h3>
+              <h3 className="text-xl font-display font-black text-neutral-800">{t('detail.reviewsTitle')} ({displayFeedbackCount})</h3>
 
               <div className="flex flex-col gap-4">
                 {feedbackLoading ? (
                   <div className="bg-white p-5 rounded-xl border border-neutral-100 shadow-sm text-xs font-bold text-neutral-400 animate-pulse">
-                    Đang tải đánh giá thực tế...
+                    {t('feedback.loading')}
                   </div>
                 ) : feedbacks.length === 0 ? (
                   <EmptyState
-                    title={language === 'vi' ? 'Chưa có đánh giá nào cho villa này.' : (language === 'ko' ? '등록된 리뷰가 없습니다' : 'No reviews yet for this villa.')}
-                    description={language === 'vi' ? 'Các đánh giá đã xác thực từ khách lưu trú sẽ hiển thị tại đây.' : (language === 'ko' ? '인증된 투숙객 리뷰가 여기에 표시됩니다.' : 'Verified guest reviews will appear here.')}
+                    title={t('detail.noReviewsTitle')}
+                    description={t('detail.noReviewsDesc')}
                     icon="feedback"
                   />
                 ) : (
@@ -835,7 +838,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       </p>
                       <div className="text-[10px] text-neutral-400 font-bold flex items-center gap-1">
                         <span>{formatFeedbackDate(f.createdAt)}</span>
-                        {f.isVerified && <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">✓ Khách đặt thực tế</span>}
+                        {f.isVerified && <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">✓ {t('detail.verifiedGuest')}</span>}
                       </div>
                     </div>
                   ))
@@ -845,8 +848,8 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               {/* Form trigger to submit new reviews */}
               <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200/50 mt-4 flex flex-col gap-4">
                 <div>
-                  <h4 className="font-bold text-sm text-neutral-800">Gửi nhận xét của bạn</h4>
-                  <p className="text-[11px] text-neutral-400 font-semibold mt-0.5">Chia sẻ ngắn gọn để những khách sau dễ chọn hơn</p>
+                  <h4 className="font-bold text-sm text-neutral-800">{t('detail.feedbackFormTitle')}</h4>
+                  <p className="text-[11px] text-neutral-400 font-semibold mt-0.5">{t('detail.feedbackFormDesc')}</p>
                 </div>
 
                 {feedbackSuccessMsg ? (
@@ -858,18 +861,18 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                   <form onSubmit={handleReviewFeedbackSubmit} className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Họ và tên của bạn</span>
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackName')}</span>
                         <input
                           type="text"
                           required
                           value={newFeedbackName}
                           onChange={(e) => setNewFeedbackName(e.target.value)}
-                          placeholder="Ví dụ: Nguyễn Văn A"
+                          placeholder={t('detail.feedbackNamePlaceholder')}
                           className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2]"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Mã booking</span>
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackBookingCode')}</span>
                         <input
                           type="text"
                           required
@@ -880,7 +883,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Số điện thoại đặt phòng</span>
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackPhone')}</span>
                         <input
                           type="tel"
                           required
@@ -891,29 +894,29 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-neutral-600 uppercase">Đánh giá số sao</span>
+                        <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackRating')}</span>
                         <select
                           value={newFeedbackRating}
                           onChange={(e) => setNewFeedbackRating(Number(e.target.value))}
                           className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2] cursor-pointer"
                         >
-                          <option value="5">⭐️⭐️⭐️⭐️⭐️ (5/5 tuyệt vời)</option>
-                          <option value="4">⭐️⭐️⭐️⭐️ (4/5 rất hài lòng)</option>
-                          <option value="3">⭐️⭐️⭐️ (3/5 bình thường)</option>
-                          <option value="2">⭐️⭐️ (2/5 chất lượng kém)</option>
-                          <option value="1">⭐️ (1/5 tệ hại)</option>
+                          <option value="5">⭐️⭐️⭐️⭐️⭐️ ({t('detail.rating5')})</option>
+                          <option value="4">⭐️⭐️⭐️⭐️ ({t('detail.rating4')})</option>
+                          <option value="3">⭐️⭐️⭐️ ({t('detail.rating3')})</option>
+                          <option value="2">⭐️⭐️ ({t('detail.rating2')})</option>
+                          <option value="1">⭐️ ({t('detail.rating1')})</option>
                         </select>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-bold text-neutral-600 uppercase">Bình luận của khách</span>
+                      <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackComment')}</span>
                       <textarea
                         required
                         rows={3}
                         value={newFeedbackComment}
                         onChange={(e) => setNewFeedbackComment(e.target.value)}
-                        placeholder="Bạn có thể chia sẻ về phòng, vị trí, tiện nghi hoặc cách hỗ trợ của chủ nhà..."
+                        placeholder={t('detail.feedbackCommentPlaceholder')}
                         className="bg-white border border-neutral-200 rounded-lg p-3 text-xs font-semibold outline-none focus:border-[#0071c2] resize-none"
                       />
                     </div>
@@ -923,7 +926,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       disabled={isSubmittingFeedback}
                       className="self-end bg-[#0071c2] hover:bg-[#005899] disabled:bg-neutral-400 text-white font-bold text-xs py-2 px-5 rounded-lg cursor-pointer"
                     >
-                      {isSubmittingFeedback ? 'Đang gửi...' : 'Gửi nhận xét ngay'}
+                      {isSubmittingFeedback ? t('detail.feedbackSubmitting') : t('detail.feedbackSubmit')}
                     </button>
                   </form>
                 )}
@@ -952,7 +955,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 {/* Dates pickers */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="relative flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Check-in</label>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">{t('home.checkIn')}</label>
                     <button
                       type="button"
                       onClick={() => setActiveBookingDateField(activeBookingDateField === 'checkIn' ? null : 'checkIn')}
@@ -963,7 +966,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                     {renderBookingDateCalendar('checkIn', checkIn, setCheckIn)}
                   </div>
                   <div className="relative flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Check-out</label>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">{t('home.checkOut')}</label>
                     <button
                       type="button"
                       onClick={() => setActiveBookingDateField(activeBookingDateField === 'checkOut' ? null : 'checkOut')}
@@ -981,53 +984,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 {/* Amount counters */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="col-span-2 flex flex-col gap-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="min-h-[26px] flex items-end text-[10px] font-bold text-neutral-500 uppercase leading-tight">Người lớn từ 12 tuổi</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={adultCount || ''}
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/\D/g, '');
-                            setAdultCount(rawValue === '' ? 0 : Math.min(Number(rawValue), villa.guestsCount || 20));
-                          }}
-                          onBlur={() => setAdultCount(Math.min(Math.max(adultCount || 1, 1), villa.guestsCount || 20))}
-                          className="h-9 w-full bg-neutral-50 border border-neutral-200 px-3.5 py-1.5 text-xs font-bold text-neutral-700 rounded-lg outline-none"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="min-h-[26px] flex items-end text-[10px] font-bold text-neutral-500 uppercase leading-tight">Trẻ em 6-11 tuổi</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={childrenCount || ''}
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/\D/g, '');
-                            setChildrenCount(rawValue === '' ? 0 : Math.min(Number(rawValue), villa.guestsCount || 20));
-                          }}
-                          className="h-9 w-full bg-neutral-50 border border-neutral-200 px-3.5 py-1.5 text-xs font-bold text-neutral-700 rounded-lg outline-none"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="min-h-[26px] flex items-end text-[10px] font-bold text-neutral-500 uppercase leading-tight">Trẻ em dưới 6 tuổi</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={infantCount || ''}
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/\D/g, '');
-                            setInfantCount(rawValue === '' ? 0 : Math.min(Number(rawValue), villa.guestsCount || 20));
-                          }}
-                          className="h-9 w-full bg-neutral-50 border border-neutral-200 px-3.5 py-1.5 text-xs font-bold text-neutral-700 rounded-lg outline-none"
-                        />
-                      </div>
-                    </div>
+                    <GuestCategoryPicker
+                      adults={adultCount}
+                      children={childrenCount}
+                      infants={infantCount}
+                      onAdultsChange={setAdultCount}
+                      onChildrenChange={setChildrenCount}
+                      onInfantsChange={setInfantCount}
+                      maxGuests={villa.guestsCount || 20}
+                    />
                     <div className={`rounded-lg border px-3 py-2 text-[10px] font-bold ${guestsCount > (villa.guestsCount || 20) ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-[#edf3ff] border-[#a1c9ff]/40 text-[#005899]'}`}>
-                      Tổng khách: {guestsCount}/{villa.guestsCount || 20}. Trẻ em dưới 6 tuổi vẫn được tính vào tổng số khách lưu trú. Trường hợp gia đình có trẻ nhỏ cần hỗ trợ thêm, vui lòng liên hệ để được tư vấn phù hợp.
+                      {t('guest.total')}: {guestsCount}/{villa.guestsCount || 20}. {t('guest.totalHelp')}
                     </div>
                   </div>
 
@@ -1093,7 +1060,6 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                   </div>
                   <div className="flex justify-between text-xs text-neutral-500 font-semibold border-b border-neutral-100 pb-2">
                     <span>{t('booking.taxFee')}</span>
-                    <span className="text-emerald-600 font-bold">{t('detail.freeCharge')}</span>
                   </div>
                   <div className="flex justify-between text-xs items-center">
                     <span className="font-extrabold text-[#005899]">{t('booking.totalPayment')}</span>
@@ -1260,7 +1226,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                   className="flex items-center justify-center gap-1.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-600 font-bold text-xs py-3 rounded-xl px-4"
                 >
                   <Copy className="w-4 h-4" />
-                  <span>Code</span>
+                  <span>{t('booking.modalCode')}</span>
                 </button>
               </div>
 

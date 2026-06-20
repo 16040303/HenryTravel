@@ -83,12 +83,16 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
     if (lang === 'ko') {
       return (
         <svg viewBox="0 0 30 20" className={className} aria-hidden="true">
-          <rect width="30" height="20" fill="#fff" />
-          <circle cx="15" cy="10" r="4" fill="#CD2E3A" />
-          <path d="M11 10a4 4 0 0 0 8 0 4 4 0 0 1-8 0" fill="#0047A0" />
-          <g stroke="#111" strokeWidth="1.1">
-            <path d="M6 4l4 2" /><path d="M5 6l4 2" /><path d="M24 4l-4 2" /><path d="M25 6l-4 2" />
-            <path d="M6 16l4-2" /><path d="M5 14l4-2" /><path d="M24 16l-4-2" /><path d="M25 14l-4-2" />
+          <rect width="30" height="20" rx="1" fill="#fff" />
+          <g transform="translate(15 10) rotate(-33)">
+            <path d="M0 -4a4 4 0 1 1 0 8a2 2 0 1 0 0 -4a2 2 0 1 1 0 -4" fill="#CD2E3A" />
+            <path d="M0 4a4 4 0 1 1 0 -8a2 2 0 1 0 0 4a2 2 0 1 1 0 4" fill="#0047A0" />
+          </g>
+          <g stroke="#111" strokeWidth="0.9" strokeLinecap="square">
+            <path d="M6.2 3.2l4 2.2M5.5 4.6l4 2.2M4.8 6l4 2.2" />
+            <path d="M20.2 3.6l4-2.2M21 5.1l4-2.2M21.8 6.6l4-2.2" />
+            <path d="M5.2 15.4l4-2.2M6 16.9l4-2.2M6.8 18.4l4-2.2" />
+            <path d="M20.8 13.2l4 2.2M20 14.7l4 2.2M19.2 16.2l4 2.2" />
           </g>
         </svg>
       );
@@ -170,7 +174,12 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
   const isMobileDevice = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const buildWeChatLink = (id: string) => `weixin://dl/chat?${encodeURIComponent(id)}`;
   const buildKakaoTalkLink = (id: string) => `kakaotalk://plusfriend/home/${encodeURIComponent(id)}`;
-  const getWhatsAppPhoneFromUrl = (url: string) => url.match(/(?:wa\.me\/|phone=)(\+?\d+)/)?.[1] || '';
+  const getWhatsAppPhoneFromUrl = (url: string) => {
+    const match = url.match(/(?:wa\.me\/|phone=)(\d+)/);
+    if (!match) return '';
+    const digits = match[1];
+    return digits && !digits.startsWith('0') ? '+' + digits : digits;
+  };
 
   const handleAppContactClick = (appUrl: string, id: string, appName: string) => {
     if (isMobileDevice()) {
@@ -229,12 +238,12 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
               <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute left-0 top-full pt-2 transition-all duration-200 z-50">
                 <div className="w-52 rounded-2xl border border-neutral-100 bg-white p-2 shadow-xl shadow-neutral-900/10">
                   {[
-                    ['Villa Đà Nẵng', 'Đà Nẵng'],
-                    ['Villa Hội An', 'Hội An'],
-                    ['Villa Huế', 'Huế'],
-                  ].map(([label, location]) => (
-                    <Link key={label} to={listingLink(location, 'villa')} className="block rounded-xl px-3 py-2 text-xs font-bold text-neutral-600 hover:bg-[#edf3ff] hover:text-[#005899]">
-                      {label}
+                    ['nav.villaDanang', 'Đà Nẵng'],
+                    ['nav.villaHoian', 'Hội An'],
+                    ['nav.villaHue', 'Huế'],
+                  ].map(([labelKey, location]) => (
+                    <Link key={labelKey} to={listingLink(location, 'villa')} className="block rounded-xl px-3 py-2 text-xs font-bold text-neutral-600 hover:bg-[#edf3ff] hover:text-[#005899]">
+                      {t(labelKey)}
                     </Link>
                   ))}
                 </div>
@@ -256,13 +265,13 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
               <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute left-0 top-full pt-2 transition-all duration-200 z-50">
                 <div className="w-64 rounded-2xl border border-neutral-100 bg-white p-2 shadow-xl shadow-neutral-900/10">
                   {[
-                    ['Khách sạn - resort Hội An', 'Hội An'],
-                    ['Khách sạn - resort Đà Nẵng', 'Đà Nẵng'],
-                    ['Khách sạn - resort Huế', 'Huế'],
-                    ['Khách sạn - resort Toàn quốc', 'All'],
-                  ].map(([label, location]) => (
-                    <Link key={label} to={listingLink(location, 'hotel_resort')} className="block rounded-xl px-3 py-2 text-xs font-bold text-neutral-600 hover:bg-[#edf3ff] hover:text-[#005899]">
-                      {label}
+                    ['nav.hotelHoian', 'Hội An'],
+                    ['nav.hotelDanang', 'Đà Nẵng'],
+                    ['nav.hotelHue', 'Huế'],
+                    ['nav.hotelNationwide', 'All'],
+                  ].map(([labelKey, location]) => (
+                    <Link key={labelKey} to={listingLink(location, 'hotel_resort')} className="block rounded-xl px-3 py-2 text-xs font-bold text-neutral-600 hover:bg-[#edf3ff] hover:text-[#005899]">
+                      {t(labelKey)}
                     </Link>
                   ))}
                 </div>
@@ -359,15 +368,15 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
           <div className="absolute left-2 right-2 top-full z-50 mt-1 rounded-2xl border border-neutral-100 bg-white p-2 shadow-xl shadow-neutral-900/15 animate-scaleIn">
             {(mobileCategory === 'villa'
               ? [
-                  ['Villa Đà Nẵng', 'Đà Nẵng'],
-                  ['Villa Hội An', 'Hội An'],
-                  ['Villa Huế', 'Huế'],
+                  ['nav.villaDanang', 'Đà Nẵng'],
+                  ['nav.villaHoian', 'Hội An'],
+                  ['nav.villaHue', 'Huế'],
                 ]
               : [
-                  ['Khách sạn - resort Hội An', 'Hội An'],
-                  ['Khách sạn - resort Đà Nẵng', 'Đà Nẵng'],
-                  ['Khách sạn - resort Huế', 'Huế'],
-                  ['Khách sạn - resort Toàn quốc', 'All'],
+                  ['nav.hotelHoian', 'Hội An'],
+                  ['nav.hotelDanang', 'Đà Nẵng'],
+                  ['nav.hotelHue', 'Huế'],
+                  ['nav.hotelNationwide', 'All'],
                 ]
             ).map(([label, location]) => (
               <Link
@@ -376,7 +385,7 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
                 onClick={() => setMobileCategory(null)}
                 className="block rounded-xl px-3 py-2.5 text-xs font-bold text-neutral-600 hover:bg-[#edf3ff] hover:text-[#005899]"
               >
-                {label}
+                {t(label)}
               </Link>
             ))}
           </div>
@@ -445,19 +454,19 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
                 )}
                 {socialLinks.instagramWorkUrl && (
                   <a href={socialLinks.instagramWorkUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><FaInstagram size={18} color="#E4405F" /> Instagram</span>
+                    <span className="flex items-center gap-3"><FaInstagram size={18} color="#E4405F" /> {t('contact.instagram')}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}
                 {socialLinks.tikTokUrl && (
                   <a href={socialLinks.tikTokUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><FaTiktok size={17} color="#111111" /> TikTok</span>
+                    <span className="flex items-center gap-3"><FaTiktok size={17} color="#111111" /> {t('contact.tiktok')}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}
                 {socialLinks.naverBlogUrl && (
                   <a href={socialLinks.naverBlogUrl} target="_blank" rel="noopener noreferrer" className={contactLinkClass}>
-                    <span className="flex items-center gap-3"><SiNaver size={16} color="#03C75A" /> Naver Blog</span>
+                    <span className="flex items-center gap-3"><SiNaver size={16} color="#03C75A" /> {t('contact.naverBlog')}</span>
                     <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
                   </a>
                 )}

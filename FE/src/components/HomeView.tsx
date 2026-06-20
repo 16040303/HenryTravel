@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Calendar, Users, SlidersHorizontal, Search, Star, MapPin, Check, MessageSquare, ShieldCheck, Heart, ChevronDown } from 'lucide-react';
 import { Villa, SearchParams, FilterParams } from '../types';
 import { getVillas } from '../lib/api';
 import { DEFAULT_LOCATIONS, FILTER_FACILITIES, normalizeLocationCity } from '../constants';
@@ -8,6 +8,8 @@ import { useToast } from './Toast';
 import { useLanguage } from '../contexts/LanguageContext';
 import OptimizedImage from './OptimizedImage';
 import CustomDatePicker from './common/CustomDatePicker';
+import GuestCategoryPicker from './common/GuestCategoryPicker';
+import { getLocalDateString } from '../lib/date';
 
 interface HomeViewProps {
   onSearch: (searchParams: SearchParams, filterParams: FilterParams) => void;
@@ -24,21 +26,45 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   };
   const { showToast } = useToast();
 
-  const defaultCheckIn = new Date().toISOString().slice(0, 10);
+  const defaultCheckIn = getLocalDateString();
   const defaultCheckOutDate = new Date();
   defaultCheckOutDate.setDate(defaultCheckOutDate.getDate() + 1);
-  const defaultCheckOut = defaultCheckOutDate.toISOString().slice(0, 10);
+  const defaultCheckOut = getLocalDateString(defaultCheckOutDate);
 
   // Main Search State
   const [searchLocation, setSearchLocation] = useState('All');
   const [checkIn, setCheckIn] = useState(defaultCheckIn);
   const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState(2);
+  const [adultCount, setAdultCount] = useState(0);
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [infantCount, setInfantCount] = useState(0);
+  const guests = adultCount + childrenCount + infantCount;
   const [rooms, setRooms] = useState(1);
-  const todayDate = new Date().toISOString().slice(0, 10);
+  const todayDate = getLocalDateString();
 
   // Advanced Filters State
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [guestsDropdownOpen, setGuestsDropdownOpen] = useState(false);
+  const guestsRef = useRef<HTMLDivElement | null>(null);
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const locationRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!guestsDropdownOpen && !locationDropdownOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (guestsDropdownOpen && !guestsRef.current?.contains(target)) {
+        setGuestsDropdownOpen(false);
+      }
+      if (locationDropdownOpen && !locationRef.current?.contains(target)) {
+        setLocationDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [guestsDropdownOpen, locationDropdownOpen]);
   const [priceMax, setPriceMax] = useState(10000000);
   const [propertyType, setPropertyType] = useState<FilterParams['type']>('All');
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
@@ -121,7 +147,9 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     setSearchLocation('All');
     setCheckIn(defaultCheckIn);
     setCheckOut('');
-    setGuests(2);
+    setAdultCount(2);
+    setChildrenCount(0);
+    setInfantCount(0);
     setRooms(1);
     setPriceMax(10000000);
     setPropertyType('All');
@@ -149,10 +177,10 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     <div className="bg-[#fcf9f8] min-h-screen text-[#1c1b1b]">
       
       {/* Hero Section */}
-      <section className="relative px-4 py-24 md:py-32 flex flex-col justify-center items-center overflow-hidden min-h-[640px] bg-neutral-900 border-b border-neutral-100">
+      <section className="relative px-4 py-24 md:py-32 flex flex-col justify-center items-center min-h-[640px] bg-neutral-900 border-b border-neutral-100">
         
         {/* Real-world high-quality Background Cover */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <OptimizedImage 
             alt="Hero Background" 
             className="w-full h-full opacity-60 scale-105" 
@@ -183,28 +211,77 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
               
               {/* Location selection */}
               <div className="md:col-span-4 flex flex-col gap-1.5 min-w-0">
-                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1.5 h-[18px]">
                   <MapPin className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.popularLocations')}
                 </label>
-                <div className="relative">
-                  <select 
-                    value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                    className="w-full bg-neutral-50 py-2.5 pl-3 pr-8 border border-neutral-200 rounded-lg text-sm font-semibold outline-none focus:border-[#0071c2] focus:ring-1 focus:ring-[#0071c2] cursor-pointer appearance-none text-[#1c1b1b]"
+                <div className="relative" ref={locationRef}>
+                  <button
+                    type="button"
+                    onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
+                    className="w-full bg-neutral-50 h-[42px] pl-3 pr-8 border border-neutral-200 rounded-lg text-sm font-semibold outline-none cursor-pointer text-left text-[#1c1b1b] flex items-center justify-between select-none relative"
                   >
-                    <option value="All">{t('loc.all')}</option>
-                    {locationOptions.map(loc => (
-                      <option key={loc} value={loc}>{getLocationLabel(loc)}</option>
-                    ))}
-                  </select>
-                  <MapPin className="w-4 h-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <span className="truncate">{getLocationLabel(searchLocation)}</span>
+                    <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </button>
+
+                  {locationDropdownOpen && (
+                    <div className="absolute top-[calc(100%+8px)] left-0 z-[300] w-full sm:w-[280px] rounded-2xl border border-neutral-200 bg-white p-2 shadow-2xl shadow-neutral-900/20 animate-scaleIn sm:before:content-[''] sm:before:absolute sm:before:bottom-full sm:before:left-6 sm:before:border-[9px] sm:before:border-transparent sm:before:border-b-neutral-200 sm:after:content-[''] sm:after:absolute sm:after:bottom-full sm:after:left-[25px] sm:after:border-8 sm:after:border-transparent sm:after:border-b-white">
+                      <div className="flex flex-col max-h-[240px] overflow-y-auto overscroll-contain gap-0.5">
+                        {/* Option: All */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchLocation('All');
+                            setLocationDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-all text-left ${
+                            searchLocation === 'All'
+                              ? 'bg-[#edf3ff] text-[#005899]'
+                              : 'text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-[#0071c2]" />
+                            <span>{t('loc.all')}</span>
+                          </div>
+                          {searchLocation === 'All' && <Check className="w-4 h-4 text-[#0071c2]" />}
+                        </button>
+
+                        {/* Other options */}
+                        {locationOptions.filter(loc => loc !== 'All').map(loc => {
+                          const isSelected = searchLocation === loc;
+                          return (
+                            <button
+                              key={loc}
+                              type="button"
+                              onClick={() => {
+                                setSearchLocation(loc);
+                                setLocationDropdownOpen(false);
+                              }}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-all text-left ${
+                                isSelected
+                                  ? 'bg-[#edf3ff] text-[#005899]'
+                                  : 'text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-[#0071c2]" />
+                                <span>{getLocationLabel(loc)}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-[#0071c2]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Check-In */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1.5 h-[18px]">
                   <Calendar className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.checkIn')}
                 </label>
@@ -215,17 +292,18 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                     if (checkOut && new Date(checkOut) <= new Date(next)) {
                       const adjusted = new Date(next);
                       adjusted.setDate(adjusted.getDate() + 1);
-                      setCheckOut(adjusted.toISOString().slice(0, 10));
+                      setCheckOut(getLocalDateString(adjusted));
                     }
                   }}
                   minDate={todayDate}
                   label="dd/mm/yyyy"
+                  buttonClassName="w-full bg-neutral-50 h-[42px] border border-neutral-200 rounded-lg text-sm font-semibold outline-none px-3 cursor-pointer text-left text-[#1c1b1b]"
                 />
               </div>
 
               {/* Check-Out */}
               <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1.5 h-[18px]">
                   <Calendar className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.checkOut')}
                 </label>
@@ -234,28 +312,57 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                   onChange={setCheckOut}
                   minDate={todayDate}
                   label="dd/mm/yyyy"
+                  buttonClassName="w-full bg-neutral-50 h-[42px] border border-neutral-200 rounded-lg text-sm font-semibold outline-none px-3 cursor-pointer text-left text-[#1c1b1b]"
                 />
               </div>
 
               {/* Guests Selection */}
-              <div className="md:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1">
+              <div ref={guestsRef} className="md:col-span-3 flex flex-col gap-1.5 relative">
+                <label className="text-xs font-bold text-neutral-500 tracking-wide flex items-center gap-1.5 h-[18px]">
                   <Users className="w-3.5 h-3.5 text-[#0071c2]" />
                   {t('home.guests')}
                 </label>
-                <input 
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={guests}
-                  onChange={(e) => setGuests(Math.min(Math.max(Number(e.target.value), 1), 20))}
-                  className="w-full bg-neutral-50 py-2.5 px-3 border border-neutral-200 rounded-lg text-sm font-semibold outline-none focus:border-[#0071c2] text-[#1c1b1b]"
-                />
+                <button
+                  type="button"
+                  onClick={() => setGuestsDropdownOpen(!guestsDropdownOpen)}
+                  className="w-full bg-neutral-50 h-[42px] pl-3 pr-8 border border-neutral-200 rounded-lg text-sm font-semibold outline-none cursor-pointer text-left select-none relative flex flex-col justify-center"
+                >
+                  <span className={`leading-tight truncate pr-2 ${guests > 0 ? 'text-[#1c1b1b]' : 'text-neutral-400'}`}>
+                    {guests > 0 ? `${guests} ${t('detail.guestUnit')}` : t('home.guestsPlaceholder')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </button>
+
+                {guestsDropdownOpen && (
+                  <div className="absolute top-[calc(100%+8px)] right-0 z-[300] w-full sm:w-[340px] rounded-2xl border border-neutral-200 bg-white p-4 shadow-2xl shadow-neutral-900/20 animate-scaleIn sm:before:content-[''] sm:before:absolute sm:before:bottom-full sm:before:right-[106px] sm:before:border-[9px] sm:before:border-transparent sm:before:border-b-neutral-200 sm:after:content-[''] sm:after:absolute sm:after:bottom-full sm:after:right-[107px] sm:after:border-8 sm:after:border-transparent sm:after:border-b-white">
+                    <GuestCategoryPicker
+                      adults={adultCount}
+                      children={childrenCount}
+                      infants={infantCount}
+                      onAdultsChange={setAdultCount}
+                      onChildrenChange={setChildrenCount}
+                      onInfantsChange={setInfantCount}
+                      maxGuests={20}
+                      flat={true}
+                      minAdults={0}
+                      showMax={false}
+                    />
+                    <div className="mt-3 pt-2 border-t border-neutral-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setGuestsDropdownOpen(false)}
+                        className="rounded-lg px-3.5 py-1.5 text-xs font-black text-[#0071c2] hover:bg-[#edf3ff] transition-all"
+                      >
+                        {t('common.done')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
 
               {/* Submit btn */}
-              <div className="md:col-span-2 flex flex-col justify-end">
+              <div className="md:col-span-1 flex flex-col justify-end">
                 <button 
                   type="submit"
                   className="w-full bg-[#fe6a34] hover:bg-[#e05420] text-white h-[42px] rounded-lg font-black text-xs transition-colors shadow-lg shadow-[#fe6a34]/20 cursor-pointer flex items-center justify-center gap-2"
@@ -278,11 +385,6 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                 <span>{t('list.filters')}</span>
                 <span className="text-[10px] bg-blue-50 text-[#0071c2] px-2 py-0.5 rounded-full font-bold">{t('home.filterEngine')}</span>
               </button>
-
-              <div className="text-[10px] text-neutral-400 font-semibold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                <span>{t('home.filterActive')}</span>
-              </div>
             </div>
 
             {/* Dropdown advanced filter panel visual body */}

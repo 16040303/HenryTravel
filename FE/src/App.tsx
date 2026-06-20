@@ -106,7 +106,9 @@ const buildKakaoTalkLink = (id: string) => `kakaotalk://search?query=${encodeURI
 const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 const getWhatsAppPhoneFromUrl = (url: string) => {
   const match = url.match(/(?:wa\.me\/|phone=)(\d+)/);
-  return match?.[1] || '';
+  if (!match) return '';
+  const digits = match[1];
+  return digits && !digits.startsWith('0') ? '+' + digits : digits;
 };
 
 function AppContent() {
@@ -490,31 +492,31 @@ function AppContent() {
                 {publicSocialLinks.facebookFanpageUrl && (
                   <a href={publicSocialLinks.facebookFanpageUrl} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200">
                     <FaFacebookF size={14} color="#1877F2" />
-                    <span>Facebook Fanpage</span>
+                    <span>{t('contact.facebookFanpage')}</span>
                   </a>
                 )}
                 {publicSocialLinks.facebookPersonalUrl && (
                   <a href={publicSocialLinks.facebookPersonalUrl} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200">
                     <FaFacebookF size={14} color="#1877F2" />
-                    <span>Personal Facebook</span>
+                    <span>{t('contact.facebookPersonal')}</span>
                   </a>
                 )}
                 {publicSocialLinks.instagramWorkUrl && (
                   <a href={publicSocialLinks.instagramWorkUrl} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200">
                     <FaInstagram size={14} color="#E4405F" />
-                    <span>Instagram</span>
+                    <span>{t('contact.instagram')}</span>
                   </a>
                 )}
                 {publicSocialLinks.tikTokUrl && (
                   <a href={publicSocialLinks.tikTokUrl} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200">
                     <FaTiktok size={14} color="#ffffff" />
-                    <span>TikTok</span>
+                    <span>{t('contact.tiktok')}</span>
                   </a>
                 )}
                 {publicSocialLinks.naverBlogUrl && (
                   <a href={publicSocialLinks.naverBlogUrl} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200">
                     <SiNaver size={14} color="#03C75A" />
-                    <span>Naver Blog</span>
+                    <span>{t('contact.naverBlog')}</span>
                   </a>
                 )}
               </div>
@@ -540,7 +542,7 @@ function AppContent() {
                     type="button"
                     onClick={() => handleAppContactClick(buildWeChatLink(publicWeChatId), publicWeChatId, 'WeChat')}
                     className="flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200"
-                    title="Điện thoại: mở WeChat · Máy tính: sao chép ID"
+                    title={t('contact.wechatTooltip')}
                   >
                     <SiWechat size={14} color="#07C160" />
                     <span>WeChat ID: {publicWeChatId}</span>
@@ -551,7 +553,7 @@ function AppContent() {
                     type="button"
                     onClick={() => handleAppContactClick(buildKakaoTalkLink(publicKakaoTalkId), publicKakaoTalkId, 'KakaoTalk')}
                     className="flex items-center gap-2 hover:text-white text-left cursor-pointer transition-colors duration-200"
-                    title="Điện thoại: mở KakaoTalk · Máy tính: sao chép ID"
+                    title={t('contact.kakaoTooltip')}
                   >
                     <SiKakaotalk size={14} color="#FEE500" />
                     <span>KakaoTalk ID: {publicKakaoTalkId}</span>

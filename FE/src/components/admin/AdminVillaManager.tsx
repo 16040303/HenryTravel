@@ -181,8 +181,8 @@ export default function AdminVillaManager({
       status: villaStatus,
       isActive: villaIsActive,
       policies: {
-        time: ['Nhận phòng: Từ 14:00', 'Trả phòng: Trước 12:00'],
-        other: ['Cần liên hệ đặt cọc trước.', 'Giữ vệ sinh chung.']
+        time: [t('admin.villa.policyCheckIn'), t('admin.villa.policyCheckOut')],
+        other: [t('admin.villa.policyDeposit'), t('admin.villa.policyHygiene')]
       }
     });
     handleCloseAdd();
@@ -528,7 +528,7 @@ export default function AdminVillaManager({
                   </div>
                   <div className="flex flex-col border-x border-neutral-200">
                     <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.beds')}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{v.bedroomsCount} P</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{v.bedroomsCount} {t('admin.villa.roomUnit')}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.baths')}</span>
@@ -798,7 +798,7 @@ export default function AdminVillaManager({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Name EN</span>
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.nameEn')}</span>
                     <input
                       type="text"
                       value={villaNameEn}
@@ -807,7 +807,7 @@ export default function AdminVillaManager({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Location EN</span>
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.locationEn')}</span>
                     <input
                       type="text"
                       value={villaLocationEn}
@@ -818,7 +818,7 @@ export default function AdminVillaManager({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase">Description EN</span>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.descriptionEn')}</span>
                   <textarea
                     rows={3}
                     value={villaDescriptionEn}
@@ -846,7 +846,7 @@ export default function AdminVillaManager({
                     type="text"
                     value={amenitySearchQuery}
                     onChange={(e) => setAmenitySearchQuery(e.target.value)}
-                    placeholder="Tìm tiện ích..."
+                    placeholder={t('admin.villa.amenitySearch')}
                     className="w-full sm:w-60 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold outline-none focus:border-[#0071c2] focus:bg-white"
                   />
                 </div>

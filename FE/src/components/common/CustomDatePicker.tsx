@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getLocalDateString } from '../../lib/date';
 
 interface CustomDatePickerProps {
   id?: string;
@@ -30,8 +31,8 @@ export default function CustomDatePicker({
   const popupRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
-  const [viewDate, setViewDate] = useState(() => new Date(value || new Date().toISOString().slice(0, 10)));
-  const selected = new Date(value || new Date().toISOString().slice(0, 10));
+  const [viewDate, setViewDate] = useState(() => new Date(value || getLocalDateString()));
+  const selected = new Date(value || getLocalDateString());
   const year = Number.isNaN(viewDate.getTime()) ? new Date().getFullYear() : viewDate.getFullYear();
   const month = Number.isNaN(viewDate.getTime()) ? new Date().getMonth() : viewDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -158,7 +159,7 @@ export default function CustomDatePicker({
               </button>
               <button
                 type="button"
-                onClick={() => selectDate(new Date().toISOString().slice(0, 10))}
+                onClick={() => selectDate(getLocalDateString())}
                 className="rounded-lg px-2 py-1 text-[10px] font-bold text-[#0071c2] hover:bg-[#edf3ff]"
               >
                 {t('common.today')}
