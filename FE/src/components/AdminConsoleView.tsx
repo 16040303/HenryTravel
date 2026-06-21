@@ -657,7 +657,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   return (
     <div className="bg-[#f8f9fc] h-full min-h-0 overflow-hidden flex flex-col">
       {/* Visual Admin header */}
-      <div className="bg-white border-b border-neutral-100 px-4 py-3 sm:py-4.5 shrink-0 z-40 shadow-sm flex items-center justify-between">
+      <div className="hidden bg-white border-b border-neutral-100 px-4 py-3 sm:py-4.5 shrink-0 z-40 shadow-sm lg:flex items-center justify-between">
         <div className="max-w-[1280px] mx-auto px-0 sm:px-4 md:px-8 w-full flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span className="shrink-0 bg-[#0071c2]/10 text-[#0071c2] px-2.5 py-1 rounded-full font-black text-[10px] tracking-wider uppercase">{t('admin.portal')}</span>

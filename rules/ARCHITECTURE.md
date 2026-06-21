@@ -56,7 +56,7 @@ Current schema is in [schema.prisma](file:///c:/xampp/htdocs/henrytravel/BE/pris
 - `PriceType`: `fixed`, `contact`
 - `BookingStatus`: `pending_hold`, `confirmed`, `cancelled`, `completed`
 - `BookingSource`: `web`, `admin_manual`
-- `DepositStatus`: `none`, `pending`, `paid`, `refunded`
+- `DepositStatus`: `none`, `pending`, `paid`, `refunded` — used for manual deposit tracking only
 - `MediaType`: `image`, `video`
 - `AccommodationType`: `villa`, `hotel_resort`
 
@@ -222,4 +222,4 @@ Requires separate verification:
 - Production email delivery.
 - Full security audit.
 - Full responsive/device matrix testing.
-- Production end-to-end booking/payment/email workflows.
+- Production end-to-end booking/manual-deposit/email workflows.

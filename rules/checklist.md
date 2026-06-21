@@ -173,12 +173,12 @@
 - [x] Booking CSV export API/client/UI exists
 - [ ] Advanced demand analytics/reporting — pending
 
-### 💳 Payment / Deposit Placeholder
+### 💰 Manual Deposit Tracking
 
 - [x] Deposit fields in DB schema
 - [x] Deposit-related FE/BE types and display support exist
-- [ ] Real payment gateway integration — pending
-- [ ] Production payment workflow — requires verification
+- [x] Manual deposit/status tracking only; no payment gateway required
+- [ ] Production manual deposit workflow verification — requires verification
 
 ### ⚡ Performance
 

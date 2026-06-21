@@ -226,6 +226,7 @@ Recommended deployment targets remain flexible:
 | Database | PostgreSQL via Prisma |
 | Media | Cloudinary |
 | Email | SendGrid config/dependency present; production delivery requires verification |
+| Deposit | Manual status tracking only; no payment gateway required |
 
 Requires verification:
 
@@ -234,7 +235,7 @@ Requires verification:
 - Production DB migrations.
 - Production Cloudinary credentials.
 - Production email delivery.
-- Production end-to-end flow.
+- Production end-to-end booking/manual-deposit flow.
 - Full production security audit.
 
 ---
@@ -265,7 +266,7 @@ Requires verification:
 - [ ] Full security audit.
 - [ ] Full responsive/device QA.
 - [ ] Full production E2E workflow.
-- [ ] Real payment gateway integration.
+- [ ] Production manual deposit workflow verification.
 
 ---
 
