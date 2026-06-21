@@ -290,7 +290,7 @@ function AppContent() {
           selectedVillaIdForDetail={null}
         />
 
-        <main className={isAdminRoute ? 'min-h-0 flex-1 overflow-y-auto app-scroll' : 'min-h-[calc(100vh-8rem)] flex-1'}>
+        <main className={isAdminRoute ? 'min-h-0 flex-1 overflow-y-auto lg:app-scroll' : 'min-h-[calc(100vh-8rem)] flex-1'}>
           <Suspense fallback={<RouteFallback />}>
             <AnimatePresence mode="wait">
               <Routes>
