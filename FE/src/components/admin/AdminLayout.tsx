@@ -143,9 +143,9 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="flex min-h-full w-full max-w-[1280px] flex-col gap-4 overflow-visible px-4 py-4 mx-auto md:px-8 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
+    <div className="flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-4 overflow-hidden px-4 py-4 mx-auto md:px-8 lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
       {/* Mobile admin header */}
-      <div className="sticky top-0 z-40 -mx-4 -mt-4 flex items-center justify-between border-b border-neutral-100 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-8 md:px-8 lg:hidden">
+      <div className="z-40 -mx-4 -mt-4 flex shrink-0 items-center justify-between border-b border-neutral-100 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-8 md:px-8 lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen(true)}
@@ -279,13 +279,13 @@ export default function AdminLayout({
         </nav>
       </aside>
 
-      <section className="min-h-0 w-full flex flex-col relative lg:flex-1 lg:overflow-hidden">
+      <section className="flex-1 min-h-0 w-full overflow-hidden flex flex-col relative">
         {(isRefreshing || isTabPending) && (
           <div className="absolute left-0 right-0 top-0 z-20 h-1 overflow-hidden rounded-full bg-[#edf3ff]">
             <div className="h-full w-1/3 animate-pulse rounded-full bg-[#0071c2]" />
           </div>
         )}
-        <div ref={scrollRef} className="scrollbar-safe min-h-0 w-full pr-0 lg:app-scroll lg:flex-1 lg:pr-1 pb-8 pt-1 overflow-x-hidden">
+        <div ref={scrollRef} className="app-scroll scrollbar-safe flex-1 min-h-0 w-full pr-0 lg:pr-1 pb-8 pt-1 overflow-x-hidden">
         {activeTab === 'dashboard' && (
           <AdminDashboard
             villas={villas}

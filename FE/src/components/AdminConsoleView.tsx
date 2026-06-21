@@ -655,7 +655,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
 
   // Logged-in admin layout
   return (
-    <div className="bg-[#f8f9fc] min-h-full overflow-visible flex flex-col lg:h-full lg:min-h-0 lg:overflow-hidden">
+    <div className="bg-[#f8f9fc] h-full min-h-0 overflow-hidden flex flex-col">
       {/* Visual Admin header */}
       <div className="hidden bg-white border-b border-neutral-100 px-4 py-3 sm:py-4.5 shrink-0 z-40 shadow-sm lg:flex items-center justify-between">
         <div className="max-w-[1280px] mx-auto px-0 sm:px-4 md:px-8 w-full flex items-center justify-between gap-3">
