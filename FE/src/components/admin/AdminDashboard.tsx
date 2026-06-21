@@ -441,7 +441,13 @@ export default function AdminDashboard({
                 <div key={v.id} className="flex gap-3 items-center">
                   {/* Image thumb with rank index */}
                   <div className="relative w-14 h-11 rounded-lg overflow-hidden border shrink-0 bg-neutral-100">
-                    <img src={v.image} alt={v.name} className="w-full h-full object-cover" />
+                    {v.image ? (
+                      <img src={v.image} alt={v.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-neutral-400">
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                    )}
                     <span className="absolute top-0.5 left-0.5 bg-black/60 text-white font-mono font-black text-[8px] px-1 rounded">
                       #{index + 1}
                     </span>
