@@ -416,7 +416,7 @@ function AppContent() {
 
                 <Route path="/admin" element={
                   <motion.div
-                    className="min-h-full"
+                    className="h-full min-h-0"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
