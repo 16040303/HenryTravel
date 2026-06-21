@@ -1,26 +1,39 @@
 # HenryTravel — Villa Booking System
 
-HenryTravel là hệ thống đặt villa/homestay gồm frontend Vite React và backend Node.js Express, có booking hold, quản trị villa/booking/feedback, Zalo fallback, Cloudinary upload và Prisma/PostgreSQL.
+HenryTravel là hệ thống đặt villa/homestay gồm **FE Vite React + TypeScript** và **BE Express + Prisma/PostgreSQL**. Hệ thống hỗ trợ booking hold, tra cứu booking, quản trị villa/booking/feedback, đa ngôn ngữ FE, Zalo fallback, media Cloudinary và admin audit log.
 
 ## Project structure
 
 ```txt
 henrytravel/
-├── BE/                 # Express API + Prisma
-│   ├── prisma/         # schema, migrations, seed
-│   └── src/            # routes, services, middleware, jobs
-├── FE/                 # Vite React frontend
-│   └── src/            # app, components, api client
-├── rules/              # architecture, checklist, project rules
-└── DEPLOY_CHECKLIST.md
+├── BE/                         # Express API + Prisma
+│   ├── prisma/
+│   │   ├── schema.prisma        # Prisma schema hiện tại
+│   │   └── seed.ts
+│   └── src/
+│       ├── routes/              # Public/admin API routes
+│       ├── services/            # Booking, settings, upload, email, logs
+│       ├── middleware/          # Auth, rate limit, error handling
+│       ├── jobs/                # Hold release + Cloudinary cleanup jobs
+│       ├── lib/                 # Prisma client
+│       └── utils/
+├── FE/                         # Vite React + TypeScript frontend
+│   └── src/
+│       ├── components/          # Public/admin UI components
+│       ├── i18n/                # FE translation dictionaries
+│       ├── lib/api.ts           # API client and data mapping
+│       └── types/index.ts       # FE types
+├── rules/                      # Architecture, checklist, project plan/rules
+├── DEPLOY_CHECKLIST.md
+└── README.md
 ```
 
 ## Requirements
 
 - Node.js 20+
-- PostgreSQL database, e.g. Supabase
-- Cloudinary account for image upload
-- Zalo phone configured via admin settings or env fallback
+- PostgreSQL database
+- Cloudinary account for image/video upload
+- Zalo/contact settings configured from admin settings or env fallback
 
 ## Environment files
 
@@ -31,7 +44,7 @@ cp BE/.env.example BE/.env
 cp FE/.env.example FE/.env
 ```
 
-### Backend required env
+### Backend env
 
 See [BE/.env.example](file:///c:/xampp/htdocs/henrytravel/BE/.env.example).
 
@@ -39,19 +52,23 @@ Important values:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `ADMIN_REFRESH_TOKEN_DAYS`
 - `CLIENT_URL`
 - `CLOUDINARY_CLOUD_NAME`
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
+- Contact/settings fallbacks: `ZALO_PHONE`, `WHATSAPP_PHONE`, social links
+- Email placeholders/config: `SENDGRID_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL`, SMTP fallback values
 
-### Frontend required env
+### Frontend env
 
 See [FE/.env.example](file:///c:/xampp/htdocs/henrytravel/FE/.env.example).
 
 Important values:
 
 - `VITE_API_URL`
-- `VITE_ZALO_PHONE`
+- `VITE_ZALO_PHONE` fallback only
 
 ## Local development
 
@@ -78,7 +95,7 @@ npm run dev
 
 Default web URL: `http://localhost:3000`.
 
-> Note: backend CORS must allow the frontend URL via `CLIENT_URL`.
+> Backend CORS must allow the frontend URL via `CLIENT_URL`.
 
 ## Build
 
@@ -100,7 +117,7 @@ npm run preview
 
 ## Database workflow
 
-Use Prisma for all schema changes.
+Use Prisma for all schema changes. Current schema lives at [BE/prisma/schema.prisma](file:///c:/xampp/htdocs/henrytravel/BE/prisma/schema.prisma).
 
 ```bash
 cd BE
@@ -112,27 +129,30 @@ npm run seed
 
 For production deploy, run migrations against the production database before starting the API.
 
-## Core flows to test
+## Current core flows to test
 
 - Public villa list/detail loads from API.
+- Public settings load from `/api/settings/public`.
+- Villa availability includes booked, pending, and manually blocked dates.
 - Booking creates `pending_hold`, booking code, guest token cookie, and Zalo links.
-- Expired hold job cancels old `pending_hold` bookings.
-- Admin login works.
+- Expired hold job cancels old `pending_hold` bookings and writes booking history.
+- Admin login, refresh session, logout, and change password work.
+- Admin villa CRUD, bulk status/delete, media upload/reorder/cover/delete work.
+- Admin blocked dates work.
 - Admin confirm/cancel/complete booking writes booking history and admin log.
+- Admin CSV export works.
 - Public feedback only shows verified feedback.
-- Admin upload validates image type/size and uploads to Cloudinary.
-
-## Deploy
-
-Follow [DEPLOY_CHECKLIST.md](file:///c:/xampp/htdocs/henrytravel/DEPLOY_CHECKLIST.md).
-
-Recommended targets:
-
-- Backend: Render/Railway
-- Frontend: Vercel/Netlify
-- Database: Supabase PostgreSQL
-- Images: Cloudinary
+- Cloudinary upload validates media and cleanup job tracks orphan cleanup.
 
 ## Documentation
 
 Project rules and architecture live in [rules](file:///c:/xampp/htdocs/henrytravel/rules). Read them before changing logic or database schema.
+
+## Verification status
+
+Recent local verification:
+
+- `BE`: `npm run build` passed.
+- `FE`: `npm run build` passed.
+
+Production deploy, production security audit, and production end-to-end tests require separate verification.

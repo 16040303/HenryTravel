@@ -1,830 +1,225 @@
-# 🏛️ ARCHITECTURE.md — Villa Booking System v2.0
+# 🏛️ ARCHITECTURE.md — HenryTravel Current Architecture
 
-> File này mô tả chi tiết kỹ thuật của toàn bộ hệ thống: DB schema đầy đủ, API contract, component interface, và các quyết định thiết kế quan trọng.
-> **AI phải đọc file này trước khi viết bất kỳ code nào.**
+> Tài liệu này mô tả hệ thống hiện tại đã đối chiếu với code. Nguồn tham chiếu chính: `BE/prisma/schema.prisma`, `BE/src/routes`, `FE/src/lib/api.ts`, `FE/src/types/index.ts`.
 
 ---
 
-## 1. Database Schema (Prisma)
+## 1. Tech Stack & Paths
 
-```prisma
-// packages/prisma/schema.prisma
+| Layer | Hiện tại |
+|---|---|
+| Frontend | Vite React + TypeScript |
+| Backend | Node.js Express + TypeScript |
+| ORM | Prisma |
+| Database | PostgreSQL |
+| Media | Cloudinary |
+| FE i18n | `FE/src/i18n` |
+| FE API client | `FE/src/lib/api.ts` |
+| FE types | `FE/src/types/index.ts` |
+| Prisma schema | `BE/prisma/schema.prisma` |
+| BE routes | `BE/src/routes` |
 
-generator client {
-  provider = "prisma-client-js"
-}
+---
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+## 2. Runtime Structure
 
-enum UserRole {
-  user
-  admin
-}
+```txt
+BE/src/
+├── index.ts                 # Express bootstrap, CORS, jobs, routes
+├── routes/                  # Public + admin routers
+├── services/                # Booking, upload, email, settings, admin logs
+├── middleware/              # Auth, rate limit, error handler
+├── jobs/                    # Release hold, Cloudinary cleanup
+├── lib/prisma.ts            # Prisma client
+└── utils/                   # Errors, validators
 
-enum VillaStatus {
-  available
-  maintenance
-  hidden
-}
-
-enum PriceType {
-  fixed
-  contact
-}
-
-enum BookingStatus {
-  pending_hold
-  confirmed
-  cancelled
-  completed
-}
-
-enum BookingSource {
-  web
-  admin_manual
-}
-
-enum DepositStatus {
-  none
-  pending
-  paid
-  refunded
-}
-
-model User {
-  id          String    @id @default(uuid())
-  name        String
-  email       String    @unique
-  phone       String?
-  role        UserRole  @default(user)
-  isGuest     Boolean   @default(false) @map("is_guest")
-  guestToken  String?   @map("guest_token")
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  bookings    Booking[]
-  adminLogs   AdminLog[]
-
-  @@map("users")
-}
-
-model Villa {
-  id              String      @id @default(uuid())
-  name            String
-  location        String
-  description     String?
-  status          VillaStatus @default(available)
-  price           Decimal     @default(0)
-  priceType       PriceType   @default(fixed) @map("price_type")
-  facilities      Json        @default("[]")   // string[]
-  images          Json        @default("[]")   // string[] — CDN URLs
-  viewsCount      Int         @default(0) @map("views_count")
-  holdMinutes     Int         @default(15) @map("hold_minutes")
-  depositRequired Boolean     @default(false) @map("deposit_required")
-  depositAmount   Decimal?    @map("deposit_amount")
-  maxGuests       Int         @default(10) @map("max_guests")
-  createdAt       DateTime    @default(now()) @map("created_at")
-
-  bookings        Booking[]
-  feedbacks       Feedback[]
-
-  @@map("villas")
-}
-
-model Booking {
-  id              String        @id @default(uuid())
-  bookingCode     String        @unique @map("booking_code")  // VB-YYYY-NNN
-  userId          String?       @map("user_id")
-  villaId         String        @map("villa_id")
-  guestName       String?       @map("guest_name")
-  guestPhone      String?       @map("guest_phone")
-  guestEmail      String?       @map("guest_email")
-  guestToken      String?       @map("guest_token")  // UUID v4 — tra cứu không đăng nhập
-  checkIn         DateTime      @map("check_in")
-  checkOut        DateTime      @map("check_out")
-  guestsCount     Int           @map("guests_count")
-  roomsCount      Int           @default(1) @map("rooms_count")
-  specialRequest  String?       @map("special_request")
-  status          BookingStatus @default(pending_hold)
-  source          BookingSource @default(web)
-  holdExpireAt    DateTime?     @map("hold_expire_at")
-  depositStatus   DepositStatus @default(none) @map("deposit_status")
-  depositMethod   String?       @map("deposit_method")  // bank_transfer / momo / vnpay
-  depositPaidAt   DateTime?     @map("deposit_paid_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-
-  user            User?         @relation(fields: [userId], references: [id])
-  villa           Villa         @relation(fields: [villaId], references: [id])
-  feedback        Feedback?
-  zaloMessages    ZaloMessage[]
-  history         BookingHistory[]
-
-  @@index([villaId])
-  @@index([userId])
-  @@index([checkIn])
-  @@index([status])
-  @@index([bookingCode])
-  @@map("bookings")
-}
-
-model ZaloMessage {
-  id                String   @id @default(uuid())
-  bookingId         String   @map("booking_id")
-  messageUrlMobile  String   @map("message_url_mobile")   // zalo:// scheme
-  messageUrlWeb     String   @map("message_url_web")      // zalo.me link
-  messageUrlFallback String  @map("message_url_fallback") // zalo.me?text=encoded
-  sentAt            DateTime @default(now()) @map("sent_at")
-
-  booking           Booking  @relation(fields: [bookingId], references: [id])
-
-  @@map("zalo_messages")
-}
-
-model Feedback {
-  id        String   @id @default(uuid())
-  bookingId String   @unique @map("booking_id")  // 1 booking = 1 feedback
-  villaId   String   @map("villa_id")
-  rating    Int                                   // 1-5
-  comment   String?
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  booking   Booking  @relation(fields: [bookingId], references: [id])
-  villa     Villa    @relation(fields: [villaId], references: [id])
-
-  @@index([villaId])
-  @@map("feedbacks")
-}
-
-model AdminLog {
-  id         String   @id @default(uuid())
-  adminId    String   @map("admin_id")
-  action     String                        // CREATE_VILLA / CONFIRM_BOOKING / etc.
-  targetType String   @map("target_type")  // villa / booking / user / feedback
-  targetId   String   @map("target_id")
-  ipAddress  String?  @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  timestamp  DateTime @default(now())
-
-  admin      User     @relation(fields: [adminId], references: [id])
-
-  @@map("admin_logs")
-}
-
-model BookingHistory {
-  id         String   @id @default(uuid())
-  bookingId  String   @map("booking_id")
-  status     String
-  changedBy  String?  @map("changed_by")  // admin UUID hoặc 'system'
-  note       String?
-  timestamp  DateTime @default(now())
-
-  booking    Booking  @relation(fields: [bookingId], references: [id])
-
-  @@map("booking_history")
-}
-
-model BookingAttempt {
-  id          String   @id @default(uuid())
-  ipAddress   String   @map("ip_address")
-  phone       String
-  villaId     String   @map("villa_id")
-  attemptedAt DateTime @default(now()) @map("attempted_at")
-
-  @@index([ipAddress, attemptedAt])
-  @@index([phone, attemptedAt])
-  @@map("booking_attempts")
-}
-
-model SystemSetting {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("system_settings")
-}
+FE/src/
+├── App.tsx
+├── components/              # Public views + admin components
+├── contexts/LanguageContext.tsx
+├── i18n/                    # vi/en/ko/zh dictionaries
+├── lib/api.ts               # API calls + backend/frontend mapping
+├── hooks/                   # Queries/mutations/countdown
+└── types/index.ts
 ```
 
 ---
 
-## 2. Shared Types (`packages/shared/types.ts`)
+## 3. Database Schema Summary
 
-```typescript
-// Tất cả type dùng chung giữa FE và BE
+Current schema is in [schema.prisma](file:///c:/xampp/htdocs/henrytravel/BE/prisma/schema.prisma).
 
-export type BookingStatus = 'pending_hold' | 'confirmed' | 'cancelled' | 'completed';
-export type VillaStatus = 'available' | 'maintenance' | 'hidden';
-export type PriceType = 'fixed' | 'contact';
-export type DepositStatus = 'none' | 'pending' | 'paid' | 'refunded';
+### Enums
 
-export interface Villa {
-  id: string;
-  name: string;
-  location: string;
-  description?: string;
-  status: VillaStatus;
-  price: number;
-  priceType: PriceType;
-  facilities: string[];
-  images: string[];
-  viewsCount: number;
-  holdMinutes: number;
-  depositRequired: boolean;
-  depositAmount?: number;
-  maxGuests: number;
-  createdAt: string;
-  // Aggregated
-  avgRating?: number;
-  feedbackCount?: number;
-}
+- `UserRole`: `user`, `admin`
+- `VillaStatus`: `available`, `maintenance`, `hidden`
+- `PriceType`: `fixed`, `contact`
+- `BookingStatus`: `pending_hold`, `confirmed`, `cancelled`, `completed`
+- `BookingSource`: `web`, `admin_manual`
+- `DepositStatus`: `none`, `pending`, `paid`, `refunded`
+- `MediaType`: `image`, `video`
+- `AccommodationType`: `villa`, `hotel_resort`
 
-export interface Booking {
-  id: string;
-  bookingCode: string;
-  villaId: string;
-  villa?: Pick<Villa, 'id' | 'name' | 'location' | 'images'>;
-  guestName?: string;
-  guestPhone?: string;
-  guestEmail?: string;
-  checkIn: string;
-  checkOut: string;
-  guestsCount: number;
-  roomsCount: number;
-  specialRequest?: string;
-  status: BookingStatus;
-  holdExpireAt?: string;
-  depositStatus: DepositStatus;
-  depositMethod?: string;
-  createdAt: string;
-}
+### Main Models
 
-export interface ZaloLinks {
-  mobile: string;    // zalo://
-  web: string;       // zalo.me
-  fallback: string;  // zalo.me?text=
-  phone: string;     // Hiển thị rõ ràng để copy
-}
+| Model | Purpose |
+|---|---|
+| `User` | Admin/user/guest records, password for admin, refresh token relation |
+| `AdminRefreshToken` | Admin refresh sessions, hashed token, expiry/revocation |
+| `Villa` | Accommodation record with multilingual fields, type, price range, facilities |
+| `VillaMedia` | Cloudinary image/video media; replaces the legacy JSON image-field approach |
+| `VillaBlockedDate` | Admin-managed unavailable date ranges |
+| `Booking` | Guest booking hold/confirmed/cancelled/completed lifecycle |
+| `ZaloMessage` | Stored Zalo mobile/web/fallback links per booking |
+| `Feedback` | Verified reviews tied one-to-one to booking |
+| `AdminLog` | Admin audit trail |
+| `BookingHistory` | Booking status transition history |
+| `BookingAttempt` | Booking rate limit tracking |
+| `SystemSetting` | DB-first public/admin settings |
+| `CloudinaryCleanupJob` | Deferred cleanup of deleted Cloudinary resources |
 
-export interface Feedback {
-  id: string;
-  bookingId: string;
-  villaId: string;
-  rating: number;
-  comment?: string;
-  verified: boolean;
-  createdAt: string;
-}
+### Important Current Field Notes
 
-// API Request/Response types
-export interface CreateBookingRequest {
-  villaId: string;
-  guestName: string;
-  guestPhone: string;
-  guestEmail?: string;
-  checkIn: string;       // ISO date string
-  checkOut: string;
-  guestsCount: number;
-  roomsCount?: number;
-  specialRequest?: string;
-}
-
-export interface CreateBookingResponse {
-  booking: Booking;
-  guestToken: string;
-  zaloLinks: ZaloLinks;
-  holdMinutes: number;
-}
-
-export interface CheckBookingRequest {
-  bookingCode: string;
-  phone: string;
-}
-
-export interface CheckBookingResponse {
-  booking: Booking;
-  zaloLinks?: ZaloLinks;  // Chỉ trả nếu còn pending
-  remainingMinutes?: number;
-}
-
-export interface SubmitFeedbackRequest {
-  bookingId: string;
-  rating: number;         // 1-5
-  comment?: string;
-}
-
-export interface VillaAvailability {
-  date: string;
-  status: 'available' | 'pending' | 'booked';
-}
-
-export interface AdminStats {
-  totalVillas: number;
-  bookingsThisWeek: number;
-  bookingsThisMonth: number;
-  pendingBookings: number;
-  newFeedbacks: number;
-}
-```
+- `Villa` uses `media: VillaMedia[]`; do not document new logic as a legacy JSON image field.
+- `Villa` supports `nameEn`, `locationEn`, `descriptionEn`, `descriptionKo`.
+- `Villa` supports `priceMax` and `accommodationType`.
+- `Booking` supports `adultCount`, `childrenCount`, `infantCount` in addition to `guestsCount`.
+- `Booking.guestToken` is used for guest lookup/cookie flow; do not log or expose unnecessarily.
+- `Booking.holdExpireAt` drives auto-release of `pending_hold` records.
 
 ---
 
-## 3. API Contract
+## 4. API Routes
 
-### 3.1 User Endpoints
+Base URL defaults to `/api`.
 
-#### `GET /villas`
-```
-Query params:
-  location?:    string
-  checkIn?:     string (ISO date)
-  checkOut?:    string (ISO date)
-  guests?:      number
-  minPrice?:    number
-  maxPrice?:    number
-  facilities?:  string[] (comma-separated)
-  page?:        number (default 1)
-  limit?:       number (default 12)
+### Public Routes
 
-Response 200:
-  {
-    villas: Villa[],
-    total: number,
-    page: number,
-    totalPages: number
-  }
-```
+Registered in [BE/src/routes/index.ts](file:///c:/xampp/htdocs/henrytravel/BE/src/routes/index.ts).
 
-#### `GET /villas/:id`
-```
-Response 200: Villa (với avgRating, feedbackCount)
-Side effect: tăng views_count +1
-```
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/health` | Health check |
+| GET | `/api/villas` | Public villa list/filter |
+| GET | `/api/villas/:id` | Villa detail, includes media/data mapping |
+| GET | `/api/villas/:id/availability` | Availability with booked/pending/blocked states |
+| GET | `/api/villas/:id/feedbacks` | Verified public feedback only |
+| POST | `/api/bookings` | Create pending hold booking |
+| GET | `/api/bookings/check` | Lookup by booking code + phone |
+| POST | `/api/feedbacks` | Submit feedback after validation |
+| GET | `/api/settings/public` | Public contact/social/common policy settings |
 
-#### `GET /villas/:id/availability`
-```
-Query params:
-  month: string (YYYY-MM)
+### Admin Routes
 
-Response 200:
-  {
-    availability: VillaAvailability[]
-  }
-```
+Registered in [BE/src/routes/admin/index.ts](file:///c:/xampp/htdocs/henrytravel/BE/src/routes/admin/index.ts). All admin route groups except `/auth` are protected by `adminAuthMiddleware`.
 
-#### `GET /villas/:id/feedbacks`
-```
-Query params:
-  page?: number (default 1)
-  limit?: number (default 10, max 50)
-
-Response 200:
-  {
-    feedbacks: Feedback[],
-    avgRating: number,
-    total: number,
-    page: number,
-    totalPages: number
-  }
-Note: Chỉ trả feedback với verified = true
-```
-
-#### `POST /bookings`
-```
-Headers: (none required — guest endpoint)
-Body: CreateBookingRequest
-Rate limit: 3 req/IP/15min, 2 req/phone/hour
-
-Response 201: CreateBookingResponse
-Response 409: { error: 'DATES_UNAVAILABLE' }
-Response 429: { error: 'RATE_LIMITED', retryAfter: number }
-Response 400: { error: 'VALIDATION_ERROR', details: string[] }
-```
-
-#### `GET /bookings/check`
-```
-Query params:
-  code:  string (booking_code)
-  phone: string
-
-Response 200: CheckBookingResponse
-Response 404: { error: 'BOOKING_NOT_FOUND' }
-```
-
-#### `POST /feedbacks`
-```
-Headers: guest_token cookie hoặc Authorization Bearer
-Body: SubmitFeedbackRequest
-
-Response 201: Feedback
-Response 403: { error: 'BOOKING_NOT_CONFIRMED' | 'NOT_CHECKED_OUT' }
-Response 409: { error: 'ALREADY_REVIEWED' }
-Rule: Cho phép submit khi booking đã `confirmed` hoặc `completed`, đã qua ngày check-out, và chưa có feedback trước đó.
-```
+| Method/Group | Path | Purpose |
+|---|---|---|
+| POST | `/api/admin/auth/login` | Admin login |
+| POST | `/api/admin/auth/refresh` | Refresh admin JWT from cookie/session |
+| POST | `/api/admin/auth/logout` | Logout/revoke session |
+| PUT | `/api/admin/auth/change-password` | Change admin password |
+| GET/POST/PUT/DELETE | `/api/admin/villas` | Villa CRUD, bulk actions |
+| GET/POST/DELETE | `/api/admin/blocked-dates` | Manual unavailable date ranges |
+| GET/PUT | `/api/admin/bookings` | Booking list/export/actions/history |
+| GET/PUT | `/api/admin/feedbacks` | Feedback admin list/toggle |
+| GET | `/api/admin/logs` | Admin audit logs |
+| GET/PUT | `/api/admin/settings` | Contact/social/hold/common policy settings |
+| POST | `/api/admin/media/upload` | Upload image/video to Cloudinary |
+| GET/POST/PUT/DELETE | `/api/admin/villas/:villaId/media` | Attach/reorder/cover/delete villa media |
+| GET | `/api/admin/stats` | Dashboard stats |
 
 ---
 
-### 3.2 Admin Endpoints
+## 5. Core Flows
 
-#### `POST /admin/auth/login`
-```
-Body: { email: string, password: string }
-Response 200: { token: string, refreshToken: string, expiresIn: number }
-Response 401: { error: 'INVALID_CREDENTIALS' }
-```
+### Booking Flow
 
-#### `GET /admin/villas`
-```
-Headers: Authorization: Bearer <token> (required)
-Response 200: { villas: (Villa & { bookingCount, feedbackCount })[] }
-```
+1. `POST /api/bookings` validates date range, guest counts, villa state, overlap, blocked dates, and rate limit.
+2. Creates booking with `status = pending_hold`.
+3. Generates `bookingCode` and `guestToken`.
+4. Calculates `holdExpireAt` from current hold setting/villa behavior implemented in service.
+5. Builds three Zalo links and stores `zalo_messages`.
+6. Returns booking, guest token, hold minutes, and Zalo links.
+7. Background job releases expired holds and writes `booking_history`.
 
-#### `POST /admin/villas`
-```
-Headers: Authorization: Bearer <token>
-Body: Omit<Villa, 'id' | 'createdAt' | 'viewsCount'>
-Response 201: Villa
-Side effect: ghi admin_log
-```
+### Admin Booking Flow
 
-#### `PUT /admin/villas/:id`
-```
-Headers: Authorization: Bearer <token>
-Body: Partial<Villa>
-Response 200: Villa
-Side effect: ghi admin_log
-```
+- Confirm/cancel/complete endpoints update booking status.
+- Each status change writes `booking_history`.
+- Admin actions write `admin_logs`.
+- CSV export is available from admin bookings.
 
-#### `DELETE /admin/villas/:id`
-```
-Headers: Authorization: Bearer <token>
-Response 204
-Side effect: ghi admin_log
-Note: Chỉ xóa được nếu không có booking confirmed/pending
-```
+### Feedback Flow
 
-#### `POST /admin/upload`
-```
-Headers: Authorization: Bearer <token>
-Body: multipart/form-data
-  - files: File[] (max 20, mỗi file ≤ 5MB, type: jpeg/png/webp)
-  - villaId: string
+- Public submit uses booking code + phone.
+- Backend validates booking status, checkout date, and duplicate feedback.
+- Public villa feedback returns only verified feedback.
+- Admin can toggle feedback visibility.
 
-Response 200: { urls: string[] }
-Response 400: { error: 'INVALID_FILE_TYPE' | 'FILE_TOO_LARGE' | 'TOO_MANY_FILES' }
-```
+### Media Flow
 
-#### `GET /admin/bookings`
-```
-Headers: Authorization: Bearer <token>
-Query params:
-  villaId?, status?, checkIn?, checkOut?, phone?, page?, limit?
-Response 200: { bookings: Booking[], total: number }
-```
-
-#### `PUT /admin/bookings/:id/confirm`
-```
-Headers: Authorization: Bearer <token>
-Response 200: Booking
-Side effect: ghi booking_history, ghi admin_log, gửi email admin + khách
-```
-
-#### `PUT /admin/bookings/:id/cancel`
-```
-Headers: Authorization: Bearer <token>
-Body: { reason?: string }
-Response 200: Booking
-Side effect: ghi booking_history, ghi admin_log, gửi email khách nếu email thật đã bật
-```
-
-#### `PUT /admin/bookings/:id/complete`
-```
-Headers: Authorization: Bearer <token>
-Response 200: Booking
-Side effect: status `confirmed` → `completed`, ghi booking_history, ghi admin_log
-```
-
-#### `GET /admin/bookings/export`
-```
-Headers: Authorization: Bearer <token>
-Query params: villaId?, status?, from?, to?
-Response 200: CSV file (Content-Type: text/csv)
-```
-
-#### `GET /admin/feedbacks`
-```
-Headers: Authorization: Bearer <token>
-Query params: villaId?, page?
-Response 200: { feedbacks: Feedback[], stats: { avgRating, distribution: Record<1|2|3|4|5, number> } }
-```
-
-#### `PUT /admin/feedbacks/:id/toggle`
-```
-Headers: Authorization: Bearer <token>
-Response 200: { verified: boolean }
-Side effect: ghi admin_log
-```
-
-#### `GET /admin/stats`
-```
-Headers: Authorization: Bearer <token>
-Response 200: AdminStats
-```
-
-#### `GET /admin/settings`
-```
-Headers: Authorization: Bearer <token>
-Response 200: { zaloPhone: string, zaloUrl: string }
-Note: Đọc ZALO_PHONE từ `system_settings` trước, fallback `process.env.ZALO_PHONE`, cuối cùng là chuỗi rỗng.
-```
-
-#### `PUT /admin/settings`
-```
-Headers: Authorization: Bearer <token>
-Body: { zaloPhone?: string, zaloUrl?: string }
-Response 200: { zaloPhone: string, zaloUrl: string }
-Side effect: lưu cấu hình Zalo vào `system_settings`, không ghi ngược vào `.env`.
-```
-
-#### `GET /settings/public`
-```
-Headers: none
-Response 200: { zaloPhone: string, zaloUrl: string }
-Note: Endpoint public-safe, không expose private/admin-only settings.
-```
+1. FE sends files to `/api/admin/media/upload`.
+2. BE validates upload and sends to Cloudinary.
+3. Uploaded media metadata is attached to a villa through `/api/admin/villas/:villaId/media`.
+4. Media is stored in `villa_media`.
+5. Deleted media can create `cloudinary_cleanup_jobs` for deferred cleanup.
 
 ---
 
-## 4. Component Interface
+## 6. Frontend Architecture
 
-### `BookingForm`
-```typescript
-interface BookingFormProps {
-  villaId: string;
-  maxGuests: number;
-  holdMinutes: number;
-  depositRequired: boolean;
-  depositAmount?: number;
-  // Pre-fill từ Home filter
-  defaultCheckIn?: string;
-  defaultCheckOut?: string;
-  defaultGuests?: number;
-  // Các ngày không thể chọn
-  unavailableDates: VillaAvailability[];
-  onSuccess: (response: CreateBookingResponse) => void;
-}
-```
+### Views / Components
 
-### `CalendarMini`
-```typescript
-interface CalendarMiniProps {
-  villaId: string;
-  month?: string;       // YYYY-MM, default: tháng hiện tại
-  interactive?: boolean; // false = readonly display
-  onDateSelect?: (date: string) => void;
-}
-```
+- `HomeView`: search and discovery.
+- `ListingView`: villa list/filter display.
+- `DetailView`: villa detail, gallery, booking, feedback.
+- `LookupView`: booking lookup.
+- `PolicyView`: public policy page.
+- `AdminConsoleView`: admin shell.
+- Admin components under `FE/src/components/admin`.
+- Common components under `FE/src/components/common`.
 
-### `ZaloLinkButton`
-```typescript
-interface ZaloLinkButtonProps {
-  links: ZaloLinks;
-  variant?: 'primary' | 'secondary';
-  label?: string;
-}
-// Internal logic: detect mobile → dùng links.mobile với 2s timeout fallback
-```
+### FE Data Layer
 
-### `CountdownTimer`
-```typescript
-interface CountdownTimerProps {
-  expireAt: string;     // ISO timestamp
-  onExpire?: () => void; // Callback khi hết giờ
-}
-```
+- `FE/src/lib/api.ts` owns API calls, admin token handling, refresh flow, and backend-to-frontend mapping.
+- `FE/src/types/index.ts` owns FE-side interfaces.
+- `FE/src/hooks/queries.ts` and `FE/src/hooks/mutations.ts` provide query/mutation integration.
 
-### `FeedbackList`
-```typescript
-interface FeedbackListProps {
-  villaId: string;
-  allowSubmit?: boolean;  // true nếu user đã check-out từ villa này
-  bookingId?: string;     // Cần thiết để submit feedback
-}
-```
+### i18n
 
-### `AdminTable`
-```typescript
-interface AdminTableProps<T> {
-  data: T[];
-  columns: {
-    key: keyof T;
-    label: string;
-    render?: (value: T[keyof T], row: T) => React.ReactNode;
-    sortable?: boolean;
-    filterable?: boolean;
-  }[];
-  loading?: boolean;
-  onRowAction?: (action: string, row: T) => void;
-  pagination?: {
-    page: number;
-    totalPages: number;
-    onPageChange: (page: number) => void;
-  };
-}
-```
-
-### `ImageUploader`
-```typescript
-interface ImageUploaderProps {
-  villaId: string;
-  existingImages?: string[];    // Hiện tại
-  maxImages?: number;           // Default 20
-  onUploadComplete: (urls: string[]) => void;
-}
-// Internal: client resize trước khi upload
-```
+- Translation dictionaries exist in `FE/src/i18n` for `vi`, `en`, `ko`, and `zh`.
+- `LanguageContext` provides language state and translation access.
+- Full hardcoded-string audit still requires verification.
 
 ---
 
-## 5. Background Job — Release Hold
+## 7. Security / Constraints
 
-```typescript
-// apps/api/src/jobs/releaseHold.ts
-// Chạy mỗi 1 phút bằng node-cron hoặc setInterval
-
-// Booking lifecycle hiện tại:
-// pending_hold → confirmed → completed
-// pending_hold → cancelled
-
-async function releaseExpiredHolds() {
-  const expiredBookings = await prisma.booking.findMany({
-    where: {
-      status: 'pending_hold',
-      holdExpireAt: { lt: new Date() }
-    },
-    select: { id: true, villaId: true }
-  });
-
-  for (const booking of expiredBookings) {
-    await prisma.$transaction([
-      prisma.booking.update({
-        where: { id: booking.id },
-        data: { status: 'cancelled' }
-      }),
-      prisma.bookingHistory.create({
-        data: {
-          bookingId: booking.id,
-          status: 'cancelled',
-          changedBy: 'system',
-          note: 'Auto-released: hold time expired'
-        }
-      })
-    ]);
-  }
-}
-```
+- Admin routes must remain behind `adminAuthMiddleware`.
+- DB access should go through Prisma.
+- Booking creation must keep rate limit and overlap checks.
+- Booking status changes must keep `booking_history`.
+- Admin write actions must keep `admin_logs`.
+- Guest token/JWT/password must not be logged.
+- Cloudinary credentials and JWT secrets must stay in env files.
 
 ---
 
-## 6. Zalo Link Builder
+## 8. Verification Status
 
-```typescript
-// apps/api/src/services/zalo.ts
+Verified locally in this documentation refresh:
 
-interface ZaloLinkParams {
-  phone: string;
-  villaName: string;
-  checkIn: string;
-  checkOut: string;
-  guestsCount: number;
-  bookingCode: string;
-}
+- Current Prisma schema reviewed.
+- Current BE routes reviewed.
+- Current FE API client reviewed.
+- Current FE types reviewed.
+- Recent `npm run build` passed for both BE and FE.
 
-export function buildZaloLinks(params: ZaloLinkParams): ZaloLinks {
-  const message = `Xin chào! Tôi vừa đặt phòng tại ${params.villaName}.\n`
-    + `Mã booking: ${params.bookingCode}\n`
-    + `Check-in: ${params.checkIn} | Check-out: ${params.checkOut}\n`
-    + `Số khách: ${params.guestsCount}\n`
-    + `Vui lòng xác nhận giúp tôi. Xin cảm ơn!`;
-  
-  const encoded = encodeURIComponent(message);
-  const cleanPhone = params.phone.replace(/[^0-9]/g, '');
+Requires separate verification:
 
-  return {
-    mobile:   `zalo://conversation?phone=${cleanPhone}`,
-    web:      `https://zalo.me/${cleanPhone}`,
-    fallback: `https://zalo.me/${cleanPhone}?text=${encoded}`,
-    phone:    params.phone
-  };
-}
-```
-
----
-
-## 7. Feedback Validation Service
-
-```typescript
-// apps/api/src/services/feedback.ts
-
-export async function validateAndSubmitFeedback(
-  bookingId: string,
-  rating: number,
-  comment?: string
-): Promise<Feedback> {
-  const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
-
-  // Kiểm tra theo thứ tự — không được thay đổi
-  if (!['confirmed', 'completed'].includes(booking.status)) {
-    throw new AppError(403, 'BOOKING_NOT_CONFIRMED', 'Booking chưa được xác nhận hoặc hoàn tất');
-  }
-  if (new Date(booking.checkOut) > new Date()) {
-    throw new AppError(403, 'NOT_CHECKED_OUT', 'Chưa đến ngày check-out');
-  }
-  const existing = await prisma.feedback.findUnique({ where: { bookingId } });
-  if (existing) {
-    throw new AppError(409, 'ALREADY_REVIEWED', 'Đã đánh giá booking này rồi');
-  }
-
-  return prisma.feedback.create({
-    data: { bookingId, villaId: booking.villaId, rating, comment, verified: true }
-  });
-}
-```
-
----
-
-## 8. Rate Limiting Logic
-
-```typescript
-// apps/api/src/middleware/rateLimit.ts
-
-// Giới hạn:
-// - Max 3 lần booking / IP / 15 phút
-// - Max 2 lần booking / SĐT / 1 giờ
-
-export async function bookingRateLimit(req, res, next) {
-  const ip = req.ip;
-  const phone = req.body?.guestPhone;
-  const now = new Date();
-
-  // Check IP
-  const ipCount = await prisma.bookingAttempt.count({
-    where: {
-      ipAddress: ip,
-      attemptedAt: { gt: new Date(now.getTime() - 15 * 60 * 1000) }
-    }
-  });
-  if (ipCount >= 3) return res.status(429).json({ error: 'RATE_LIMITED', retryAfter: 15 });
-
-  // Check phone
-  if (phone) {
-    const phoneCount = await prisma.bookingAttempt.count({
-      where: {
-        phone,
-        attemptedAt: { gt: new Date(now.getTime() - 60 * 60 * 1000) }
-      }
-    });
-    if (phoneCount >= 2) return res.status(429).json({ error: 'RATE_LIMITED', retryAfter: 60 });
-  }
-
-  // Log attempt
-  await prisma.bookingAttempt.create({
-    data: { ipAddress: ip, phone: phone || '', villaId: req.body?.villaId || '' }
-  });
-
-  next();
-}
-```
-
----
-
-## 9. Admin Log Helper
-
-```typescript
-// Gọi sau mọi thao tác CRUD của admin
-export async function logAdminAction(
-  adminId: string,
-  action: string,
-  targetType: 'villa' | 'booking' | 'user' | 'feedback',
-  targetId: string,
-  req: Request
-) {
-  await prisma.adminLog.create({
-    data: {
-      adminId,
-      action,
-      targetType,
-      targetId,
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    }
-  });
-}
-```
-
----
-
-> Cập nhật file này khi có thay đổi kiến trúc đã được approve. Không tự ý sửa mà không thông báo cho team.
+- Production deploy state.
+- Production email delivery.
+- Full security audit.
+- Full responsive/device matrix testing.
+- Production end-to-end booking/payment/email workflows.

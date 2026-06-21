@@ -1,210 +1,226 @@
-# ✅ Checklist Triển Khai — Villa Booking System v2.0
+# ✅ Checklist Triển Khai — HenryTravel hiện tại
 
-> Mỗi task chỉ được đánh dấu hoàn thành khi: code đã pass review, không break test, không duplicate logic với task khác.
+> Checklist này phản ánh trạng thái đã đối chiếu với code hiện tại. Các mục production/deploy/security audit thực tế để `requires verification` nếu chưa có bằng chứng chạy production.
 
 ---
 
-## Phase 1 — Core MVP
-
-> Mục tiêu: Khách có thể xem villa, đặt phòng qua Zalo, tra cứu booking. Admin xác nhận thủ công.
+## Phase 1 — Core Booking/Public
 
 ### 🗄️ Database
 
-- [x] Tạo Prisma schema đầy đủ theo v2:
-  - [x] Bảng `users` (bao gồm `is_guest`, `guest_token`)
-  - [x] Bảng `villas` (bao gồm `hold_minutes`, `deposit_required`, `deposit_amount`, `max_guests`)
-  - [x] Bảng `bookings` (bao gồm `booking_code`, `guest_token`, `hold_expire_at`, `deposit_*`)
-  - [x] Bảng `zalo_messages`
-  - [x] Bảng `feedbacks`
-  - [x] Bảng `admin_logs`
-  - [x] Bảng `booking_history`
-  - [x] Bảng `booking_attempts` (rate limiting)
-  - [x] Bảng `system_settings` (Zalo/settings DB-first)
-- [x] Tạo toàn bộ DB indexes (xem mục 3.9 trong plan)
-- [x] Seed data: 3–5 villa mẫu với đủ thông tin
+- [x] Prisma schema tại `BE/prisma/schema.prisma`
+- [x] Bảng core: `users`, `villas`, `bookings`, `zalo_messages`, `feedbacks`, `admin_logs`, `booking_history`, `booking_attempts`, `system_settings`
+- [x] Bảng mở rộng hiện tại: `admin_refresh_tokens`, `villa_blocked_dates`, `villa_media`, `cloudinary_cleanup_jobs`
+- [x] Enum hiện tại: `UserRole`, `VillaStatus`, `PriceType`, `BookingStatus`, `BookingSource`, `DepositStatus`, `MediaType`, `AccommodationType`
+- [x] Villa hỗ trợ đa ngôn ngữ một phần: `nameEn`, `locationEn`, `descriptionEn`, `descriptionKo`
+- [x] Booking có breakdown khách: `adultCount`, `childrenCount`, `infantCount`
 
 ### 🔐 Auth
 
-- [x] JWT middleware cho admin (Bearer token, expire 8h)
-- [ ] Refresh token flow cho admin
-- [x] `guest_token` UUID v4 — tạo khi booking, lưu vào cookie
-- [x] Middleware xác thực route admin (`/admin/*`)
+- [x] Admin JWT Bearer middleware
+- [x] Admin refresh token flow qua cookie/http session route
+- [x] Admin logout
+- [x] Admin change password
+- [x] `guest_token` tạo khi booking và lưu cookie
+- [x] Admin routes gắn `adminAuthMiddleware`
 
-### 🏠 Backend — Villa
+### 🏠 Public Backend
 
-- [x] `GET /villas` — danh sách + filter (location, giá, tiện ích, ngày available)
-- [x] `GET /villas/:id` — chi tiết, tăng `views_count`
-- [x] `GET /villas/:id/availability` — trả calendar booked/pending/available
-- [x] `GET /villas/:id/feedbacks` — chỉ trả feedback `verified = true`
+- [x] `GET /api/health`
+- [x] `GET /api/villas`
+- [x] `GET /api/villas/:id`
+- [x] `GET /api/villas/:id/availability`
+- [x] `GET /api/villas/:id/feedbacks`
+- [x] `POST /api/bookings`
+- [x] `GET /api/bookings/check`
+- [x] `POST /api/feedbacks`
+- [x] `GET /api/settings/public`
+- [x] Booking rate limit qua `booking_attempts`
+- [x] Booking overlap validation gồm confirmed/pending và blocked dates
 
-### 📅 Backend — Booking
+### ⚙️ Background Jobs
 
-- [x] `POST /bookings` — tạo `pending_hold`, sinh `booking_code` (VB-YYYY-NNN), sinh `guest_token`, build link Zalo
-- [x] Rate limiting `POST /bookings`: max 3 lần/IP/15 phút + max 2 lần/SĐT/giờ (ghi vào `booking_attempts`)
-- [x] `GET /bookings/check` — tra cứu bằng `booking_code` + `phone`
-- [x] Validate: check-in < check-out, guests_count ≤ max_guests, không overlap booking confirmed/pending
+- [x] Release expired `pending_hold` bookings
+- [x] Ghi `booking_history` khi auto-cancel hold
+- [x] Cloudinary cleanup job cho media bị xóa/orphan
+- [x] Job lỗi không làm crash server
 
-### ⚙️ Background Job
+### 📱 Zalo / Contact Settings
 
-- [x] Job chạy mỗi 1 phút: scan `pending_hold` hết hạn (`hold_expire_at < NOW()`)
-- [x] Auto set `status = 'cancelled'`, ghi vào `booking_history`, phòng trở lại available
-- [x] Log lỗi job nếu fail, không làm crash server
+- [x] Build đủ Zalo links: `zalo://`, `zalo.me`, fallback text
+- [x] Lưu Zalo links vào `zalo_messages`
+- [x] Settings đọc DB-first, env fallback
+- [x] Public settings trả Zalo, WhatsApp, social links, common policy
 
-### 📱 Zalo Link Builder
+### 🖥️ Frontend Public
 
-- [x] Service tạo 3 loại link: `zalo://`, `zalo.me`, `zalo.me?text=`
-- [x] Encode message đầy đủ: tên villa, ngày, số khách, mã booking
-- [x] Lưu 3 link vào bảng `zalo_messages`
-- [x] Zalo phone/settings đọc từ `system_settings`, env chỉ là fallback
-- [x] Public endpoint `GET /settings/public` cho footer/detail/booking links
+- [x] FE stack: Vite React + TypeScript
+- [x] API client: `FE/src/lib/api.ts`
+- [x] FE types: `FE/src/types/index.ts`
+- [x] FE i18n dictionaries: `FE/src/i18n`
+- [x] Home view: search dates/guest/location/filter
+- [x] Listing view: cards/filter/list
+- [x] Detail view: media gallery, availability, booking, feedback
+- [x] Booking lookup view
+- [x] Policy view
+- [x] Scroll behavior helpers
 
-### 🖥️ Frontend — User Pages
+### 🧩 Public Components
 
-- [x] **Home (`/`)**: widget check-in/check-out + số khách/phòng + filter nâng cao
-- [x] **Danh sách villa (`/villas`)**: VillaCard + CalendarMini + filter từ Home
-- [x] **Chi tiết villa (`/villas/:id`)**: Gallery + tiện ích + BookingForm pre-fill + ZaloLinkButton
-- [x] **Booking Success (`/booking/success`)**: mã booking + CountdownTimer hold + nút Zalo + link tra cứu
-- [x] **Tra cứu booking (`/booking/check`)**: input mã + SĐT → hiển thị trạng thái
-- [x] Public FE API integration: home/list/detail/booking/lookup/settings/feedback nối API thật
-- [x] Scroll behavior fix khi chuyển view/trang
-
-### 🧩 Components (Phase 1)
-
-- [ ] `VillaCard` — ảnh, tên, tiện ích tóm tắt, giá, rating trung bình
-- [ ] `CalendarMini` — booked (đỏ) / pending (vàng) / available (xanh) + tooltip
-- [ ] `BookingForm` — pre-fill từ Home, disabled dates với tooltip
-- [ ] `ZaloLinkButton` — 3 lớp fallback, hiển thị SĐT rõ ràng
-- [ ] `CountdownTimer` — đếm ngược hold time còn lại
-- [ ] `BookingStatusBadge` — badge hiển thị trạng thái
+- [x] Villa/listing card behavior in `ListingView`
+- [x] Booking form behavior in `DetailView`
+- [x] Zalo/contact fallback behavior in FE API/constants/components
+- [x] Countdown via `useBookingCountdown`
+- [x] Booking status UI in admin/public booking displays
+- [x] Feedback display and rating UI
+- [x] Custom date picker and guest category picker
+- [x] Optimized image/lightbox components
 
 ---
 
-## Phase 2 — Admin & Feedback
+## Phase 2 — Admin & Operations
 
-> Mục tiêu: Admin có thể quản lý toàn bộ hệ thống. Feedback được kiểm soát chặt.
+### 🔑 Admin Auth UI/API
 
-### 🔑 Admin Auth
+- [x] `POST /api/admin/auth/login`
+- [x] `POST /api/admin/auth/refresh`
+- [x] `POST /api/admin/auth/logout`
+- [x] `PUT /api/admin/auth/change-password`
+- [x] Admin login/session integration in FE
 
-- [x] `POST /admin/auth/login` — trả JWT
-- [ ] `POST /admin/auth/refresh` — làm mới token
-- [x] Trang login admin (`/admin/login`) với form + error handling
+### 🏠 Admin Villa Management
 
-### 🏠 Admin — Quản lý Villa
+- [x] `GET /api/admin/villas`
+- [x] `POST /api/admin/villas`
+- [x] `PUT /api/admin/villas/:id`
+- [x] `DELETE /api/admin/villas/:id`
+- [x] `POST /api/admin/villas/bulk-delete`
+- [x] `POST /api/admin/villas/bulk-status`
+- [x] Admin villa CRUD UI
+- [x] Admin logs for main villa actions
+- [x] Delete blocked if active/history booking exists
 
-- [x] `GET /admin/villas` — danh sách + thống kê views/booking/feedback
-- [x] `POST /admin/villas` — tạo villa mới
-- [x] `PUT /admin/villas/:id` — sửa villa (tên, giá, hold_minutes, trạng thái, tiện ích)
-- [x] `DELETE /admin/villas/:id` — xóa villa (soft delete hoặc hard delete nếu không có booking)
-- [x] Trang admin villas với form CRUD, preview gallery
-- [x] Admin FE API integration cho villas
+### 📤 Media Upload / Gallery
 
-### 📤 Image Upload
+- [x] Cloudinary media upload service
+- [x] `POST /api/admin/media/upload`
+- [x] Villa media routes under `/api/admin/villas/:villaId/media`
+- [x] Store media in `villa_media`, not a legacy JSON image field
+- [x] Image/video support via `MediaType`
+- [x] Media reorder, cover image, delete
+- [x] `MediaUploader` / `ImageUploader` components exist
+- [x] Cleanup jobs recorded in `cloudinary_cleanup_jobs`
 
-- [ ] `POST /admin/upload` — nhận multipart, validate (type, size ≤ 5MB, max 20 ảnh/villa)
-- [ ] Upload lên Supabase Storage / S3, trả CDN URL
-- [ ] Component `ImageUploader` — multi-file, client resize (max 1920px, quality 85%), preview + delete
+### 📅 Availability / Blocked Dates
 
-### 📅 Admin — Quản lý Booking
+- [x] `GET /api/admin/blocked-dates`
+- [x] `POST /api/admin/blocked-dates`
+- [x] `DELETE /api/admin/blocked-dates/:id`
+- [x] Admin availability manager UI
+- [x] Public availability includes `blocked`
 
-- [x] `GET /admin/bookings` — filter theo villa/ngày/status/SĐT
-- [x] `PUT /admin/bookings/:id/confirm` — xác nhận booking, ghi booking_history
-- [x] `PUT /admin/bookings/:id/cancel` — huỷ booking, ghi booking_history
-- [x] `PUT /admin/bookings/:id/complete` — hoàn tất booking, ghi booking_history
-- [x] `GET /admin/bookings/:id/history` — lịch sử thay đổi trạng thái
-- [x] Trang admin bookings với bảng filter + action confirm/cancel/complete + xem history
-- [x] Admin actions ghi `admin_log` cho thao tác quản trị chính
+### 📅 Admin Booking Management
+
+- [x] `GET /api/admin/bookings`
+- [x] `GET /api/admin/bookings/export`
+- [x] `PUT /api/admin/bookings/:id/confirm`
+- [x] `PUT /api/admin/bookings/:id/cancel`
+- [x] `PUT /api/admin/bookings/:id/complete`
+- [x] `GET /api/admin/bookings/:id/history`
+- [x] Admin bookings table/filter/actions/history
+- [x] Admin actions write `admin_log`
+- [x] Booking status changes write `booking_history`
 
 ### ⭐ Feedback
 
-- [x] `POST /feedbacks` — validate đủ điều kiện (confirmed/completed + checked-out + chưa review)
-- [x] `GET /admin/feedbacks` — danh sách theo villa, rating, comment
-- [x] `PUT /admin/feedbacks/:id/toggle` — ẩn/hiện feedback (soft delete)
-- [x] Hiển thị FeedbackList trên trang chi tiết villa (chỉ verified = true)
-- [x] Component `FeedbackList` + `RatingStars`
-- [x] Tính điểm trung bình hiển thị trên VillaCard và VillaDetail
-- [x] Villa feedback loading từ API thật `GET /villas/:id/feedbacks`
+- [x] Public submit feedback validates booking code/phone, status, checkout, duplicate
+- [x] `GET /api/admin/feedbacks`
+- [x] `PUT /api/admin/feedbacks/:id/toggle`
+- [x] Public villa feedback only returns verified feedback
+- [x] Admin feedback management UI
+- [x] Rating averages shown from API data
 
-### 📊 Admin Dashboard
+### 📊 Admin Dashboard / Logs / Settings
 
-- [x] Thống kê tổng quan: tổng villa, booking tuần/tháng, feedback mới, pending chờ xử lý
-- [x] Biểu đồ: lượt xem theo villa, booking theo trạng thái, rating trung bình
-- [x] Alert: pending booking mới (badge + notification banner)
-- [x] Component `StatsChart`, `AlertBanner`, `AdminTable`
-- [x] Admin FE API integration cho dashboard/bookings/feedback/settings
+- [x] `GET /api/admin/stats`
+- [x] Dashboard stats/recent booking/recent feedback/top villas
+- [x] `GET /api/admin/logs`
+- [x] Admin logs UI/API
+- [x] `GET /api/admin/settings`
+- [x] `PUT /api/admin/settings`
+- [x] Admin settings UI for contact/social/common policy/hold settings
 
 ### 📧 Notification / Email
 
-- [ ] Email template: pending alert cho admin
-- [ ] Email template: confirmed cho admin + khách
-- [ ] Email template: cancelled cho khách
-- [ ] Email template: feedback mới cho admin
-- [ ] Tích hợp SendGrid (fallback Nodemailer + Gmail SMTP)
+- [x] Email service files exist: `email.ts`, `emailTemplates.ts`, `notifications.ts`
+- [x] SendGrid dependency/config present
+- [ ] Real email delivery in production — requires verification
+- [ ] Production email templates/rendering — requires verification
 
 ---
 
-## Phase 3 — Polish & Scale
+## Phase 3 — Polish, Deploy, Verification
 
-> Mục tiêu: Hoàn thiện UX, tối ưu hiệu năng, sẵn sàng production.
+### 🌐 Internationalization
 
-### 🔔 Real-time Alert Admin
+- [x] FE i18n module exists in `FE/src/i18n`
+- [x] Dictionaries exist: `vi`, `en`, `ko`, `zh`
+- [x] Language context exists
+- [ ] Full hardcoded-string audit complete — requires verification
 
-- [ ] In-app notification cho admin khi có booking pending mới
-- [ ] Polling mỗi 30 giây (hoặc WebSocket nếu cần real-time thực sự)
-- [ ] Badge đếm số pending chưa xử lý trên nav admin
+### 📥 Export & Reporting
 
-### 📥 Export & Báo cáo
+- [x] Booking CSV export API/client/UI exists
+- [ ] Advanced demand analytics/reporting — pending
 
-- [ ] `GET /admin/bookings/export` — export CSV booking history (filter theo ngày/villa/status)
-- [ ] Phân tích pending/cancelled: báo cáo nhu cầu theo villa, theo mùa
+### 💳 Payment / Deposit Placeholder
 
-### 💳 Payment Placeholder
-
-- [ ] Deposit fields đã có trong DB schema (`deposit_status`, `deposit_method`, `deposit_paid_at`)
-- [ ] UI hiển thị thông tin đặt cọc khi `villa.deposit_required = true`
-- [ ] Placeholder UI cho các phương thức: bank_transfer / momo / vnpay (chưa tích hợp thực)
-- [ ] Admin có thể set `deposit_status` thủ công
+- [x] Deposit fields in DB schema
+- [x] Deposit-related FE/BE types and display support exist
+- [ ] Real payment gateway integration — pending
+- [ ] Production payment workflow — requires verification
 
 ### ⚡ Performance
 
-- [ ] Lazy loading danh sách villa (infinite scroll hoặc pagination)
-- [ ] CDN cache ảnh (Supabase CDN / Cloudflare)
-- [ ] API response caching cho danh sách villa (5 phút)
-- [ ] Image optimization với Next.js Image component
+- [x] FE build uses chunk splitting/manual chunks in Vite output
+- [x] Public settings cache in FE API client
+- [x] Optimized image component exists
+- [ ] Production performance audit — requires verification
+- [ ] CDN/cache policy verification — requires verification
 
 ### 📱 UX & Responsive
 
-- [ ] Test responsive toàn bộ trang trên mobile (375px, 414px)
-- [ ] Touch-friendly: nút Zalo nổi bật, form dễ nhập trên mobile
-- [ ] CalendarMini hiển thị tốt trên màn nhỏ
-- [ ] Kiểm tra UX flow tổng thể: Home → Danh sách → Chi tiết → Booking → Success → Tra cứu
+- [x] Mobile-oriented React UI/components exist
+- [ ] Full device matrix test 375px/414px/tablet/desktop — requires verification
+- [ ] Full end-to-end UX test in production — requires verification
 
 ### 🚀 Deploy & Test
 
-- [ ] Deploy backend lên Render (set env vars)
-- [ ] Deploy frontend lên Vercel (set env vars)
-- [ ] Setup Supabase production (DB + Storage)
-- [ ] Test workflow end-to-end: đặt phòng → Zalo → admin confirm → email → checkout → feedback
-- [ ] Test auto-release hold job trên production
-- [ ] Test rate limiting thực tế
-- [ ] Kiểm tra CORS, SSL, security headers
+- [ ] Backend production deploy — requires verification
+- [ ] Frontend production deploy — requires verification
+- [ ] Production database migration verification — requires verification
+- [ ] Production Cloudinary config verification — requires verification
+- [ ] End-to-end production workflow test — requires verification
 
 ### 🛡️ Security Audit
 
-- [ ] Review tất cả API endpoints: có đúng auth middleware chưa?
-- [ ] Kiểm tra SQL injection: toàn bộ query qua Prisma/parameterized?
-- [ ] Validate file upload trên production
-- [ ] Test guest_token không bị leak qua response không cần thiết
-- [ ] Review admin_logs có ghi đầy đủ chưa
+- [x] Admin route registration uses `adminAuthMiddleware`
+- [x] Prisma ORM used for DB access in checked routes/services
+- [x] Rate limiting exists for booking create
+- [x] Error handler exists
+- [ ] Full endpoint-by-endpoint security audit — requires verification
+- [ ] Guest token leak audit — requires verification
+- [ ] Production CORS/security headers audit — requires verification
 
 ---
 
 ## 📌 Definition of Done
 
-Một task được coi là **hoàn thành** khi:
+Một task được coi là hoàn thành khi:
 
-1. Code implement đúng theo kiến trúc trong `README.md` và `ARCHITECTURE.md`
-2. Không duplicate logic đã có ở nơi khác
-3. Có error handling cho các edge case (null, timeout, invalid input)
-4. Đã test thủ công hoặc có unit test
-5. Không break các feature đã hoàn thành ở phase trước
-6. Đã đọc `.cursorrules` trước khi bắt đầu task
+1. Code/docs đúng với kiến trúc hiện tại trong `README.md` và `rules/ARCHITECTURE.md`.
+2. Không duplicate logic đã có.
+3. Có error handling cho edge cases liên quan.
+4. Đã test thủ công hoặc có automated check phù hợp.
+5. Không break feature đã hoàn thành.
+6. Không sửa ngoài scope khi chưa được duyệt.

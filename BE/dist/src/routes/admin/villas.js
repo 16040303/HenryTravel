@@ -190,6 +190,10 @@ router.post('/bulk-delete', async (req, res, next) => {
         });
         if (activeCount > 0)
             throw new errors_1.AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Một hoặc nhiều villa đang có booking hoạt động.');
+        const historicalBookingCount = await prisma_1.prisma.booking.count({ where: { villaId: { in: villaIds } } });
+        if (historicalBookingCount > 0) {
+            throw new errors_1.AppError(409, 'VILLA_HAS_BOOKING_HISTORY', 'Không thể xóa villa vì vẫn còn lịch sử booking liên quan. Hãy ẩn villa thay vì xóa để giữ dữ liệu phân tích.');
+        }
         const cleanupJobs = villas.flatMap((villa) => villa.media
             .filter((media) => media.publicId)
             .map((media) => ({
@@ -201,17 +205,7 @@ router.post('/bulk-delete', async (req, res, next) => {
         })));
         const adminId = getAdminId(req);
         const result = await prisma_1.prisma.$transaction(async (tx) => {
-            const relatedBookings = await tx.booking.findMany({ where: { villaId: { in: villaIds } }, select: { id: true } });
-            const bookingIds = relatedBookings.map((booking) => booking.id);
-            if (bookingIds.length > 0) {
-                await tx.bookingHistory.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                await tx.zaloMessage.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                await tx.feedback.deleteMany({ where: { OR: [{ bookingId: { in: bookingIds } }, { villaId: { in: villaIds } }] } });
-                await tx.booking.deleteMany({ where: { id: { in: bookingIds } } });
-            }
-            else {
-                await tx.feedback.deleteMany({ where: { villaId: { in: villaIds } } });
-            }
+            await tx.feedback.deleteMany({ where: { villaId: { in: villaIds } } });
             await tx.villaBlockedDate.deleteMany({ where: { villaId: { in: villaIds } } });
             const deleteResult = await tx.villa.deleteMany({ where: { id: { in: villaIds } } });
             if (cleanupJobs.length > 0) {
@@ -297,18 +291,12 @@ router.delete('/:id', async (req, res, next) => {
         });
         if (activeCount > 0)
             throw new errors_1.AppError(409, 'VILLA_HAS_ACTIVE_BOOKINGS', 'Villa đang có booking hoạt động.');
+        const historicalBookingCount = await prisma_1.prisma.booking.count({ where: { villaId: req.params.id } });
+        if (historicalBookingCount > 0) {
+            throw new errors_1.AppError(409, 'VILLA_HAS_BOOKING_HISTORY', 'Không thể xóa villa vì vẫn còn lịch sử booking liên quan. Hãy ẩn villa thay vì xóa để giữ dữ liệu phân tích.');
+        }
         await prisma_1.prisma.$transaction(async (tx) => {
-            const relatedBookings = await tx.booking.findMany({ where: { villaId: req.params.id }, select: { id: true } });
-            const bookingIds = relatedBookings.map((booking) => booking.id);
-            if (bookingIds.length > 0) {
-                await tx.bookingHistory.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                await tx.zaloMessage.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                await tx.feedback.deleteMany({ where: { OR: [{ bookingId: { in: bookingIds } }, { villaId: req.params.id }] } });
-                await tx.booking.deleteMany({ where: { id: { in: bookingIds } } });
-            }
-            else {
-                await tx.feedback.deleteMany({ where: { villaId: req.params.id } });
-            }
+            await tx.feedback.deleteMany({ where: { villaId: req.params.id } });
             await tx.villaBlockedDate.deleteMany({ where: { villaId: req.params.id } });
             await tx.villa.delete({ where: { id: req.params.id } });
         });
