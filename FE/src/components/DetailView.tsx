@@ -25,6 +25,7 @@ import { VillaDetailSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
 import GuestCategoryPicker from './common/GuestCategoryPicker';
 import { getLocalDateString } from '../lib/date';
+import CustomSelect from './common/CustomSelect';
 
 const AMENITY_ICON_COMPONENTS = {
   Wifi, KeyRound, ParkingCircle, Snowflake, WashingMachine, Wind, Laptop, Waves,
@@ -852,17 +853,17 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                       </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-bold text-neutral-600 uppercase">{t('detail.feedbackRating')}</span>
-                        <select
-                          value={newFeedbackRating}
-                          onChange={(e) => setNewFeedbackRating(Number(e.target.value))}
-                          className="bg-white border border-neutral-200 rounded-lg p-2 text-xs font-semibold outline-none focus:border-[#0071c2] cursor-pointer"
-                        >
-                          <option value="5">⭐️⭐️⭐️⭐️⭐️ ({t('detail.rating5')})</option>
-                          <option value="4">⭐️⭐️⭐️⭐️ ({t('detail.rating4')})</option>
-                          <option value="3">⭐️⭐️⭐️ ({t('detail.rating3')})</option>
-                          <option value="2">⭐️⭐️ ({t('detail.rating2')})</option>
-                          <option value="1">⭐️ ({t('detail.rating1')})</option>
-                        </select>
+                        <CustomSelect
+                          value={String(newFeedbackRating)}
+                          onChange={(value) => setNewFeedbackRating(Number(value))}
+                          options={[
+                            { value: '5', label: `⭐️⭐️⭐️⭐️⭐️ (${t('detail.rating5')})` },
+                            { value: '4', label: `⭐️⭐️⭐️⭐️ (${t('detail.rating4')})` },
+                            { value: '3', label: `⭐️⭐️⭐️ (${t('detail.rating3')})` },
+                            { value: '2', label: `⭐️⭐️ (${t('detail.rating2')})` },
+                            { value: '1', label: `⭐️ (${t('detail.rating1')})` },
+                          ]}
+                        />
                       </div>
                     </div>
 

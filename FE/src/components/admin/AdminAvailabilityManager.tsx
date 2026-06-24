@@ -6,6 +6,7 @@ import { useCreateAdminBlockedDateMutation, useDeleteAdminBlockedDateMutation } 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../Toast';
 import CustomDatePicker from '../common/CustomDatePicker';
+import CustomSelect from '../common/CustomSelect';
 
 interface AdminAvailabilityManagerProps {
   villas: VillaDetail[];
@@ -92,15 +93,12 @@ export default function AdminAvailabilityManager({ villas }: AdminAvailabilityMa
             {t('admin.availability.desc')}
           </p>
         </div>
-        <select
-          value={activeVillaId}
-          onChange={(event) => setActiveVillaId(event.target.value)}
-          className="bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-xs"
-        >
-          {villas.map((villa) => (
-            <option key={villa.id} value={villa.id}>{villa.name}</option>
-          ))}
-        </select>
+        <CustomSelect
+          value={String(activeVillaId)}
+          onChange={setActiveVillaId}
+          className="max-w-xs"
+          options={villas.map((villa) => ({ value: String(villa.id), label: villa.name }))}
+        />
       </div>
 
       {activeVilla ? (

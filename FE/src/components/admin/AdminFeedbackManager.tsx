@@ -6,6 +6,7 @@ import {
 import { EntityId, Feedback, VillaDetail } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import EmptyState from '../common/EmptyState';
+import CustomSelect from '../common/CustomSelect';
 
 interface AdminFeedbackManagerProps {
   feedbacks: Feedback[];
@@ -48,28 +49,26 @@ export default function AdminFeedbackManager({
         {/* Dropdown selectors */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Villa Selector */}
-          <select
-            value={selectedVillaId}
-            onChange={(e) => setSelectedVillaId(e.target.value === 'ALL' ? 'ALL' : e.target.value)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer max-w-[180px] truncate"
-          >
-            <option value="ALL">{t('admin.feedback.allVillas')}</option>
-            {villas.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
+          <CustomSelect
+            value={String(selectedVillaId)}
+            onChange={(value) => setSelectedVillaId(value === 'ALL' ? 'ALL' : value)}
+            className="min-w-44 max-w-[220px]"
+            options={[
+              { value: 'ALL', label: t('admin.feedback.allVillas') },
+              ...villas.map((v) => ({ value: String(v.id), label: v.name }))
+            ]}
+          />
 
           {/* Rating filter selector */}
-          <select
-            value={ratingFilter}
-            onChange={(e) => setRatingFilter(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
-          >
-            <option value="ALL">{t('admin.feedback.allRatings')}</option>
-            {[5, 4, 3, 2, 1].map(r => (
-              <option key={r} value={r}>{r} ⭐</option>
-            ))}
-          </select>
+          <CustomSelect
+            value={String(ratingFilter)}
+            onChange={(value) => setRatingFilter(value === 'ALL' ? 'ALL' : Number(value))}
+            className="min-w-36"
+            options={[
+              { value: 'ALL', label: t('admin.feedback.allRatings') },
+              ...[5, 4, 3, 2, 1].map((r) => ({ value: String(r), label: `${r} ⭐` }))
+            ]}
+          />
         </div>
       </div>
 

@@ -143,7 +143,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
       {/* Toast Container */}
       <div
-        className="fixed top-6 left-1/2 z-[9998] flex -translate-x-1/2 flex-col gap-2 pointer-events-none"
+        className="fixed top-6 left-1/2 z-[2147483647] flex -translate-x-1/2 flex-col gap-2 pointer-events-none"
         aria-live="polite"
       >
         {toasts.map((t) => (

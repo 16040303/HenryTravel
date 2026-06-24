@@ -10,6 +10,7 @@ import { AMENITY_CATEGORY_LABELS, AMENITIES, getAmenityDisplay, getAmenityLabel,
 import { VIETNAM_PROVINCES_2025 } from '../../constants/vietnamProvinces';
 import { useLanguage } from '../../contexts/LanguageContext';
 import MediaUploader from './MediaUploader';
+import CustomSelect from '../common/CustomSelect';
 
 interface AdminVillaManagerProps {
   villas: VillaDetail[];
@@ -59,6 +60,7 @@ export default function AdminVillaManager({
   const [villaName, setVillaName] = useState('');
   const [villaLocation, setVillaLocation] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const locationSuggestionsRef = useRef<HTMLDivElement>(null);
   const [villaPrice, setVillaPrice] = useState<number | ''>('');
   const [villaPriceMax, setVillaPriceMax] = useState<number | ''>('');
   const [villaType, setVillaType] = useState<AccommodationTypeLabel>('Villa');
@@ -84,6 +86,20 @@ export default function AdminVillaManager({
       document.body.classList.remove('modal-open');
     };
   }, [showAddModal, showEditModal]);
+
+  useEffect(() => {
+    if (!showLocationSuggestions) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !locationSuggestionsRef.current?.contains(target)) {
+        setShowLocationSuggestions(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showLocationSuggestions]);
 
   const resetVillaModalScroll = () => {
     requestAnimationFrame(() => {
@@ -297,65 +313,70 @@ export default function AdminVillaManager({
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">
       {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
-        {/* Search bar */}
-        <div className="relative flex-1 max-w-md">
-          <span className="absolute left-3.5 top-3 text-neutral-400">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder={t('admin.villa.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2 pl-10 pr-4 text-xs font-semibold outline-none focus:bg-white focus:border-[#0071c2]"
-          />
-        </div>
+      <div className="rounded-3xl border border-neutral-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,1fr)_auto] xl:items-center">
+          {/* Search bar */}
+          <div className="relative w-full xl:max-w-sm">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400">
+              <Search className="h-4 w-4" />
+            </span>
+            <input
+              type="text"
+              placeholder={t('admin.villa.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-4 text-xs font-semibold outline-none transition-colors focus:border-[#0071c2] focus:bg-white"
+            />
+          </div>
 
-        {/* Filters Group */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Availability Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
-          >
-            <option value="All">{t('admin.villa.allStatuses')}</option>
-            <option value="Available">{t('admin.villa.available')}</option>
-            <option value="Hết phòng">{t('admin.villa.booked')}</option>
-            <option value="Sắp có">{t('admin.villa.upcoming')}</option>
-            <option value="Maintenance">{t('admin.villa.maintenance')}</option>
-          </select>
+          {/* Filters Group */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[180px_210px_180px_auto] lg:items-center xl:justify-end">
+            {/* Availability Status Filter */}
+            <CustomSelect
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value as typeof statusFilter)}
+              ariaLabel={t('admin.villa.status')}
+              options={[
+                { value: 'All', label: t('admin.villa.allStatuses') },
+                { value: 'Available', label: t('admin.villa.available') },
+                { value: 'Hết phòng', label: t('admin.villa.booked') },
+                { value: 'Sắp có', label: t('admin.villa.upcoming') },
+                { value: 'Maintenance', label: t('admin.villa.maintenance') },
+              ]}
+            />
 
-          {/* Accommodation Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as 'All' | AccommodationTypeLabel)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
-          >
-            <option value="All">{t('admin.villa.allTypes')}</option>
-            <option value="Villa">Villa</option>
-            <option value="Khách sạn - resort">{t('nav.hotelResort')}</option>
-          </select>
+            {/* Accommodation Type Filter */}
+            <CustomSelect
+              value={typeFilter}
+              onChange={(value) => setTypeFilter(value as 'All' | AccommodationTypeLabel)}
+              ariaLabel={t('admin.villa.type')}
+              options={[
+                { value: 'All', label: t('admin.villa.allTypes') },
+                { value: 'Villa', label: 'Villa' },
+                { value: 'Khách sạn - resort', label: t('nav.hotelResort') },
+              ]}
+            />
 
-          {/* Active / Inactive operational filter */}
-          <select
-            value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as any)}
-            className="bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer"
-          >
-            <option value="All">{t('admin.villa.allActivity')}</option>
-            <option value="Active">{t('admin.villa.activeOnly')}</option>
-            <option value="Inactive">{t('admin.villa.inactiveOnly')}</option>
-          </select>
+            {/* Active / Inactive operational filter */}
+            <CustomSelect
+              value={activeFilter}
+              onChange={(value) => setActiveFilter(value as typeof activeFilter)}
+              ariaLabel={t('admin.villa.websiteVisibility')}
+              options={[
+                { value: 'All', label: t('admin.villa.allActivity') },
+                { value: 'Active', label: t('admin.villa.activeOnly') },
+                { value: 'Inactive', label: t('admin.villa.inactiveOnly') },
+              ]}
+            />
 
-          <button
-            onClick={handleOpenAdd}
-            className="bg-[#0071c2] hover:bg-[#005899] text-white font-black text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow shadow-[#0071c2]/10"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>{t('admin.villa.add')}</span>
-          </button>
+            <button
+              onClick={handleOpenAdd}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0071c2] px-4 py-2.5 text-xs font-black text-white shadow shadow-[#0071c2]/10 transition-colors hover:bg-[#005899] sm:col-span-2 lg:col-span-1 lg:w-auto lg:whitespace-nowrap"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>{t('admin.villa.add')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -440,15 +461,23 @@ export default function AdminVillaManager({
             >
               {/* Image Block */}
               <div className="relative aspect-[4/3] w-full bg-neutral-100">
-                <img 
-                  src={v.image} 
-                  alt={v.name} 
-                  className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300" 
-                />
+                {v.image ? (
+                  <img
+                    src={v.image}
+                    alt={v.name}
+                    className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-50 text-neutral-300">
+                    <Building2 className="h-8 w-8" />
+                    <span className="text-[10px] font-bold uppercase tracking-wide">Chưa có ảnh</span>
+                  </div>
+                )}
                 
                 {/* Row Checkbox Overlay top-left */}
                 <button
                   type="button"
+                  aria-label={isChecked ? t('admin.villa.deselectAll') : t('admin.villa.selectAll')}
                   onClick={() => handleToggleSelect(v.id)}
                   className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg p-1 text-neutral-800 shadow hover:scale-105 transition-all cursor-pointer z-10"
                 >
@@ -497,9 +526,11 @@ export default function AdminVillaManager({
                     
                     {/* Active toggle button widget */}
                     <button
+                      type="button"
                       onClick={() => handleToggleActiveIndividual(v)}
                       className="text-neutral-400 hover:text-neutral-700 transition-colors flex items-center gap-1 cursor-pointer"
                       title={isActive ? t('admin.villa.deactivate') : t('admin.villa.activate')}
+                      aria-label={isActive ? t('admin.villa.deactivate') : t('admin.villa.activate')}
                     >
                       {isActive ? (
                         <ToggleRight className="w-6 h-6 text-emerald-500 fill-emerald-500/10" />
@@ -551,27 +582,33 @@ export default function AdminVillaManager({
 
                   {/* Clone duplication button */}
                   <button
+                    type="button"
                     onClick={() => onDuplicateVilla(v.id)}
                     disabled={mutationLoading}
                     className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-indigo-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title={t('admin.villa.clone')}
+                    aria-label={t('admin.villa.clone')}
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => handleOpenEdit(v)}
                     className="p-2 border border-neutral-200 hover:bg-neutral-50 hover:text-blue-600 rounded-lg text-neutral-400 transition-colors cursor-pointer"
                     title={t('admin.villa.edit')}
+                    aria-label={t('admin.villa.edit')}
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => onDeleteVilla(v.id, v.name)}
                     disabled={mutationLoading}
                     className="p-2 border border-neutral-200 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title={t('admin.villa.delete')}
+                    aria-label={t('admin.villa.delete')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -596,7 +633,9 @@ export default function AdminVillaManager({
                   {t('admin.villa.modalDesc')}
                 </p>
               </div>
-              <button 
+              <button
+                type="button"
+                aria-label={showAddModal ? t('admin.villa.closeAdd') : t('admin.villa.closeEdit')}
                 onClick={showAddModal ? handleCloseAdd : () => setShowEditModal(false)}
                 className="text-neutral-400 hover:text-neutral-800 font-bold hover:bg-neutral-100 p-1 rounded-lg"
               >
@@ -633,9 +672,9 @@ export default function AdminVillaManager({
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.location')}</span>
-                  <div className="relative">
+                  <div ref={locationSuggestionsRef} className="relative">
                     <input
                       type="text"
                       required
@@ -697,28 +736,28 @@ export default function AdminVillaManager({
 
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.type')}</span>
-                  <select
+                  <CustomSelect
                     value={villaType}
-                    onChange={(e) => setVillaType(e.target.value as AccommodationTypeLabel)}
-                    className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
-                  >
-                    <option value="Villa">Villa</option>
-                    <option value="Khách sạn - resort">{t('nav.hotelResort')}</option>
-                  </select>
+                    onChange={(value) => setVillaType(value as AccommodationTypeLabel)}
+                    options={[
+                      { value: 'Villa', label: 'Villa' },
+                      { value: 'Khách sạn - resort', label: t('nav.hotelResort') },
+                    ]}
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.status')}</span>
-                  <select
+                  <CustomSelect
                     value={villaStatus}
-                    onChange={(e) => setVillaStatus(e.target.value as 'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance')}
-                    className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
-                  >
-                    <option value="Available">{t('admin.villa.available')}</option>
-                    <option value="Hết phòng">{t('admin.villa.booked')}</option>
-                    <option value="Sắp có">{t('admin.villa.upcoming')}</option>
-                    <option value="Maintenance">{t('admin.villa.maintenance')}</option>
-                  </select>
+                    onChange={(value) => setVillaStatus(value as typeof villaStatus)}
+                    options={[
+                      { value: 'Available', label: t('admin.villa.available') },
+                      { value: 'Hết phòng', label: t('admin.villa.booked') },
+                      { value: 'Sắp có', label: t('admin.villa.upcoming') },
+                      { value: 'Maintenance', label: t('admin.villa.maintenance') },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -755,14 +794,14 @@ export default function AdminVillaManager({
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.websiteVisibility')}</span>
-                  <select
+                  <CustomSelect
                     value={villaIsActive ? 'Active' : 'Inactive'}
-                    onChange={(e) => setVillaIsActive(e.target.value === 'Active')}
-                    className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none text-neutral-800 cursor-pointer"
-                  >
-                    <option value="Active">{t('admin.villa.activeOption')}</option>
-                    <option value="Inactive">{t('admin.villa.inactiveOption')}</option>
-                  </select>
+                    onChange={(value) => setVillaIsActive(value === 'Active')}
+                    options={[
+                      { value: 'Active', label: t('admin.villa.activeOption') },
+                      { value: 'Inactive', label: t('admin.villa.inactiveOption') },
+                    ]}
+                  />
                 </div>
               </div>
 

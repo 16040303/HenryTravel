@@ -9,6 +9,7 @@ import { adminLogout } from '../../lib/api';
 import { useAdminSettingsQuery } from '../../hooks/queries';
 import { useChangeAdminPasswordMutation, useUpdateAdminSettingsMutation } from '../../hooks/mutations';
 import { useToast } from '../Toast';
+import CustomSelect from '../common/CustomSelect';
 
 interface AdminSettingsProps {
   onLogout: () => void;
@@ -235,10 +236,9 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
               <Clock className="w-3.5 h-3.5 text-[#fe6a34]" />
               {t('admin.settings.holdLabel')}
             </label>
-            <select
+            <CustomSelect
               value={holdTimeMode === 'custom' ? 'custom' : String(holdMinutes)}
-              onChange={(e) => {
-                const val = e.target.value;
+              onChange={(val) => {
                 if (val === 'custom') {
                   setHoldTimeMode('custom');
                 } else {
@@ -246,14 +246,15 @@ export default function AdminSettings({ onLogout, section = 'system' }: AdminSet
                   setHoldMinutes(Number(val));
                 }
               }}
-              className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] text-neutral-800 text-xs cursor-pointer font-bold"
-            >
-              <option value="15">15 {t('admin.settings.minutes', { minutes: '' }).trim()}</option>
-              <option value="30">30 {t('admin.settings.minutes', { minutes: '' }).trim()}</option>
-              <option value="60">60 {t('admin.settings.minutes', { minutes: '' }).trim()} (1h)</option>
-              <option value="120">120 {t('admin.settings.minutes', { minutes: '' }).trim()} (2h)</option>
-              <option value="custom">{t('admin.settings.customOption')}</option>
-            </select>
+              error={Boolean(validationError)}
+              options={[
+                { value: '15', label: `15 ${t('admin.settings.minutes', { minutes: '' }).trim()}` },
+                { value: '30', label: `30 ${t('admin.settings.minutes', { minutes: '' }).trim()}` },
+                { value: '60', label: `60 ${t('admin.settings.minutes', { minutes: '' }).trim()} (1h)` },
+                { value: '120', label: `120 ${t('admin.settings.minutes', { minutes: '' }).trim()} (2h)` },
+                { value: 'custom', label: t('admin.settings.customOption') },
+              ]}
+            />
 
             {/* Custom Input UI */}
             {holdTimeMode === 'custom' && (

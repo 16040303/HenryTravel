@@ -143,9 +143,9 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-4 overflow-hidden px-4 py-4 mx-auto md:px-8 lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
+    <div className="flex h-full min-h-0 w-full max-w-[1280px] flex-col gap-4 overflow-hidden px-4 pb-4 pt-0 mx-auto md:px-8 lg:flex-row lg:gap-6 lg:py-5 animate-fadeIn">
       {/* Mobile admin header */}
-      <div className="z-40 -mx-4 -mt-4 flex shrink-0 items-center justify-between border-b border-neutral-100 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-8 md:px-8 lg:hidden">
+      <div className="sticky top-0 z-[60] -mx-4 flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl md:-mx-8 md:px-8 lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen(true)}
@@ -170,7 +170,7 @@ export default function AdminLayout({
       </div>
 
       {/* Mobile off-canvas menu */}
-      <div className={`fixed inset-0 z-50 lg:hidden ${isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div className={`fixed inset-0 z-[80] lg:hidden ${isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <button
           type="button"
           className={`absolute inset-0 bg-neutral-950/45 backdrop-blur-[2px] transition-opacity ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}

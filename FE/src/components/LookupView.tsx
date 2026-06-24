@@ -8,6 +8,7 @@ import { usePublicSettingsQuery } from '../hooks/queries';
 import { useLookupBookingMutation, useSubmitFeedbackMutation } from '../hooks/mutations';
 import { LookupSkeleton } from './common/Skeleton';
 import EmptyState from './common/EmptyState';
+import CustomSelect from './common/CustomSelect';
 
 export default function LookupView() {
   const { showToast } = useToast();
@@ -256,17 +257,17 @@ export default function LookupView() {
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-bold text-neutral-500 uppercase">{t('look.feedbackRating')}</span>
-                          <select
-                            value={rating}
-                            onChange={(e) => setRating(Number(e.target.value))}
-                            className="bg-[#fcf9f8] border border-neutral-200 px-3 py-2 text-xs font-semibold rounded-lg outline-none cursor-pointer"
-                          >
-                            <option value="5">{t('look.rating5')}</option>
-                            <option value="4">{t('look.rating4')}</option>
-                            <option value="3">{t('look.rating3')}</option>
-                            <option value="2">{t('look.rating2')}</option>
-                            <option value="1">{t('look.rating1')}</option>
-                          </select>
+                          <CustomSelect
+                            value={String(rating)}
+                            onChange={(value) => setRating(Number(value))}
+                            options={[
+                              { value: '5', label: t('look.rating5') },
+                              { value: '4', label: t('look.rating4') },
+                              { value: '3', label: t('look.rating3') },
+                              { value: '2', label: t('look.rating2') },
+                              { value: '1', label: t('look.rating1') },
+                            ]}
+                          />
                         </div>
                       </div>
 

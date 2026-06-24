@@ -6,6 +6,7 @@ import { SiKakaotalk, SiNaver, SiWechat, SiZalo } from 'react-icons/si';
 import { getZaloLink, ZALO_PHONE_FALLBACK } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePublicSettingsQuery } from '../hooks/queries';
+import { useToast } from './Toast';
 
 interface NavbarProps {
   currentView?: 'home' | 'listings' | 'detail' | 'lookup' | 'admin';
@@ -15,6 +16,7 @@ interface NavbarProps {
 
 export default function Navbar({ currentView, onNavigate, selectedVillaIdForDetail }: NavbarProps) {
   const { language, setLanguage, t } = useLanguage();
+  const { showToast } = useToast();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileCategory, setMobileCategory] = useState<'villa' | 'hotel_resort' | null>(null);
@@ -150,7 +152,10 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
       window.location.href = appUrl;
       return;
     }
-    void navigator.clipboard?.writeText(id).catch(() => undefined);
+
+    void navigator.clipboard?.writeText(id)
+      .then(() => showToast('success', `Đã sao chép ${appName} ID: ${id}`))
+      .catch(() => showToast('warning', `Vui lòng sao chép ${appName} ID thủ công: ${id}`));
   };
 
   const contactLinkClass = "flex items-center justify-between gap-3 rounded-2xl border border-neutral-100 bg-white px-4 py-3 text-left text-xs font-bold text-neutral-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50";
@@ -358,23 +363,28 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
       {showContactModal && (
         <div className="fixed inset-0 z-[1000] flex min-h-screen w-full items-center justify-center overflow-y-auto bg-neutral-950/55 px-4 py-4 backdrop-blur-sm" onClick={() => setShowContactModal(false)}>
           <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-neutral-50 shadow-2xl shadow-neutral-950/30" onClick={(e) => e.stopPropagation()}>
-            <div className="relative shrink-0 bg-gradient-to-br from-[#0071c2] via-[#005899] to-[#fe6a34] px-5 py-5 text-white">
+            <div className="relative shrink-0 overflow-hidden border-b border-[#0d4d72] bg-[#08324a] px-5 py-5 text-white">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#0b75ad]/45 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 left-8 h-32 w-32 rounded-full bg-[#fe6a34]/20 blur-3xl" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/15" />
               <button
                 type="button"
                 onClick={() => setShowContactModal(false)}
-                className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25 cursor-pointer"
+                className="absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white shadow-md backdrop-blur transition active:scale-95 hover:bg-white/25 cursor-pointer"
                 aria-label={t('contact.close')}
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/75">HenryTravel</p>
-              <h2 className="mt-1 text-2xl font-black">{t('contact.title')}</h2>
-              <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-white/85">
-                {t('contact.desc')}
-              </p>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/20">
-                <Clock3 className="h-4 w-4 text-[#ffd7c5]" />
-                <span>{t('footer.workingHours')} · {t('contact.timezone')}</span>
+              <div className="relative">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#8ed4ff]">HenryTravel</p>
+                <h2 className="mt-1 text-2xl font-black text-white">{t('contact.title')}</h2>
+                <p className="mt-2 max-w-sm text-xs font-semibold leading-relaxed text-white/82">
+                  {t('contact.desc')}
+                </p>
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-xs font-black text-[#07507a] shadow-lg shadow-black/10">
+                  <Clock3 className="h-4 w-4 text-[#0071c2]" />
+                  <span>{t('footer.workingHours')} · {t('contact.timezone')}</span>
+                </div>
               </div>
             </div>
 

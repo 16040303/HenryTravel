@@ -11,6 +11,7 @@ import EmptyState from './common/EmptyState';
 import GuestCategoryPicker from './common/GuestCategoryPicker';
 import AmenitiesModal from './common/AmenitiesModal';
 import { getLocalDateString } from '../lib/date';
+import CustomSelect from './common/CustomSelect';
 
 const AMENITY_ICON_COMPONENTS = {
   Waves,
@@ -391,16 +392,14 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             <form onSubmit={handleApplyEditSearch} className="flex flex-col gap-4 text-xs font-semibold">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('list.locationLabel')}</span>
-                <select 
+                <CustomSelect
                   value={editLocation}
-                  onChange={(e) => setEditLocation(e.target.value)}
-                  className="bg-neutral-50 border p-2.5 rounded-lg text-sm font-semibold outline-none focus:border-[#0071c2]"
-                >
-                  <option value="All">{t('loc.all')}</option>
-                  {locationOptions.map(loc => (
-                    <option key={loc} value={loc}>{getLocationLabel(loc)}</option>
-                  ))}
-                </select>
+                  onChange={setEditLocation}
+                  options={[
+                    { value: 'All', label: t('loc.all') },
+                    ...locationOptions.map((loc) => ({ value: loc, label: getLocationLabel(loc) }))
+                  ]}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
