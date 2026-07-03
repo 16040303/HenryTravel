@@ -51,7 +51,8 @@ interface DetailViewProps {
 
 export default function DetailView({ villaId, onBack, onNavigateToLookup, onBookingSuccessNotify, initialSearchParams }: DetailViewProps) {
   const { t, language } = useLanguage();
-  const formatPriceRange = (price: number, priceMax?: number | null) => {
+  const formatPriceRange = (price: number, priceMax?: number | null, priceType?: 'fixed' | 'contact') => {
+    if (priceType === 'contact' || price <= 0) return t('public.priceContact');
     const min = `${price.toLocaleString('vi-VN')} VND`;
     const max = priceMax && priceMax > price ? ` - ${priceMax.toLocaleString('vi-VN')} VND` : '';
     return `${t('public.priceFrom')} ${min}${max} ${t('public.pricePerNight')}`;
@@ -539,7 +540,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
   };
 
   return (
-    <div className="bg-[#fcf9f8] min-h-screen pb-20">
+    <div className="bg-[#fcf9f8] min-h-screen-safe pb-safe">
 
       {/* Breadcrumbs and navigation controls */}
       <div className="bg-white border-b border-neutral-100 py-3.5 px-4">
@@ -671,16 +672,20 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.capacity')}</span>
                 <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.guestsCount || 8} {t('detail.guestUnit')}</span>
               </div>
-              <div className="flex flex-col items-center border-r border-[#fcf9f8] sm:border-neutral-100 last:border-0 py-1">
-                <Clock className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bedrooms')}</span>
-                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bedroomsCount || 4} {t('detail.bedroomUnit')}</span>
-              </div>
-              <div className="flex flex-col items-center border-r border-neutral-100 last:border-0 py-1">
-                <Compass className="w-5 h-5 text-[#0071c2] mb-1.5" />
-                <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bathrooms')}</span>
-                <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bathroomsCount || 4} {t('detail.bathroomUnit')}</span>
-              </div>
+              {villa.bedroomsCount != null && (
+                <div className="flex flex-col items-center border-r border-[#fcf9f8] sm:border-neutral-100 last:border-0 py-1">
+                  <Clock className="w-5 h-5 text-[#0071c2] mb-1.5" />
+                  <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bedrooms')}</span>
+                  <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bedroomsCount} {t('detail.bedroomUnit')}</span>
+                </div>
+              )}
+              {villa.bathroomsCount != null && (
+                <div className="flex flex-col items-center border-r border-neutral-100 last:border-0 py-1">
+                  <Compass className="w-5 h-5 text-[#0071c2] mb-1.5" />
+                  <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.bathrooms')}</span>
+                  <span className="text-sm font-black text-neutral-800 mt-0.5">{villa.bathroomsCount} {t('detail.bathroomUnit')}</span>
+                </div>
+              )}
               <div className="flex flex-col items-center last:border-0 py-1">
                 <CheckCircle2 className="w-5 h-5 text-[#0071c2] mb-1.5" />
                 <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.status')}</span>
@@ -900,7 +905,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
               <div>
                 <span className="text-[10px] uppercase font-bold text-neutral-400">{t('detail.pricePerNight')}</span>
                 <div className="mt-0.5 text-2xl font-black text-[#fe6a34] font-display leading-tight">
-                  {formatPriceRange(villa.price, villa.priceMax)}
+                  {formatPriceRange(villa.price, villa.priceMax, villa.priceType)}
                 </div>
                 <p className="mt-2 text-[11px] font-semibold leading-5 text-neutral-500">
                   {t('public.priceEstimateNote')}
@@ -1011,20 +1016,30 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 </div>
 
                 {/* Live Checkout summary details */}
-                <div className="bg-neutral-50 border border-neutral-100 p-3 rounded-xl flex flex-col gap-2 mt-2">
-                  <div className="flex justify-between text-xs text-neutral-500 font-semibold">
-                    <span>{t('detail.nightsCalc', { price: `${villa.price.toLocaleString('vi-VN')} VND`, nights: daysCount })}</span>
-                    <span>{(daysCount * villa.price).toLocaleString('vi-VN')} VND</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-neutral-500 font-semibold border-b border-neutral-100 pb-2">
-                    <span>{t('booking.taxFee')}</span>
-                  </div>
-                  <div className="flex justify-between text-xs items-center">
-                    <span className="font-extrabold text-[#005899]">{t('booking.totalPayment')}</span>
-                    <span className="text-[#fe6a34] font-black text-lg">
-                      {totalCost.toLocaleString('vi-VN')} VND
-                    </span>
-                  </div>
+                <div className="space-y-3 text-sm text-neutral-600">
+                  {villa.priceType === 'contact' || villa.price <= 0 ? (
+                    <div className="flex justify-between">
+                      <span>{t('booking.totalPayment')}</span>
+                      <span className="font-black text-[#fe6a34]">{t('public.priceContact')}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span>{t('detail.nightsCalc', { price: `${villa.price.toLocaleString('vi-VN')} VND`, nights: daysCount })}</span>
+                        <span>{(daysCount * villa.price).toLocaleString('vi-VN')} VND</span>
+                      </div>
+                      <div className="flex justify-between text-neutral-400 text-xs">
+                        <span>{t('booking.taxFee')}</span>
+                        <span>0 VND</span>
+                      </div>
+                      <div className="pt-3 border-t border-neutral-100 flex justify-between items-center font-black text-lg text-neutral-800">
+                        <span>{t('booking.totalPayment')}</span>
+                        <span className="text-[#fe6a34]">
+                          {totalCost.toLocaleString('vi-VN')} VND
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Urgency tag ticker (Screen 3 Spec) */}
@@ -1057,7 +1072,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
       {showBookingModal && bookingResult && (
         <div ref={bookingModalOverlayRef} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
           <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
-            <div ref={bookingModalPanelRef} className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto overscroll-contain shadow-2xl animate-scaleIn border border-neutral-100">
+            <div ref={bookingModalPanelRef} className="bg-white rounded-3xl max-w-lg w-full max-h-modal-safe overflow-y-auto overscroll-contain shadow-2xl animate-scaleIn border border-neutral-100">
 
             {/* Header Success Accent */}
             <div className={`${isBookingCancelled ? 'bg-rose-700' : isBookingConfirmed || isBookingCompleted ? 'bg-emerald-700' : 'bg-[#003b66]'} text-white p-6 text-center flex flex-col items-center`}>
@@ -1124,7 +1139,7 @@ export default function DetailView({ villaId, onBack, onNavigateToLookup, onBook
                 </div>
                 <div className="flex justify-between">
                   <span>{t('booking.totalPayment')}:</span>
-                  <span className="text-[#fe6a34] font-black">{totalCost.toLocaleString('vi-VN')} VND</span>
+                  <span className="text-[#fe6a34] font-black">{villa.priceType === 'contact' || villa.price <= 0 ? t('public.priceContact') : `${totalCost.toLocaleString('vi-VN')} VND`}</span>
                 </div>
               </div>
 

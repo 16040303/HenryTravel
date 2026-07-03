@@ -6,7 +6,7 @@ import { parseFacilities, parsePositiveInt } from '../utils/validators';
 
 const router = Router();
 const accommodationTypes: AccommodationType[] = ['villa', 'hotel_resort'];
-type PublicLang = 'vi' | 'en' | 'ko';
+type PublicLang = 'vi' | 'en' | 'ko' | 'zh';
 
 type VillaContentFields = {
   name: string;
@@ -16,10 +16,11 @@ type VillaContentFields = {
   description?: string | null;
   descriptionEn?: string | null;
   descriptionKo?: string | null;
+  descriptionZh?: string | null;
 };
 
 function getLang(value: unknown): PublicLang {
-  return value === 'en' || value === 'ko' ? value : 'vi';
+  return value === 'en' || value === 'ko' || value === 'zh' ? value : 'vi';
 }
 
 function resolveVillaContent<T extends VillaContentFields>(villa: T, lang: PublicLang) {
@@ -33,6 +34,11 @@ function resolveVillaContent<T extends VillaContentFields>(villa: T, lang: Publi
     resolved.name = villa.nameEn?.trim() || villa.name;
     resolved.location = villa.locationEn?.trim() || villa.location;
     resolved.description = villa.descriptionKo?.trim() || villa.descriptionEn?.trim() || villa.description;
+  }
+  if (lang === 'zh') {
+    resolved.name = villa.nameEn?.trim() || villa.name;
+    resolved.location = villa.locationEn?.trim() || villa.location;
+    resolved.description = villa.descriptionZh?.trim() || villa.descriptionEn?.trim() || villa.description;
   }
   return resolved;
 }

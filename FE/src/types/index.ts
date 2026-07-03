@@ -27,11 +27,13 @@ export interface Villa {
   reviewsCount: number;
   price: number;
   priceMax?: number | null;
+  priceType?: 'fixed' | 'contact';
   type: AccommodationTypeLabel;
   facilities: string[];
   description: string;
   descriptionEn?: string | null;
   descriptionKo?: string | null;
+  descriptionZh?: string | null;
   isActive?: boolean;
   avgRating?: number;
   feedbackCount?: number;
@@ -39,8 +41,8 @@ export interface Villa {
 
 export interface VillaDetail extends Villa {
   guestsCount: number;
-  bedroomsCount: number;
-  bathroomsCount: number;
+  bedroomsCount?: number | null;
+  bathroomsCount?: number | null;
   address: string;
   mapUrl?: string;
   policies: {
@@ -208,6 +210,7 @@ export interface AdminVillaResponse {
     description?: string | null;
     descriptionEn?: string | null;
     descriptionKo?: string | null;
+  descriptionZh?: string | null;
     status?: string;
     price: string | number;
     priceMax?: string | number | null;
@@ -215,6 +218,8 @@ export interface AdminVillaResponse {
     facilities?: string[] | null;
     mediaCover?: VillaMedia | null;
     maxGuests: number;
+    bedroomsCount?: number | null;
+    bathroomsCount?: number | null;
     avgRating?: number;
     bookingCount?: number;
     feedbackCount?: number;
@@ -294,11 +299,14 @@ export interface AdminVillaMutationPayload {
   description?: string;
   descriptionEn?: string | null;
   descriptionKo?: string | null;
+  descriptionZh?: string | null;
   price?: number;
   priceMax?: number | null;
   priceType?: 'fixed' | 'contact';
   status?: 'available' | 'maintenance' | 'hidden';
   maxGuests?: number;
+  bedroomsCount?: number | null;
+  bathroomsCount?: number | null;
   facilities?: string[];
   depositRequired?: boolean;
   depositAmount?: number | null;

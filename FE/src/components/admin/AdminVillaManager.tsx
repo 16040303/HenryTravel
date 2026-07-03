@@ -69,10 +69,11 @@ export default function AdminVillaManager({
   const [villaLocationEn, setVillaLocationEn] = useState('');
   const [villaDescriptionEn, setVillaDescriptionEn] = useState('');
   const [villaDescriptionKo, setVillaDescriptionKo] = useState('');
+  const [villaDescriptionZh, setVillaDescriptionZh] = useState('');
   const [villaAddress, setVillaAddress] = useState('');
   const [villaGuests, setVillaGuests] = useState(8);
-  const [villaBedrooms, setVillaBedrooms] = useState(4);
-  const [villaBathrooms, setVillaBathrooms] = useState(4);
+  const [villaBedrooms, setVillaBedrooms] = useState<number | ''>('');
+  const [villaBathrooms, setVillaBathrooms] = useState<number | ''>('');
   const [villaFacilities, setVillaFacilities] = useState<string[]>(['wifi', 'kitchen']);
   const [villaStatus, setVillaStatus] = useState<'Available' | 'Hết phòng' | 'Sắp có' | 'Maintenance'>('Available');
   const [villaIsActive, setVillaIsActive] = useState(true);
@@ -120,7 +121,7 @@ export default function AdminVillaManager({
     setEditingVilla(v);
     setVillaName(v.name);
     setVillaLocation(v.location);
-    setVillaPrice(v.price);
+    setVillaPrice(v.priceType === 'contact' || v.price <= 0 ? '' : v.price);
     setVillaPriceMax(v.priceMax ?? '');
     setVillaType(v.type);
     setVillaDescription(v.description);
@@ -128,10 +129,11 @@ export default function AdminVillaManager({
     setVillaLocationEn(v.locationEn || '');
     setVillaDescriptionEn(v.descriptionEn || '');
     setVillaDescriptionKo(v.descriptionKo || '');
+    setVillaDescriptionZh(v.descriptionZh || '');
     setVillaAddress(v.address);
     setVillaGuests(v.guestsCount);
-    setVillaBedrooms(v.bedroomsCount);
-    setVillaBathrooms(v.bathroomsCount);
+    setVillaBedrooms(v.bedroomsCount ?? '');
+    setVillaBathrooms(v.bathroomsCount ?? '');
     setVillaFacilities(normalizeAmenityKeys(v.facilities));
     setVillaStatus(v.status);
     setVillaIsActive(v.isActive !== false);
@@ -150,10 +152,11 @@ export default function AdminVillaManager({
     setVillaLocationEn('');
     setVillaDescriptionEn('');
     setVillaDescriptionKo('');
+    setVillaDescriptionZh('');
     setVillaAddress('');
     setVillaGuests(8);
-    setVillaBedrooms(4);
-    setVillaBathrooms(4);
+    setVillaBedrooms('');
+    setVillaBathrooms('');
     setVillaFacilities(['wifi_high_speed', 'kitchen']);
     setAmenitySearchQuery('');
     setVillaStatus('Available');
@@ -179,7 +182,7 @@ export default function AdminVillaManager({
     await onAddVilla({
       name: villaName,
       location: villaLocation,
-      price: Number(villaPrice),
+      price: villaPrice === '' ? 0 : Number(villaPrice),
       priceMax: villaPriceMax === '' ? null : Number(villaPriceMax),
       type: villaType,
       description: villaDescription,
@@ -187,10 +190,11 @@ export default function AdminVillaManager({
       locationEn: villaLocationEn,
       descriptionEn: villaDescriptionEn,
       descriptionKo: villaDescriptionKo,
+      descriptionZh: villaDescriptionZh,
       address: villaAddress,
       guestsCount: villaGuests,
-      bedroomsCount: villaBedrooms,
-      bathroomsCount: villaBathrooms,
+      bedroomsCount: villaBedrooms === '' ? null : villaBedrooms,
+      bathroomsCount: villaBathrooms === '' ? null : villaBathrooms,
       facilities: villaFacilities,
       image: pendingMediaPreview.find((item) => item.isCover)?.thumbnailUrl || pendingMediaPreview[0]?.thumbnailUrl || pendingMediaPreview[0]?.url || '',
       media: pendingMediaPreview,
@@ -215,7 +219,7 @@ export default function AdminVillaManager({
       ...editingVilla,
       name: villaName,
       location: villaLocation,
-      price: Number(villaPrice),
+      price: villaPrice === '' ? 0 : Number(villaPrice),
       priceMax: villaPriceMax === '' ? null : Number(villaPriceMax),
       type: villaType,
       description: villaDescription,
@@ -223,10 +227,11 @@ export default function AdminVillaManager({
       locationEn: villaLocationEn,
       descriptionEn: villaDescriptionEn,
       descriptionKo: villaDescriptionKo,
+      descriptionZh: villaDescriptionZh,
       address: villaAddress,
       guestsCount: villaGuests,
-      bedroomsCount: villaBedrooms,
-      bathroomsCount: villaBathrooms,
+      bedroomsCount: villaBedrooms === '' ? null : villaBedrooms,
+      bathroomsCount: villaBathrooms === '' ? null : villaBathrooms,
       facilities: villaFacilities,
       image: editingVilla.image,
       media: editingVilla.media,
@@ -314,9 +319,9 @@ export default function AdminVillaManager({
     <div className="flex flex-col gap-6 animate-fadeIn">
       {/* Header Controls */}
       <div className="rounded-3xl border border-neutral-100 bg-white p-4 shadow-sm sm:p-5">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,1fr)_auto] xl:items-center">
+        <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(260px,1fr)_auto] 2xl:items-center">
           {/* Search bar */}
-          <div className="relative w-full xl:max-w-sm">
+          <div className="relative w-full 2xl:max-w-sm">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400">
               <Search className="h-4 w-4" />
             </span>
@@ -330,7 +335,7 @@ export default function AdminVillaManager({
           </div>
 
           {/* Filters Group */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[180px_210px_180px_auto] lg:items-center xl:justify-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-[180px_210px_180px_auto] 2xl:items-center 2xl:justify-end">
             {/* Availability Status Filter */}
             <CustomSelect
               value={statusFilter}
@@ -547,8 +552,8 @@ export default function AdminVillaManager({
                 </div>
 
                 <div className="flex items-baseline gap-1 mt-1 font-mono text-sm font-black text-[#fe6a34] border-t border-neutral-50 pt-3">
-                  <span>{v.price.toLocaleString('vi-VN')} VND{v.priceMax && v.priceMax > v.price ? ` - ${v.priceMax.toLocaleString('vi-VN')} VND` : ''}</span>
-                  <span className="text-[10px] text-neutral-400 font-normal"> / {t('admin.villa.night')}</span>
+                  <span>{v.priceType === 'contact' || v.price <= 0 ? t('public.priceContact') : `${v.price.toLocaleString('vi-VN')} VND${v.priceMax && v.priceMax > v.price ? ` - ${v.priceMax.toLocaleString('vi-VN')} VND` : ''}`}</span>
+                  {v.priceType !== 'contact' && v.price > 0 && <span className="text-[10px] text-neutral-400 font-normal"> / {t('admin.villa.night')}</span>}
                 </div>
 
                 {/* Grid details */}
@@ -559,11 +564,11 @@ export default function AdminVillaManager({
                   </div>
                   <div className="flex flex-col border-x border-neutral-200">
                     <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.beds')}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{v.bedroomsCount} {t('admin.villa.roomUnit')}</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{v.bedroomsCount ?? '?'} {v.bedroomsCount != null ? t('admin.villa.roomUnit') : ''}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[8px] uppercase font-bold text-neutral-400">{t('admin.villa.baths')}</span>
-                    <span className="text-neutral-700 font-bold mt-0.5">{v.bathroomsCount} WC</span>
+                    <span className="text-neutral-700 font-bold mt-0.5">{v.bathroomsCount ?? '?'} {v.bathroomsCount != null ? 'WC' : ''}</span>
                   </div>
                 </div>
 
@@ -623,7 +628,7 @@ export default function AdminVillaManager({
       {(showAddModal || showEditModal) && createPortal(
         <div ref={modalOverlayRef} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
           <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
-            <div ref={modalPanelRef} className="relative bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto overscroll-contain max-h-[90vh] shadow-2xl animate-scaleIn border">
+            <div ref={modalPanelRef} className="relative bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 overflow-y-auto overscroll-contain max-h-modal-safe pb-safe-sm shadow-2xl animate-scaleIn border">
             <div className="flex justify-between items-center mb-6 pb-2 border-b border-neutral-100">
               <div>
                 <h3 className="text-lg font-display font-black text-neutral-800">
@@ -714,8 +719,8 @@ export default function AdminVillaManager({
                   <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.priceMin')}</span>
                   <input
                     type="number"
-                    required
                     min={0}
+                    placeholder={t('admin.villa.contactPricePlaceholder')}
                     value={villaPrice}
                     onChange={(e) => setVillaPrice(e.target.value === '' ? '' : Number(e.target.value))}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none focus:border-[#0071c2] focus:bg-white font-mono text-xs text-neutral-800"
@@ -778,7 +783,7 @@ export default function AdminVillaManager({
                     type="number"
                     min={0}
                     value={villaBedrooms}
-                    onChange={(e) => setVillaBedrooms(Number(e.target.value))}
+                    onChange={(e) => setVillaBedrooms(e.target.value === '' ? '' : Number(e.target.value))}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none"
                   />
                 </div>
@@ -788,7 +793,7 @@ export default function AdminVillaManager({
                     type="number"
                     min={0}
                     value={villaBathrooms}
-                    onChange={(e) => setVillaBathrooms(Number(e.target.value))}
+                    onChange={(e) => setVillaBathrooms(e.target.value === '' ? '' : Number(e.target.value))}
                     className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 outline-none"
                   />
                 </div>
@@ -872,6 +877,16 @@ export default function AdminVillaManager({
                     rows={3}
                     value={villaDescriptionKo}
                     onChange={(e) => setVillaDescriptionKo(e.target.value)}
+                    className="bg-white border border-neutral-200 rounded-xl p-3 outline-none resize-none text-xs leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">{t('admin.villa.descriptionZh')}</span>
+                  <textarea
+                    rows={3}
+                    value={villaDescriptionZh}
+                    onChange={(e) => setVillaDescriptionZh(e.target.value)}
                     className="bg-white border border-neutral-200 rounded-xl p-3 outline-none resize-none text-xs leading-relaxed"
                   />
                 </div>

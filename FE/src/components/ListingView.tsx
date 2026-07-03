@@ -41,7 +41,8 @@ interface ListingViewProps {
 
 export default function ListingView({ initialSearchParams, initialFilterParams, onViewDetail, villasTriggerUpdate = 0, onSearchParamsUpdate }: ListingViewProps) {
   const { t, language } = useLanguage();
-  const formatPriceRange = (price: number, priceMax?: number | null) => {
+  const formatPriceRange = (price: number, priceMax?: number | null, priceType?: 'fixed' | 'contact') => {
+    if (priceType === 'contact' || price <= 0) return t('public.priceContact');
     const min = `${price.toLocaleString('vi-VN')} VND`;
     const max = priceMax && priceMax > price ? ` - ${priceMax.toLocaleString('vi-VN')} VND` : '';
     return `${t('public.priceFrom')} ${min}${max}`;
@@ -152,7 +153,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
           ? 'bg-rose-50 text-rose-800 border-rose-200'
           : 'bg-neutral-100 text-neutral-600',
       locationLabel: getLocationLabel(villa.location),
-      priceRange: formatPriceRange(villa.price, villa.priceMax),
+      priceRange: formatPriceRange(villa.price, villa.priceMax, villa.priceType),
       amenities: cardAmenities.items.map(item => ({
         key: item.key,
         label: getAmenityLabel(item, language),
@@ -196,7 +197,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   const handleResetSearch = () => {
     setFilterParams({
       priceMin: 0,
-      priceMax: 10000000,
+      priceMax: 100000000,
       type: 'All',
       facilities: []
     });
@@ -217,7 +218,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
     setEditRooms(resetParams.rooms);
     onSearchParamsUpdate?.(resetParams, {
       priceMin: 0,
-      priceMax: 10000000,
+      priceMax: 100000000,
       type: 'All',
       facilities: []
     });
@@ -352,7 +353,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
   };
 
   return (
-    <div className="bg-[#fcf9f8] min-h-screen text-[#1c1b1b]">
+    <div className="bg-[#fcf9f8] min-h-screen-safe text-[#1c1b1b]">
       
       {/* Visual Header overview block */}
       <section className="bg-[#003580] text-white py-12 px-4 shadow-inner border-b border-blue-900">
@@ -384,7 +385,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
       {showEditSearch && (
         <div className="fixed inset-0 z-[300] overflow-y-auto overscroll-contain bg-neutral-900/60 p-4 backdrop-blur-sm">
           <div className="flex min-h-full items-center justify-center py-4">
-            <div className="max-h-[90vh] w-full max-w-[540px] overflow-y-auto overscroll-contain rounded-2xl border border-neutral-100 bg-white p-5 shadow-2xl animate-scaleIn sm:p-6">
+            <div className="max-h-modal-safe w-full max-w-[540px] overflow-y-auto overscroll-contain rounded-2xl border border-neutral-100 bg-white p-5 shadow-2xl animate-scaleIn sm:p-6">
             <h3 className="font-black font-display text-lg text-neutral-800 mb-4 pb-2 border-b border-neutral-100">
               {t('list.editTitle')}
             </h3>
@@ -493,7 +494,7 @@ export default function ListingView({ initialSearchParams, initialFilterParams, 
             <input 
               type="range"
               min={1000000}
-              max={10000000}
+              max={100000000}
               step={500000}
               value={filterParams.priceMax}
               onChange={(e) => handlePriceMaxSlider(Number(e.target.value))}

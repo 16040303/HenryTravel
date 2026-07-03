@@ -361,8 +361,8 @@ export default function Navbar({ currentView, onNavigate, selectedVillaIdForDeta
         )}
       </div>
       {showContactModal && (
-        <div className="fixed inset-0 z-[1000] flex min-h-screen w-full items-center justify-center overflow-y-auto bg-neutral-950/55 px-4 py-4 backdrop-blur-sm" onClick={() => setShowContactModal(false)}>
-          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-neutral-50 shadow-2xl shadow-neutral-950/30" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[1000] flex min-h-screen-safe w-full items-center justify-center overflow-y-auto bg-neutral-950/55 px-4 py-4 backdrop-blur-sm" onClick={() => setShowContactModal(false)}>
+          <div className="flex max-h-modal-safe w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-neutral-50 shadow-2xl shadow-neutral-950/30" onClick={(e) => e.stopPropagation()}>
             <div className="relative shrink-0 overflow-hidden border-b border-[#0d4d72] bg-[#08324a] px-5 py-5 text-white">
               <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#0b75ad]/45 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-16 left-8 h-32 w-32 rounded-full bg-[#fe6a34]/20 blur-3xl" />

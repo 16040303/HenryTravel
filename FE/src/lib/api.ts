@@ -55,10 +55,13 @@ interface BackendVilla {
   description?: string | null;
   descriptionEn?: string | null;
   descriptionKo?: string | null;
+  descriptionZh?: string | null;
   price?: string | number;
   priceMax?: string | number | null;
   priceType?: string;
   maxGuests?: number;
+  bedroomsCount?: number | null;
+  bathroomsCount?: number | null;
   mediaCover?: VillaMedia | null;
   media?: VillaMedia[];
   facilities?: string[] | null;
@@ -205,18 +208,20 @@ export function mapBackendVillaToFrontendVilla(villa: BackendVilla): VillaDetail
     rating: villa.avgRating || 0,
     reviewsCount: villa.feedbackCount || 0,
     price: Number(villa.price) || 0,
+    priceType: villa.priceType === 'contact' ? 'contact' : 'fixed',
     priceMax: villa.priceMax === null || villa.priceMax === undefined ? null : Number(villa.priceMax) || null,
     type: villa.accommodationType === 'hotel_resort' ? 'Khách sạn - resort' : 'Villa',
     facilities,
     description: villa.description || 'Villa cao cấp đang được cập nhật mô tả chi tiết.',
     descriptionEn: villa.descriptionEn,
     descriptionKo: villa.descriptionKo,
+    descriptionZh: villa.descriptionZh,
     isActive: villa.status !== 'hidden',
     avgRating: villa.avgRating || 0,
     feedbackCount: villa.feedbackCount || 0,
     guestsCount: villa.maxGuests || 1,
-    bedroomsCount: Math.max(1, Math.ceil((villa.maxGuests || 2) / 2)),
-    bathroomsCount: Math.max(1, Math.ceil((villa.maxGuests || 2) / 3)),
+    bedroomsCount: villa.bedroomsCount ?? null,
+    bathroomsCount: villa.bathroomsCount ?? null,
     address: villa.location,
     policies: {
       time: ['Nhận phòng sau 14:00', 'Trả phòng trước 12:00'],

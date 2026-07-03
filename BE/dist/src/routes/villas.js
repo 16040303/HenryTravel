@@ -7,7 +7,7 @@ const validators_1 = require("../utils/validators");
 const router = (0, express_1.Router)();
 const accommodationTypes = ['villa', 'hotel_resort'];
 function getLang(value) {
-    return value === 'en' || value === 'ko' ? value : 'vi';
+    return value === 'en' || value === 'ko' || value === 'zh' ? value : 'vi';
 }
 function resolveVillaContent(villa, lang) {
     const resolved = { ...villa };
@@ -20,6 +20,11 @@ function resolveVillaContent(villa, lang) {
         resolved.name = villa.nameEn?.trim() || villa.name;
         resolved.location = villa.locationEn?.trim() || villa.location;
         resolved.description = villa.descriptionKo?.trim() || villa.descriptionEn?.trim() || villa.description;
+    }
+    if (lang === 'zh') {
+        resolved.name = villa.nameEn?.trim() || villa.name;
+        resolved.location = villa.locationEn?.trim() || villa.location;
+        resolved.description = villa.descriptionZh?.trim() || villa.descriptionEn?.trim() || villa.description;
     }
     return resolved;
 }

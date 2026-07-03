@@ -1,0 +1,2 @@
+ALTER TABLE "villas" ADD COLUMN IF NOT EXISTS "bedrooms_count" INTEGER;
+ALTER TABLE "villas" ADD COLUMN IF NOT EXISTS "bathrooms_count" INTEGER;

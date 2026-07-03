@@ -454,7 +454,7 @@ export default function AdminBookingManager({
       {selectedBooking && createPortal(
         <div ref={bookingModalOverlayRef} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
           <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
-            <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl animate-scaleIn border">
+            <div className="bg-white rounded-3xl max-w-md w-full max-h-modal-safe overflow-hidden shadow-2xl animate-scaleIn border">
             {/* Header banner */}
             <div className="bg-[#003b66] text-white p-6 text-center flex flex-col items-center relative">
               <button

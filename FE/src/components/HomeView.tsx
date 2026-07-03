@@ -32,7 +32,8 @@ interface HomeViewProps {
 
 export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate = 0 }: HomeViewProps) {
   const { t, language } = useLanguage();
-  const formatPriceRange = (price: number, priceMax?: number | null) => {
+  const formatPriceRange = (price: number, priceMax?: number | null, priceType?: 'fixed' | 'contact') => {
+    if (priceType === 'contact' || price <= 0) return t('public.priceContact');
     const min = `${price.toLocaleString('vi-VN')} VND`;
     const max = priceMax && priceMax > price ? ` - ${priceMax.toLocaleString('vi-VN')} VND` : '';
     return `${min}${max}`;
@@ -78,7 +79,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     document.addEventListener('mousedown', closeOnOutsideClick);
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [guestsDropdownOpen, locationDropdownOpen]);
-  const [priceMax, setPriceMax] = useState(10000000);
+  const [priceMax, setPriceMax] = useState(100000000);
   const [propertyType, setPropertyType] = useState<FilterParams['type']>('All');
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [isAmenitiesModalOpen, setIsAmenitiesModalOpen] = useState(false);
@@ -142,7 +143,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
     setChildrenCount(0);
     setInfantCount(0);
     setRooms(1);
-    setPriceMax(10000000);
+    setPriceMax(100000000);
     setPropertyType('All');
     setSelectedFacilities([]);
   };
@@ -165,7 +166,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
   }, [t]);
 
   return (
-    <div className="bg-[#fcf9f8] min-h-screen text-[#1c1b1b]">
+    <div className="bg-[#fcf9f8] min-h-screen-safe text-[#1c1b1b]">
       
       {/* Hero Section */}
       <section className="relative px-4 py-24 md:py-32 flex flex-col justify-center items-center min-h-[640px] bg-neutral-900 border-b border-neutral-100">
@@ -417,7 +418,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                       <input 
                         type="range"
                         min={1000000}
-                        max={10000000}
+                        max={100000000}
                         step={500000}
                         value={priceMax}
                         onChange={(e) => setPriceMax(Number(e.target.value))}
@@ -425,8 +426,8 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                       />
                       <div className="flex justify-between mt-1 text-[10px] text-neutral-400 font-semibold font-mono">
                         <span>1.000.000 VND</span>
-                        <span>5.000.000 VND</span>
-                        <span>10.000.000 VND+</span>
+                        <span>50.000.000 VND</span>
+                        <span>100.000.000 VND+</span>
                       </div>
                     </div>
                   </div>
@@ -643,7 +644,7 @@ export default function HomeView({ onSearch, onViewDetail, villasTriggerUpdate =
                       <div className="flex flex-col">
                         <span className="text-[10px] font-bold text-neutral-400 tracking-wide">{t('home.from')}</span>
                         <span className="text-sm font-black leading-6 tracking-tight text-[#fe6a34] font-display">
-                          {formatPriceRange(villa.price, villa.priceMax)}
+                          {formatPriceRange(villa.price, villa.priceMax, villa.priceType)}
                         </span>
                         <span className="text-[11px] font-bold text-neutral-400">{t('public.pricePerNight')}</span>
                       </div>

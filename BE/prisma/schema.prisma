@@ -115,6 +115,7 @@ model Villa {
   description       String?
   descriptionEn     String?           @map("description_en")
   descriptionKo     String?           @map("description_ko")
+  descriptionZh     String?           @map("description_zh")
   status            VillaStatus       @default(available)
   accommodationType AccommodationType @default(villa) @map("accommodation_type")
   price             Decimal           @default(0)
@@ -125,6 +126,8 @@ model Villa {
   depositRequired   Boolean           @default(false) @map("deposit_required")
   depositAmount     Decimal?          @map("deposit_amount")
   maxGuests         Int               @default(10) @map("max_guests")
+  bedroomsCount     Int?              @map("bedrooms_count")
+  bathroomsCount    Int?              @map("bathrooms_count")
   createdAt         DateTime          @default(now()) @map("created_at")
 
   bookings        Booking[]

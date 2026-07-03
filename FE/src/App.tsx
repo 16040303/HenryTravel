@@ -27,7 +27,7 @@ const AdminConsoleView = lazy(() => import('./components/AdminConsoleView'));
 const PolicyView = lazy(() => import('./components/PolicyView'));
 
 const RouteFallback = () => (
-  <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4">
+  <div className="flex min-h-[calc(100dvh-8rem)] items-center justify-center px-4">
     <div className="rounded-2xl border border-neutral-100 bg-white/90 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#0071c2] shadow-sm">
       Đang tải...
     </div>
@@ -44,7 +44,7 @@ const DEFAULT_SEARCH_PARAMS: SearchParams = {
 
 const DEFAULT_FILTER_PARAMS: FilterParams = {
   priceMin: 0,
-  priceMax: 10000000,
+  priceMax: 100000000,
   type: 'All',
   facilities: [],
 };
@@ -280,7 +280,7 @@ function AppContent() {
   };
 
   return (
-    <div id="app-root" className={`min-h-screen bg-[#fcf9f8] font-sans antialiased selection:bg-[#fe6a34]/20 selection:text-[#fe6a34] flex flex-col no-horizontal-scroll ${isAdminRoute ? 'h-screen overflow-hidden' : ''}`}>
+    <div id="app-root" className={`min-h-screen-safe bg-[#fcf9f8] font-sans antialiased selection:bg-[#fe6a34]/20 selection:text-[#fe6a34] flex flex-col no-horizontal-scroll ${isAdminRoute ? 'h-screen-safe overflow-hidden' : ''}`}>
 
       <div className={isAdminRoute ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'flex flex-1 flex-col'}>
         {/* Persisted Branding Navbar Header */}
@@ -290,7 +290,7 @@ function AppContent() {
           selectedVillaIdForDetail={null}
         />
 
-        <main className={isAdminRoute ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-[calc(100vh-8rem)] flex-1'}>
+        <main className={isAdminRoute ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-[calc(100dvh-8rem)] flex-1'}>
           <Suspense fallback={<RouteFallback />}>
             <AnimatePresence mode="wait">
               <Routes>

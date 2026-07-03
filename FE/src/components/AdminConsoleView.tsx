@@ -267,11 +267,14 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
       description: v.description?.trim() || '',
       descriptionEn: v.descriptionEn?.trim() || null,
       descriptionKo: v.descriptionKo?.trim() || null,
+      descriptionZh: v.descriptionZh?.trim() || null,
       price: Number(v.price) || 0,
       priceMax: v.priceMax === undefined ? null : v.priceMax,
       priceType: Number(v.price) > 0 ? 'fixed' : 'contact',
       status,
       maxGuests: Number(v.guestsCount) || 1,
+      bedroomsCount: v.bedroomsCount ?? null,
+      bathroomsCount: v.bathroomsCount ?? null,
       facilities: Array.isArray(v.facilities) ? v.facilities : [],
       depositRequired: true,
       depositAmount: null,
@@ -282,8 +285,7 @@ export default function AdminConsoleView({ onVillaAddedNotification }: AdminCons
   const validateVillaPayload = (payload: AdminVillaMutationPayload) => {
     if (!payload.name) throw new Error(t('admin.validationVillaName'));
     if (!payload.location) throw new Error(t('admin.validationVillaLocation'));
-    if (!payload.price || payload.price <= 0) throw new Error(t('admin.validationVillaPrice'));
-    if (payload.priceMax !== null && payload.priceMax !== undefined && payload.priceMax < payload.price) throw new Error(t('admin.validationVillaPriceRange'));
+    if (payload.price && payload.price > 0 && payload.priceMax !== null && payload.priceMax !== undefined && payload.priceMax < payload.price) throw new Error(t('admin.validationVillaPriceRange'));
     if (!payload.maxGuests || payload.maxGuests <= 0) throw new Error(t('admin.validationVillaGuests'));
     if (!Array.isArray(payload.facilities)) throw new Error(t('admin.validationFacilitiesArray'));
   };

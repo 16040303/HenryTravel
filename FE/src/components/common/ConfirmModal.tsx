@@ -74,7 +74,7 @@ export default function ConfirmModal({
         <div
           ref={modalRef}
           tabIndex={-1}
-          className="w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn"
+          className="w-full max-w-md max-h-modal-safe overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-2xl border border-neutral-100 p-6 flex flex-col gap-5 outline-none relative animate-scaleIn"
           onClick={(e) => e.stopPropagation()}
         >
         {/* Close Button top-right */}

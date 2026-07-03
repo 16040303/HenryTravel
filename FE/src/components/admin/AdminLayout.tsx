@@ -238,9 +238,9 @@ export default function AdminLayout({
       </div>
 
       {/* Desktop left sidebar */}
-      <aside className="hidden lg:flex lg:w-72 shrink-0 bg-white border border-neutral-100 rounded-3xl p-5 shadow-sm flex-col gap-5 self-stretch max-h-full overflow-hidden">
+      <aside className="hidden lg:flex lg:w-72 shrink-0 bg-white border border-neutral-100 rounded-3xl p-5 shadow-sm flex-col gap-4 self-stretch max-h-full overflow-hidden">
         {/* Admin profile snippet desktop */}
-        <div className="flex items-center gap-3 bg-neutral-50 p-3 rounded-2xl border border-neutral-100">
+        <div className="flex shrink-0 items-center gap-3 bg-neutral-50 p-3 rounded-2xl border border-neutral-100">
           <div className="w-10 h-10 rounded-full bg-[#0071c2]/10 text-[#0071c2] flex items-center justify-center font-bold">
             AD
           </div>
@@ -251,7 +251,7 @@ export default function AdminLayout({
         </div>
 
         {/* Sidebar Nav anchors */}
-        <nav className="flex flex-col overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent gap-1 scrollbar-safe shrink-0 min-h-0 w-full">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent pb-2 pr-1 scrollbar-safe w-full">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
             return (

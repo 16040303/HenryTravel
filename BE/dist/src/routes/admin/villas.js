@@ -31,6 +31,7 @@ function parseVillaData(body, partial = false) {
     const locationEn = typeof body.locationEn === 'string' ? body.locationEn.trim() : undefined;
     const descriptionEn = typeof body.descriptionEn === 'string' ? body.descriptionEn.trim() : undefined;
     const descriptionKo = typeof body.descriptionKo === 'string' ? body.descriptionKo.trim() : undefined;
+    const descriptionZh = typeof body.descriptionZh === 'string' ? body.descriptionZh.trim() : undefined;
     const status = typeof body.status === 'string' ? body.status : undefined;
     const priceTypeRaw = typeof body.priceType === 'string' ? body.priceType : undefined;
     const priceType = priceTypeRaw === 'per_night' ? 'fixed' : priceTypeRaw;
@@ -38,6 +39,8 @@ function parseVillaData(body, partial = false) {
     const price = body.price === undefined ? undefined : Number(body.price);
     const priceMax = body.priceMax === undefined || body.priceMax === null || body.priceMax === '' ? null : Number(body.priceMax);
     const maxGuests = body.maxGuests === undefined ? undefined : Number(body.maxGuests);
+    const bedroomsCount = body.bedroomsCount === undefined || body.bedroomsCount === null || body.bedroomsCount === '' ? null : Number(body.bedroomsCount);
+    const bathroomsCount = body.bathroomsCount === undefined || body.bathroomsCount === null || body.bathroomsCount === '' ? null : Number(body.bathroomsCount);
     const depositAmount = body.depositAmount === undefined ? undefined : Number(body.depositAmount);
     if (body.images !== undefined)
         throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'Không gửi images trong villa payload. Hãy dùng API media.');
@@ -45,8 +48,8 @@ function parseVillaData(body, partial = false) {
         throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'name là bắt buộc.');
     if (!partial && !location)
         throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'location là bắt buộc.');
-    if (!partial && (price === undefined || !Number.isFinite(price) || price <= 0))
-        throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'price phải lớn hơn 0.');
+    if (!partial && (price === undefined || !Number.isFinite(price) || price < 0))
+        throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'price không hợp lệ.');
     if (!partial && (maxGuests === undefined || !Number.isInteger(maxGuests) || maxGuests <= 0))
         throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'maxGuests phải lớn hơn 0.');
     if (name !== undefined)
@@ -63,10 +66,14 @@ function parseVillaData(body, partial = false) {
         data.descriptionEn = descriptionEn || null;
     if (descriptionKo !== undefined)
         data.descriptionKo = descriptionKo || null;
+    if (descriptionZh !== undefined)
+        data.descriptionZh = descriptionZh || null;
     if (price !== undefined) {
-        if (!Number.isFinite(price) || price <= 0)
-            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'price phải lớn hơn 0.');
+        if (!Number.isFinite(price) || price < 0)
+            throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'price không hợp lệ.');
         data.price = price;
+        if (price === 0 && priceType === undefined)
+            data.priceType = 'contact';
     }
     if (body.priceMax !== undefined) {
         if (priceMax === null) {
@@ -100,6 +107,26 @@ function parseVillaData(body, partial = false) {
         if (!Number.isInteger(maxGuests) || maxGuests <= 0)
             throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'maxGuests phải lớn hơn 0.');
         data.maxGuests = maxGuests;
+    }
+    if (body.bedroomsCount !== undefined) {
+        if (bedroomsCount === null) {
+            data.bedroomsCount = null;
+        }
+        else {
+            if (!Number.isInteger(bedroomsCount) || bedroomsCount < 0)
+                throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'bedroomsCount phải là số nguyên không âm.');
+            data.bedroomsCount = bedroomsCount;
+        }
+    }
+    if (body.bathroomsCount !== undefined) {
+        if (bathroomsCount === null) {
+            data.bathroomsCount = null;
+        }
+        else {
+            if (!Number.isInteger(bathroomsCount) || bathroomsCount < 0)
+                throw new errors_1.AppError(400, 'VALIDATION_ERROR', 'bathroomsCount phải là số nguyên không âm.');
+            data.bathroomsCount = bathroomsCount;
+        }
     }
     if (typeof body.depositRequired === 'boolean')
         data.depositRequired = body.depositRequired;

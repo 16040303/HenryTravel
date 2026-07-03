@@ -79,7 +79,7 @@ export default function LookupView() {
   };
 
   return (
-    <div className="bg-[#fcf9f8] min-h-screen py-12 px-4">
+    <div className="bg-[#fcf9f8] min-h-screen-safe py-12 pb-safe px-4">
       <div className="max-w-[720px] mx-auto flex flex-col gap-8">
         
         {/* Lookup Card Visual form */}
