@@ -1,8 +1,24 @@
-export const DEFAULT_LOCATIONS = ['Đà Nẵng', 'Huế', 'Hội An'];
+export const DEFAULT_LOCATIONS = ['Đà Nẵng', 'Huế', 'Hội An'] as const;
+
+export const TRAVEL_DESTINATIONS = [
+  'Đà Nẵng',
+  'Huế',
+  'Hội An',
+  'Nha Trang',
+  'Đà Lạt',
+  'Phú Quốc',
+  'Hạ Long',
+  'Sapa',
+  'Vũng Tàu',
+  'Quy Nhơn',
+  'Mũi Né',
+  'Hà Nội',
+  'TP. Hồ Chí Minh',
+] as const;
 
 export function normalizeLocationCity(location: string): string {
   const value = location.trim();
-  const knownCities = [...DEFAULT_LOCATIONS, 'Đà Lạt', 'Vũng Tàu', 'Phú Quốc', 'Nha Trang', 'TP.HCM'];
+  const knownCities = TRAVEL_DESTINATIONS;
   const matchedCity = knownCities.find(city => value.toLowerCase().includes(city.toLowerCase()));
   return matchedCity || value.split(',').map(part => part.trim()).filter(Boolean).pop() || value;
 }

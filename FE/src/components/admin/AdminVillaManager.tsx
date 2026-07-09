@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { AccommodationTypeLabel, EntityId, VillaDetail, VillaMedia } from '../../types';
 import { AMENITY_CATEGORY_LABELS, AMENITIES, getAmenityDisplay, getAmenityLabel, normalizeAmenityKey, normalizeAmenityKeys } from '../../data/amenities';
-import { VIETNAM_PROVINCES_2025 } from '../../constants/vietnamProvinces';
+import { TRAVEL_DESTINATIONS } from '../../constants';
 import { useLanguage } from '../../contexts/LanguageContext';
 import MediaUploader from './MediaUploader';
 import CustomSelect from '../common/CustomSelect';
@@ -304,9 +304,9 @@ export default function AdminVillaManager({
 
   const locationSuggestions = useMemo(() => {
     const query = villaLocation.trim().toLowerCase();
-    if (!query) return VIETNAM_PROVINCES_2025.slice(0, 8);
-    return VIETNAM_PROVINCES_2025.filter((province) =>
-      province.toLowerCase().includes(query)
+    if (!query) return TRAVEL_DESTINATIONS.slice(0, 8);
+    return TRAVEL_DESTINATIONS.filter((destination) =>
+      destination.toLowerCase().includes(query)
     ).slice(0, 8);
   }, [villaLocation]);
 
@@ -694,18 +694,18 @@ export default function AdminVillaManager({
                     />
                     {showLocationSuggestions && locationSuggestions.length > 0 && (
                       <div className="absolute left-0 right-0 top-full z-[80] mt-1 max-h-56 overflow-y-auto rounded-xl border border-neutral-100 bg-white p-1 shadow-xl shadow-neutral-900/10">
-                        {locationSuggestions.map((province) => (
+                        {locationSuggestions.map((destination) => (
                           <button
-                            key={province}
+                            key={destination}
                             type="button"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
-                              setVillaLocation(province);
+                              setVillaLocation(destination);
                               setShowLocationSuggestions(false);
                             }}
                             className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-neutral-700 hover:bg-[#edf3ff] hover:text-[#005899]"
                           >
-                            {province}
+                            {destination}
                           </button>
                         ))}
                       </div>
