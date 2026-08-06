@@ -8,7 +8,8 @@ import {
   getAdminStats,
   getAdminVillaMedia,
   getAdminVillas,
-  getPublicSettings,
+  fetchPublicSettings,
+  getInitialPublicSettings,
   getVillaAvailability,
   getVillaById,
   getVillaFeedbacks,
@@ -20,7 +21,17 @@ import type { FilterParams, SearchParams } from '../types';
 export function usePublicSettingsQuery() {
   return useQuery({
     queryKey: queryKeys.publicSettings,
-    queryFn: getPublicSettings,
+    queryFn: fetchPublicSettings,
+    initialData: () => getInitialPublicSettings(),
+    initialDataUpdatedAt: 0,
+    staleTime: Infinity,
+    refetchOnMount: (query) => {
+      const hasNotFetched = query.state.dataUpdatedAt === 0 && query.state.errorUpdatedAt === 0;
+      return hasNotFetched ? 'always' : false;
+    },
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
 

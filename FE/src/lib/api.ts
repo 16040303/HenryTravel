@@ -24,6 +24,7 @@ import {
   VillaMedia,
   ZaloLinks,
 } from '../types';
+import { PUBLIC_SETTINGS_FALLBACK } from '../constants';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -171,25 +172,109 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   return data as T;
 }
 
-const PUBLIC_SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
-let publicSettingsCache: { value: PublicSettings; cachedAt: number } | null = null;
+const PUBLIC_SETTINGS_CACHE_KEY = 'henrytravel_public_settings_v1';
+const PUBLIC_SETTINGS_CACHE_VERSION = 1;
+const PUBLIC_SETTINGS_CACHE_TTL_MS = 5 * 24 * 60 * 60 * 1000;
 
-export async function getPublicSettings(): Promise<PublicSettings> {
-  const now = Date.now();
-  if (publicSettingsCache && now - publicSettingsCache.cachedAt < PUBLIC_SETTINGS_CACHE_TTL_MS) {
-    return publicSettingsCache.value;
-  }
+interface PublicSettingsCache {
+  version: typeof PUBLIC_SETTINGS_CACHE_VERSION;
+  value: PublicSettings;
+  cachedAt: number;
+}
 
+function isHttpsUrl(value: string): boolean {
+  if (!value) return true;
   try {
-    const settings = await apiRequest<PublicSettings>('/settings/public');
-    publicSettingsCache = { value: settings, cachedAt: now };
-    return settings;
-  } catch (error) {
-    if (publicSettingsCache) {
-      return publicSettingsCache.value;
-    }
-    throw error;
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
   }
+}
+
+function normalizePublicSettings(value: unknown): PublicSettings | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const stringKeys: Array<keyof PublicSettings> = [
+    'zaloPhone', 'zaloUrl', 'whatsappUrl', 'wechatId', 'kakaoTalkId',
+    'tikTokUrl', 'facebookPersonalUrl', 'facebookFanpageUrl',
+    'naverBlogUrl', 'instagramWorkUrl', 'commonPolicy',
+  ];
+
+  if (stringKeys.some((key) => typeof candidate[key] !== 'string')) return null;
+
+  const normalized = Object.fromEntries(
+    stringKeys.map((key) => [key, (candidate[key] as string).trim()])
+  ) as unknown as PublicSettings;
+  const phone = normalized.zaloPhone.replace(/[^0-9]/g, '');
+  if (normalized.zaloPhone && (phone !== normalized.zaloPhone || phone.length < 8 || phone.length > 15)) return null;
+
+  const urlKeys: Array<keyof PublicSettings> = [
+    'zaloUrl', 'whatsappUrl', 'tikTokUrl', 'facebookPersonalUrl',
+    'facebookFanpageUrl', 'naverBlogUrl', 'instagramWorkUrl',
+  ];
+  if (urlKeys.some((key) => !isHttpsUrl(normalized[key]))) return null;
+
+  return normalized;
+}
+
+function removeInvalidPublicSettingsCache(): void {
+  try {
+    localStorage.removeItem(PUBLIC_SETTINGS_CACHE_KEY);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function readPublicSettingsCache(): PublicSettings | null {
+  try {
+    const raw = localStorage.getItem(PUBLIC_SETTINGS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PublicSettingsCache>;
+    const now = Date.now();
+    const cachedAt = parsed.cachedAt;
+    const isValidCachedAt = typeof cachedAt === 'number'
+      && Number.isFinite(cachedAt)
+      && cachedAt > 0
+      && cachedAt <= now
+      && now - cachedAt <= PUBLIC_SETTINGS_CACHE_TTL_MS;
+    const value = normalizePublicSettings(parsed.value);
+
+    if (parsed.version !== PUBLIC_SETTINGS_CACHE_VERSION || !isValidCachedAt || !value) {
+      removeInvalidPublicSettingsCache();
+      return null;
+    }
+    return value;
+  } catch {
+    removeInvalidPublicSettingsCache();
+    return null;
+  }
+}
+
+function writePublicSettingsCache(value: PublicSettings): void {
+  const cache: PublicSettingsCache = {
+    version: PUBLIC_SETTINGS_CACHE_VERSION,
+    value,
+    cachedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(PUBLIC_SETTINGS_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // A valid API response remains usable even when persistence is unavailable.
+  }
+}
+
+export function getInitialPublicSettings(): PublicSettings {
+  return readPublicSettingsCache() || { ...PUBLIC_SETTINGS_FALLBACK };
+}
+
+export async function fetchPublicSettings(): Promise<PublicSettings> {
+  const response = await apiRequest<unknown>('/settings/public');
+  const settings = normalizePublicSettings(response);
+  if (!settings) {
+    throw new Error('Dữ liệu liên hệ từ máy chủ không hợp lệ.');
+  }
+  writePublicSettingsCache(settings);
+  return settings;
 }
 
 export function mapBackendVillaToFrontendVilla(villa: BackendVilla): VillaDetail {

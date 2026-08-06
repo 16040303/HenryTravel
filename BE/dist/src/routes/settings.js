@@ -11,6 +11,7 @@ const router = (0, express_1.Router)();
 router.get('/public', async (_req, res, next) => {
     try {
         const settings = await (0, settings_1.getPublicSettings)();
+        res.set('Cache-Control', 'no-cache');
         res.json(settings);
     }
     catch (error) {
